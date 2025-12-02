@@ -1,0 +1,18 @@
+# Restate Server Configuration
+# For workflows that may take up to 6 hours
+
+[worker]
+# Maximum time to wait for a handler to complete (in seconds)
+# Set to 7 hours to allow 6 hour procedure + 1 hour buffer
+invoker.abort-timeout = "7h"
+
+[admin]
+# Admin API bind address
+bind-address = "0.0.0.0:9070"
+
+[ingress]
+# Ingress HTTP bind address  
+bind-address = "0.0.0.0:8080"
+
+# Concurrency settings
+concurrent-api-requests-limit = 1000000

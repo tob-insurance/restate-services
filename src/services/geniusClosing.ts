@@ -19,6 +19,27 @@ export interface GeniusClosingJobSubmit {
 }
 
 /**
+ * Helper to manage Oracle connection lifecycle
+ */
+async function withOracleConnection<T>(
+  operation: (connection: oracledb.Connection) => Promise<T>
+): Promise<T> {
+  let connection: oracledb.Connection | null = null;
+  try {
+    connection = await getOracleConnection();
+    return await operation(connection);
+  } finally {
+    if (connection) {
+      try {
+        await connection.close();
+      } catch (err) {
+        console.error('Error closing Oracle connection:', err);
+      }
+    }
+  }
+}
+
+/**
  * Submit Genius closing job ke Oracle DBMS_SCHEDULER (fire-and-forget)
  * Job akan berjalan di background tanpa blocking workflow
  * 
@@ -31,39 +52,38 @@ export async function submitGeniusClosingJob(
   userId: string = 'ASK'
 ): Promise<GeniusClosingJobSubmit> {
   const startTime = new Date();
-  let connection: oracledb.Connection | null = null;
 
   try {
     const [year, month] = closingDate.split('-');
     const jobName = `GENIUS_CLOSING_${year}_${month}_${Date.now()}`;
-    
+
     console.log(`🚀 Submitting Genius closing job: ${jobName}`);
     console.log(`   Year: ${year}, Month: ${month}, UserId: ${userId}`);
-    
-    connection = await getOracleConnection();
 
-    await connection.execute(
-      `BEGIN
-         DBMS_SCHEDULER.CREATE_JOB (
-           job_name   => '${jobName}',
-           job_type   => 'PLSQL_BLOCK',
-           job_action => 'BEGIN Package_Rpt_Ac_Fi806.get_master_data(:1, :2, :3, :4, :5, :6); END;',
-           number_of_arguments => 6,
-           enabled    => FALSE
-         );
-         
-         DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 1, '${year}');
-         DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 2, '${month}');
-         DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 3, '${month}');
-         DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 4, '${userId}');
-         DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 5, NULL);
-         DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 6, NULL);
-         
-         DBMS_SCHEDULER.ENABLE('${jobName}');
-       END;`,
-      {},
-      { autoCommit: true }
-    );
+    await withOracleConnection(async (connection) => {
+      await connection.execute(
+        `BEGIN
+           DBMS_SCHEDULER.CREATE_JOB (
+             job_name   => '${jobName}',
+             job_type   => 'PLSQL_BLOCK',
+             job_action => 'BEGIN Package_Rpt_Ac_Fi806.get_master_data(:1, :2, :3, :4, :5, :6); END;',
+             number_of_arguments => 6,
+             enabled    => FALSE
+           );
+           
+           DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 1, '${year}');
+           DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 2, '${month}');
+           DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 3, '${month}');
+           DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 4, '${userId}');
+           DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 5, NULL);
+           DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 6, NULL);
+           
+           DBMS_SCHEDULER.ENABLE('${jobName}');
+         END;`,
+        {},
+        { autoCommit: true }
+      );
+    });
 
     console.log(`✅ Job ${jobName} submitted successfully (running in background)`);
     console.log(`   Use checkGeniusClosingJobStatus('${jobName}') to check progress`);
@@ -77,14 +97,6 @@ export async function submitGeniusClosingJob(
   } catch (error) {
     console.error('❌ Failed to submit Genius closing job:', error);
     throw error;
-  } finally {
-    if (connection) {
-      try {
-        await connection.close();
-      } catch (err) {
-        console.error('Error closing Oracle connection:', err);
-      }
-    }
   }
 }
 
@@ -103,64 +115,54 @@ export async function checkGeniusClosingJobStatus(
   failed: boolean;
   message: string;
 }> {
-  let connection: oracledb.Connection | null = null;
-
   try {
-    connection = await getOracleConnection();
+    return await withOracleConnection(async (connection) => {
+      const result = await connection.execute(
+        `SELECT state, error#, 
+                TO_CHAR(last_start_date, 'YYYY-MM-DD HH24:MI:SS') as last_start,
+                TO_CHAR(last_run_duration, 'HH24:MI:SS') as duration
+         FROM user_scheduler_jobs 
+         WHERE job_name = :jobName`,
+        { jobName },
+        { outFormat: oracledb.OUT_FORMAT_OBJECT }
+      );
 
-    const result = await connection.execute(
-      `SELECT state, error#, 
-              TO_CHAR(last_start_date, 'YYYY-MM-DD HH24:MI:SS') as last_start,
-              TO_CHAR(last_run_duration, 'HH24:MI:SS') as duration
-       FROM user_scheduler_jobs 
-       WHERE job_name = :jobName`,
-      { jobName },
-      { outFormat: oracledb.OUT_FORMAT_OBJECT }
-    );
+      if (!result.rows || result.rows.length === 0) {
+        return {
+          status: 'NOT_FOUND',
+          running: false,
+          completed: false,
+          failed: false,
+          message: `Job ${jobName} not found. It may have been completed and cleaned up.`,
+        };
+      }
 
-    if (!result.rows || result.rows.length === 0) {
+      const row = result.rows[0] as any;
+      const state = row.STATE;
+      const error = row.ERROR;
+      const lastStart = row.LAST_START;
+      const duration = row.DURATION;
+
+      const running = state === 'RUNNING';
+      const completed = state === 'SUCCEEDED' || state === 'COMPLETED';
+      const failed = state === 'FAILED' || error > 0;
+
+      let message = `Job ${jobName}: ${state}`;
+      if (lastStart) message += ` (started: ${lastStart})`;
+      if (duration) message += ` (duration: ${duration})`;
+      if (error) message += ` [Error: ${error}]`;
+
       return {
-        status: 'NOT_FOUND',
-        running: false,
-        completed: false,
-        failed: false,
-        message: `Job ${jobName} not found. It may have been completed and cleaned up.`,
+        status: state,
+        running,
+        completed,
+        failed,
+        message,
       };
-    }
-
-    const row = result.rows[0] as any;
-    const state = row.STATE;
-    const error = row.ERROR;
-    const lastStart = row.LAST_START;
-    const duration = row.DURATION;
-
-    const running = state === 'RUNNING';
-    const completed = state === 'SUCCEEDED' || state === 'COMPLETED';
-    const failed = state === 'FAILED' || error > 0;
-
-    let message = `Job ${jobName}: ${state}`;
-    if (lastStart) message += ` (started: ${lastStart})`;
-    if (duration) message += ` (duration: ${duration})`;
-    if (error) message += ` [Error: ${error}]`;
-
-    return {
-      status: state,
-      running,
-      completed,
-      failed,
-      message,
-    };
+    });
   } catch (error) {
     console.error('❌ Failed to check job status:', error);
     throw error;
-  } finally {
-    if (connection) {
-      try {
-        await connection.close();
-      } catch (err) {
-        console.error('Error closing connection:', err);
-      }
-    }
   }
 }
 
@@ -180,51 +182,46 @@ export async function executeGeniusClosing(
   userId: string = 'ASK'
 ): Promise<GeniusClosingResult> {
   const startTime = new Date();
-  let connection: oracledb.Connection | null = null;
 
   try {
-    // Parse date: "2025-11-24" -> year="2025", month="11"
     const [year, month] = closingDate.split('-');
-    
+
     console.log(`🔄 Starting Genius closing procedure (Package_Rpt_Ac_Fi806.get_master_data)`);
     console.log(`   Year: ${year}, Month: ${month}, UserId: ${userId}`);
-    
-    connection = await getOracleConnection();
 
-    // Execute Oracle stored procedure: Package_Rpt_Ac_Fi806.get_master_data
-    // This matches the C# implementation in reference1.cs
-    // Note: This procedure can take up to 6 hours (21600 seconds)
-    const result = await connection.execute(
-      `BEGIN 
-         Package_Rpt_Ac_Fi806.get_master_data(
-           :p_year,
-           :p_from_month,
-           :p_to_month,
-           :p_userid,
-           :p_status,
-           :p_error_message
-         ); 
-       END;`,
-      {
-        p_year: { val: year, type: oracledb.STRING, dir: oracledb.BIND_IN },
-        p_from_month: { val: month, type: oracledb.STRING, dir: oracledb.BIND_IN },
-        p_to_month: { val: month, type: oracledb.STRING, dir: oracledb.BIND_IN },
-        p_userid: { val: userId, type: oracledb.STRING, dir: oracledb.BIND_IN },
-        p_status: { type: oracledb.STRING, dir: oracledb.BIND_OUT, maxSize: 1 },
-        p_error_message: { type: oracledb.STRING, dir: oracledb.BIND_OUT, maxSize: 100 },
-      },
-      {
-        autoCommit: true,
-      }
-    );
+    const result = await withOracleConnection(async (connection) => {
+      return await connection.execute(
+        `BEGIN 
+           Package_Rpt_Ac_Fi806.get_master_data(
+             :p_year,
+             :p_from_month,
+             :p_to_month,
+             :p_userid,
+             :p_status,
+             :p_error_message
+           ); 
+         END;`,
+        {
+          p_year: { val: year, type: oracledb.STRING, dir: oracledb.BIND_IN },
+          p_from_month: { val: month, type: oracledb.STRING, dir: oracledb.BIND_IN },
+          p_to_month: { val: month, type: oracledb.STRING, dir: oracledb.BIND_IN },
+          p_userid: { val: userId, type: oracledb.STRING, dir: oracledb.BIND_IN },
+          p_status: { type: oracledb.STRING, dir: oracledb.BIND_OUT, maxSize: 1 },
+          p_error_message: { type: oracledb.STRING, dir: oracledb.BIND_OUT, maxSize: 100 },
+        },
+        {
+          autoCommit: true,
+        }
+      );
+    });
 
     const endTime = new Date();
-    const duration = (endTime.getTime() - startTime.getTime()) / 1000; // in seconds
+    const duration = (endTime.getTime() - startTime.getTime()) / 1000;
 
     const outBinds = result.outBinds as any;
     const status = outBinds?.p_status || '0';
     const errorMessage = outBinds?.p_error_message || '';
-    
+
     const success = status === '1';
 
     if (success) {
@@ -239,8 +236,8 @@ export async function executeGeniusClosing(
       startTime,
       endTime,
       duration,
-      message: success 
-        ? `Closing completed successfully for ${year}-${month}` 
+      message: success
+        ? `Closing completed successfully for ${year}-${month}`
         : `Closing failed: ${errorMessage}`,
       status,
       errorMessage,
@@ -260,14 +257,6 @@ export async function executeGeniusClosing(
       status: '0',
       errorMessage: error instanceof Error ? error.message : 'Unknown error',
     };
-  } finally {
-    if (connection) {
-      try {
-        await connection.close();
-      } catch (err) {
-        console.error('Error closing Oracle connection:', err);
-      }
-    }
   }
 }
 
@@ -278,44 +267,34 @@ export async function checkGeniusReadiness(): Promise<{
   ready: boolean;
   message: string;
 }> {
-  let connection: oracledb.Connection | null = null;
-
   try {
-    connection = await getOracleConnection();
-    
-    // Check if there are any pending transactions or locks
-    const result = await connection.execute(
-      `SELECT COUNT(*) as pending_count 
-       FROM v$transaction`,
-      [],
-      { outFormat: oracledb.OUT_FORMAT_OBJECT }
-    );
+    return await withOracleConnection(async (connection) => {
+      // Check if there are any pending transactions or locks
+      const result = await connection.execute(
+        `SELECT COUNT(*) as pending_count 
+         FROM v$transaction`,
+        [],
+        { outFormat: oracledb.OUT_FORMAT_OBJECT }
+      );
 
-    const pendingCount = (result.rows?.[0] as any)?.PENDING_COUNT || 0;
+      const pendingCount = (result.rows?.[0] as any)?.PENDING_COUNT || 0;
 
-    if (pendingCount > 0) {
+      if (pendingCount > 0) {
+        return {
+          ready: false,
+          message: `${pendingCount} pending transactions found. Please complete them before closing.`,
+        };
+      }
+
       return {
-        ready: false,
-        message: `${pendingCount} pending transactions found. Please complete them before closing.`,
+        ready: true,
+        message: 'Genius system is ready for closing',
       };
-    }
-
-    return {
-      ready: true,
-      message: 'Genius system is ready for closing',
-    };
+    });
   } catch (error) {
     return {
       ready: false,
       message: error instanceof Error ? error.message : 'Unknown error checking readiness',
     };
-  } finally {
-    if (connection) {
-      try {
-        await connection.close();
-      } catch (err) {
-        console.error('Error closing connection:', err);
-      }
-    }
   }
 }

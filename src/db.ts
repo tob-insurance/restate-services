@@ -11,10 +11,8 @@ const poolConfig: PoolConfig = {
   user: process.env.PG_USER || 'postgres',
   password: process.env.PG_PASSWORD,
   max: 20,
-  min: 2, // Keep minimum 2 connections alive
+  min: 2,
   idleTimeoutMillis: 30000,
-  // No timeout limits - let queries run as long as needed
-  // Allow graceful handling of connection issues
   allowExitOnIdle: false,
 };
 

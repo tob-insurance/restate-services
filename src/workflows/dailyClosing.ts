@@ -3,12 +3,11 @@ import { z } from "zod";
 import { executeGeniusClosing } from "../services/geniusClosing";
 import { calculateFinancialMetrics } from "../services/financialMetrics";
 
-// Schema for Daily Closing Workflow
 export const DailyClosingInput = z.object({
-  date: z.string(), // Format: YYYY-MM-DD
+  date: z.string(),
   skipOracleClosing: z.boolean().optional().default(false),
   skipFinancialMetrics: z.boolean().optional().default(false),
-  userId: z.string().optional().default('ASK'), // User ID for Oracle closing procedure
+  userId: z.string().optional().default('ASK'),
 });
 
 export const DailyClosingResult = z.object({
@@ -47,15 +46,13 @@ export const dailyClosingWorkflow = restate.workflow({
     },
   },
   handlers: {
-    // Main workflow execution
     run: async (
       ctx: restate.WorkflowContext,
       input?: z.infer<typeof DailyClosingInput>
     ): Promise<z.infer<typeof DailyClosingResult>> => {
-      const workflowId = ctx.key; // Unique workflow ID (e.g., "2025-11-24")
+      const workflowId = ctx.key;
       const workflowStartTime = Date.now();
 
-      // If no input provided, use workflow key as date and set defaults
       const closingDate = input?.date || workflowId;
       const skipOracleClosing = input?.skipOracleClosing || false;
       const skipFinancialMetrics = input?.skipFinancialMetrics || false;

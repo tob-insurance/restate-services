@@ -5,7 +5,7 @@ dotenv.config();
 
 try {
   const instantClientPath = process.env.ORACLE_INSTANT_CLIENT_PATH;
-  
+
   oracledb.initOracleClient({ libDir: instantClientPath });
   console.log('✅ Oracle Thick mode enabled');
   console.log(`   Using Instant Client from: ${instantClientPath}`);
@@ -13,7 +13,7 @@ try {
   console.log('⚠️  Oracle Thick mode failed, running in Thin mode');
   console.log('   Thin mode only supports Oracle Database 12.1+');
   console.error('   Error:', err.message);
-  
+
   if (err.message.includes('DPI-1047') || err.message.includes('cannot load')) {
     console.log('\n💡 To fix this:');
     console.log('   1. Download Oracle Instant Client from:');
@@ -36,7 +36,6 @@ const poolConfig: oracledb.PoolAttributes = {
   poolMax: 10,
   poolIncrement: 2,
   poolTimeout: 60,
-  // queueTimeout: 60000, // 60 seconds to get connection from pool
 };
 
 let pool: oracledb.Pool | null = null;

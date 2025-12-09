@@ -1,0 +1,9 @@
+2025-12-08T02:53:38.328549Z  WARN daemon_server: turborepo_lib::commands::daemon: daemon already running
+2025-12-08T02:59:18.049717Z  WARN daemon_server: turborepo_lib::commands::daemon: daemon already running
+2025-12-08T03:12:37.032009Z  WARN daemon_server: turborepo_lib::commands::daemon: daemon already running
+2025-12-08T03:12:37.175847Z  WARN daemon_server: turborepo_lib::commands::daemon: daemon already running
+2025-12-08T03:15:20.853842Z  WARN daemon_server: turborepo_lib::commands::daemon: daemon already running
+2025-12-08T03:17:15.448810Z  WARN daemon_server: turborepo_lib::commands::daemon: daemon already running
+2025-12-08T03:22:40.786158Z  WARN turborepo_filewatch: failed to remove cookie file failed to remove file `C:\Users\sean\Documents\finance\restate\.turbo\cookies\.turbo-cookie`
+2025-12-08T03:22:40.895205Z  WARN daemon_server: turborepo_lib::commands::daemon: daemon already running
+2025-12-08T03:22:40.912991Z  WARN daemon_server: turborepo_lib::commands::daemon: daemon already running

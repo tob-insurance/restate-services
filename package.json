@@ -1,33 +1,14 @@
 {
-  "name": "restate-ts-template",
-  "version": "0.0.1",
-  "description": "Template for JavaScript/TypeScript services running with Restate (https://github.com/restatedev/) ",
-  "main": "app.js",
-  "type": "commonjs",
-  "scripts": {
-    "build": "tsc --noEmitOnError",
-    "start": "node ./dist/app.js",
-    "dev": "tsx watch ./src/app.ts",
-    "prebundle": "rm -rf dist",
-    "bundle": "esbuild src/app.ts --bundle --minify --sourcemap --platform=node --target=es2020 --outfile=dist/app.js",
-    "postbundle": "cd dist && zip -r index.zip app.js*",
-    "app": "npm run start",
-    "app-dev": "npm run dev"
-  },
-  "dependencies": {
-    "@restatedev/restate-sdk": "^1.9.1",
-    "@restatedev/restate-sdk-zod": "^1.9.1",
-    "dotenv": "^17.2.3",
-    "oracledb": "^6.10.0",
-    "pg": "^8.16.3",
-    "zod": "^4.1.0"
-  },
-  "devDependencies": {
-    "@types/node": "^20.14.2",
-    "@types/oracledb": "^6.10.0",
-    "@types/pg": "^8.15.6",
-    "esbuild": "^0.25.4",
-    "tsx": "^4.19.2",
-    "typescript": "^5.4.5"
-  }
+    "name": "restate-monorepo",
+    "private": true,
+    "scripts": {
+        "build": "turbo run build",
+        "dev": "turbo run dev",
+        "lint": "turbo run lint",
+        "clean": "turbo run clean"
+    },
+    "devDependencies": {
+        "turbo": "latest"
+    },
+    "packageManager": "pnpm@9.1.0"
 }

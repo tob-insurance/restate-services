@@ -1,4 +1,4 @@
-import { pool } from '../db';
+import { pool } from '../pg';
 import { PoolClient } from 'pg';
 
 export interface FinancialMetricsResult {

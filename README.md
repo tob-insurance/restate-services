@@ -1,152 +1,68 @@
-# Daily Closing Workflow - Restate
+# Restate Monorepo
 
-Durable workflow untuk menjalankan proses daily closing yang terdiri dari:
+This repository is a **Monorepo** managed by [Turborepo](https://turbo.build/) and [pnpm workspaces](https://pnpm.io/workspaces). It is designed to host multiple Restate services/workflows for different applications in a single repository.
 
-1.  **Genius Oracle Closing** (dapat memakan waktu hingga 6 jam)
-2.  **PostgreSQL Financial Metrics Calculation**
-3.  **Automated Scheduler** (Cron Job)
+## 📂 Project Structure
 
-## Setup
+```
+/
+├── apps/
+│   ├── finance/          # Finance Application (Closing Workflow, etc.)
+│   ├── [new-app]/        # Future applications (e.g., hr, inventory)
+│   └── ...
+├── packages/             # Shared libraries (optional, for shared code)
+├── package.json          # Root configuration
+├── pnpm-workspace.yaml   # Workspace definition
+└── turbo.json            # Turborepo pipeline config
+```
 
-### 1. Install Dependencies
+## 🚀 Getting Started
 
+### Prerequisites
+- Node.js (v18+)
+- pnpm (`npm install -g pnpm`)
+- Restate Server running locally
+
+### Installation
+Install dependencies for all apps:
 ```bash
-npm install
+pnpm install
 ```
 
-### 2. Configure Environment Variables
-
-Edit file `.env`:
-
-```env
-# PostgreSQL Configuration
-PG_HOST=127.0.0.1
-PG_PORT=5432
-PG_DATABASE=postgres
-PG_USER=postgres
-PG_PASSWORD=your_password
-PG_SCHEMA=financial_report
-
-# Oracle Configuration (Genius)
-ORACLE_USER=ACPDB
-ORACLE_PASSWORD=your_oracle_password
-ORACLE_CONNECT_STRING=(DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(HOST=aws3.tob-insurance.com)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=ORCL)))
-
-# Restate Configuration
-RESTATE_PORT=9080
-```
-
-### 3. Install & Start Restate Server
-
+### Running All Services
+Start all applications in development mode simultaneously:
 ```bash
-# Install Restate CLI
-npm install -g @restatedev/restate
-
-# Start Restate Server (terminal 1)
-restate-server --config-file restate.config.toml
+pnpm dev
 ```
 
-**⚠️ PENTING**: File `restate.config.toml` sudah dikonfigurasi dengan `invoker.abort-timeout = "7h"` untuk mengizinkan proses panjang.
+## ➕ How to Add a New Application
 
-### 4. Start Your Service
+To add a new service/workflow for a different domain (e.g., HR, Inventory):
 
-```bash
-# Build TypeScript
-npm run build
+1.  **Create a new folder** in `apps/`:
+    ```bash
+    mkdir apps/hr
+    ```
 
-# Start Service (terminal 2)
-npm run start
-# Atau untuk development: npm run dev
-```
+2.  **Initialize the app** (or copy from `apps/finance` as a template):
+    - Ensure it has its own `package.json`.
+    - Name the package uniquely, e.g., `@hr/service`.
 
-### 5. Register Service ke Restate
+3.  **Install dependencies**:
+    Run `pnpm install` from the root.
 
-```bash
-restate deployments register http://localhost:9080
-```
+4.  **Run**:
+    The new app will automatically be included when you run `pnpm dev` from the root, provided its `package.json` has a `dev` script.
 
-## Architecture
+## 🛠️ Commands
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Deployment Architecture                  │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌──────────────────┐         ┌──────────────────┐        │
-│  │  Restate Server  │◄───────►│  Your Service    │        │
-│  │  localhost:8080  │         │  localhost:9080  │        │
-│  │  (Ingress API)   │         │  (Workflow Code) │        │
-│  │                  │         │                  │        │
-│  │  localhost:9070  │         └──────────────────┘        │
-│  │  (Admin API/UI)  │                 │                   │
-│  └──────────────────┘                 │                   │
-│          ▲                            │                   │
-│          │                            ▼                   │
-│          │                   ┌────────────────┐          │
-│    ┌─────┴──────┐           │   Databases    │          │
-│    │ Scheduler  │           │  - PostgreSQL  │          │
-│    │ (Cron Job) │           │  - Oracle      │          │
-│    └────────────┘           └────────────────┘          │
-└─────────────────────────────────────────────────────────────┘
-```
+| Command | Description |
+| :--- | :--- |
+| `pnpm dev` | Start all apps in watch mode |
+| `pnpm build` | Build all apps |
+| `pnpm lint` | Lint all apps |
+| `pnpm clean` | Clean build artifacts |
 
-## Scheduler (Cron Job)
+## 📦 Deployment
 
-Aplikasi ini memiliki **DailyClosingScheduler** yang berjalan otomatis setiap hari.
-
-### Konfigurasi Jadwal
-Edit `src/services/scheduler.ts`:
-```typescript
-const SCHEDULE_CONFIG = {
-    hour: 0,   // Jam (0-23)
-    minute: 0, // Menit (0-59)
-};
-```
-
-### Memulai Scheduler
-Scheduler perlu dipancing sekali untuk mulai berjalan (kickstart):
-
-```bash
-curl -X POST http://localhost:8080/DailyClosingScheduler/main/start
-```
-
-Setelah itu, ia akan otomatis berjalan setiap hari pada jam yang ditentukan.
-
-## Menjalankan Workflow Manual
-
-### Trigger Workflow Manual
-```bash
-curl http://localhost:8080/DailyClosing/2025-11-24/run/send \
-  --json '{"date": "2025-11-24", "userId": "ASK"}'
-```
-
-### Check Status
-```bash
-curl http://localhost:8080/DailyClosing/2025-11-24/getStatus
-```
-
-### View in Restate UI
-Akses **http://localhost:9070** untuk melihat visualisasi workflow.
-
-## Struktur Folder
-
-```
-src/
-├── app.ts                          # Entry point & Registration
-├── db.ts                           # PostgreSQL connection
-├── oracle.ts                       # Oracle connection
-├── services/
-│   ├── financialMetrics.ts        # Financial metrics logic
-│   ├── geniusClosing.ts           # Genius Oracle logic
-│   └── scheduler.ts               # Cron Job Scheduler
-└── workflows/
-    └── dailyClosing.ts            # Main Workflow orchestration
-```
-
-## Deployment
-
-Lihat panduan lengkap di [DEPLOYMENT.md](./deployment_guide.md).
-
-1.  **Build**: `npm run build`
-2.  **Run**: `node dist/app.js` (atau via Docker)
-3.  **Register**: `restate deployments register <service-url>`
+Each application in `apps/` is independent and can be deployed separately (e.g., as individual Docker containers).

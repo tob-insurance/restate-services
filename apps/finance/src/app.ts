@@ -1,5 +1,5 @@
 import * as restate from "@restatedev/restate-sdk";
-import { testConnection } from "./db";
+import { testConnection } from "./pg";
 import { testOracleConnection } from "./oracle";
 import { dailyClosingWorkflow } from "./workflows/dailyClosing";
 import { DailyClosingScheduler } from "./services/scheduler";
@@ -18,6 +18,7 @@ Promise.all([
   restate.serve({
     services: [dailyClosingWorkflow, DailyClosingScheduler],
     port: 9080,
+    // identityKeys: ['']
   });
 
   console.log('✅ Server started on port 9080');

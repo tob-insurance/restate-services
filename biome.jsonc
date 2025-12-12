@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "extends": [
+    "ultracite/core"
+  ],
+  "files": {
+    "includes": [
+      "!bun.lock"
+    ]
+  },
+  "linter": {
+    "rules": {
+      "correctness": {
+        "noUnusedImports": {
+          "fix": "none",
+          "level": "error"
+        }
+      }
+    }
+  }
+}

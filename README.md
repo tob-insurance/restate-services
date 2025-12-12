@@ -1,6 +1,6 @@
 # Restate Monorepo
 
-This repository is a **Monorepo** managed by [Turborepo](https://turbo.build/) and [pnpm workspaces](https://pnpm.io/workspaces). It is designed to host multiple Restate services/workflows for different applications in a single repository.
+This repository is a **Monorepo** managed by [Turborepo](https://turbo.build/) and [Bun workspaces](https://bun.sh/docs/install/workspaces). It is designed to host multiple Restate services/workflows for different applications in a single repository.
 
 ## 📂 Project Structure
 
@@ -11,28 +11,26 @@ This repository is a **Monorepo** managed by [Turborepo](https://turbo.build/) a
 │   ├── [new-app]/        # Future applications (e.g., hr, inventory)
 │   └── ...
 ├── packages/             # Shared libraries (optional, for shared code)
-├── package.json          # Root configuration
-├── pnpm-workspace.yaml   # Workspace definition
+├── package.json          # Root configuration (includes workspaces)
 └── turbo.json            # Turborepo pipeline config
 ```
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js (v18+)
-- pnpm (`npm install -g pnpm`)
+- [Bun](https://bun.sh/) (v1.0+)
 - Restate Server running locally
 
 ### Installation
 Install dependencies for all apps:
 ```bash
-pnpm install
+bun install
 ```
 
 ### Running All Services
 Start all applications in development mode simultaneously:
 ```bash
-pnpm dev
+bun run dev
 ```
 
 ## ➕ How to Add a New Application
@@ -49,19 +47,19 @@ To add a new service/workflow for a different domain (e.g., HR, Inventory):
     - Name the package uniquely, e.g., `@hr/service`.
 
 3.  **Install dependencies**:
-    Run `pnpm install` from the root.
+    Run `bun install` from the root.
 
 4.  **Run**:
-    The new app will automatically be included when you run `pnpm dev` from the root, provided its `package.json` has a `dev` script.
+    The new app will automatically be included when you run `bun run dev` from the root, provided its `package.json` has a `dev` script.
 
 ## 🛠️ Commands
 
 | Command | Description |
 | :--- | :--- |
-| `pnpm dev` | Start all apps in watch mode |
-| `pnpm build` | Build all apps |
-| `pnpm lint` | Lint all apps |
-| `pnpm clean` | Clean build artifacts |
+| `bun run dev` | Start all apps in watch mode |
+| `bun run build` | Build all apps |
+| `bun run lint` | Lint all apps |
+| `bun run clean` | Clean build artifacts |
 
 ## 📦 Deployment
 

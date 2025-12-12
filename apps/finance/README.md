@@ -11,7 +11,7 @@ Durable workflow untuk menjalankan proses daily closing yang terdiri dari:
 ### 1. Install Dependencies
 
 ```bash
-npm install
+bun install
 ```
 
 ### 2. Configure Environment Variables
@@ -46,11 +46,11 @@ npm install -g @restatedev/restate
 
 ```bash
 # Build TypeScript
-npm run build
+bun run build
 
 # Start Service (terminal 2)
-npm run start
-# Atau untuk development: npm run dev
+bun run start
+# Atau untuk development: bun run dev
 ```
 
 ### 5. Register Service ke Restate
@@ -141,6 +141,6 @@ src/
 
 Lihat panduan lengkap di [DEPLOYMENT.md](./deployment_guide.md).
 
-1.  **Build**: `npm run build`
+1.  **Build**: `bun run build`
 2.  **Run**: `node dist/app.js` (atau via Docker)
 3.  **Register**: `restate deployments register <service-url>`

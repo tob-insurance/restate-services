@@ -1,14 +1,21 @@
 {
-    "name": "restate-monorepo",
-    "private": true,
-    "scripts": {
-        "build": "turbo run build",
-        "dev": "turbo run dev",
-        "lint": "turbo run lint",
-        "clean": "turbo run clean"
-    },
-    "devDependencies": {
-        "turbo": "latest"
-    },
-    "packageManager": "pnpm@9.1.0"
+  "name": "restate-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "clean": "turbo run clean",
+    "check": "ultracite check",
+    "fix": "ultracite fix"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.3.8",
+    "lefthook": "^2.0.9",
+    "turbo": "latest",
+    "ultracite": "6.3.10"
+  }
 }

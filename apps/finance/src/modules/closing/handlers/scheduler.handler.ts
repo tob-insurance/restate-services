@@ -1,13 +1,12 @@
 import { type ObjectContext, object } from "@restatedev/restate-sdk";
 import { DateTime } from "luxon";
+import { JAKARTA_ZONE } from "../../../constants.js";
 import { dailyClosingWorkflow } from "../workflows/index.js";
 
 const SCHEDULE_CONFIG = {
   hour: 0,
   minute: 0,
 };
-
-const JAKARTA_ZONE = "Asia/Jakarta";
 
 export const DailyClosingScheduler = object({
   name: "DailyClosingScheduler",

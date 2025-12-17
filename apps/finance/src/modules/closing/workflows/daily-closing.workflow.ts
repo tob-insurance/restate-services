@@ -1,9 +1,9 @@
-import { formatStepResult } from "@restate-tob/shared";
 import {
   type WorkflowContext,
   type WorkflowSharedContext,
   workflow,
 } from "@restatedev/restate-sdk";
+import { DateTime } from "luxon";
 import { z } from "zod";
 import {
   calculateFinancialMetrics,
@@ -45,6 +45,27 @@ export const DailyClosingResult = z.object({
   overallSuccess: z.boolean(),
   totalDuration: z.number(),
 });
+
+type StepResult = {
+  success: boolean;
+  startTime: DateTime;
+  endTime: DateTime;
+  duration: number;
+  message: string;
+};
+
+function formatStepResult(result: StepResult | undefined) {
+  if (!result) {
+    return;
+  }
+  return {
+    success: result.success,
+    startTime: result.startTime.toISO() ?? "",
+    endTime: result.endTime.toISO() ?? "",
+    duration: result.duration,
+    message: result.message,
+  };
+}
 
 async function executeOracleStep(
   ctx: WorkflowContext,
@@ -129,7 +150,7 @@ export const dailyClosingWorkflow = workflow({
       input?: z.infer<typeof DailyClosingInput>
     ): Promise<z.infer<typeof DailyClosingResult>> => {
       const workflowId = ctx.key;
-      const workflowStartTime = Date.now();
+      const workflowStartTime = DateTime.now();
 
       const closingDate = input?.date || workflowId;
       const skipOracleClosing = input?.skipOracleClosing ?? false;
@@ -162,7 +183,10 @@ export const dailyClosingWorkflow = workflow({
           skipFinancialMetrics
         );
 
-        const totalDuration = (Date.now() - workflowStartTime) / 1000;
+        const totalDuration = DateTime.now().diff(
+          workflowStartTime,
+          "seconds"
+        ).seconds;
         ctx.console.log(
           `🎉 Daily closing workflow completed successfully in ${totalDuration}s`
         );
@@ -176,7 +200,10 @@ export const dailyClosingWorkflow = workflow({
           totalDuration,
         };
       } catch (error) {
-        const totalDuration = (Date.now() - workflowStartTime) / 1000;
+        const totalDuration = DateTime.now().diff(
+          workflowStartTime,
+          "seconds"
+        ).seconds;
         const errorMessage =
           error instanceof Error ? error.message : "Unknown error";
 

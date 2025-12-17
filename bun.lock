@@ -33,6 +33,10 @@
         "typescript": "^5.4.5",
       },
     },
+    "packages/lambda-layers": {
+      "name": "@restate-tob/lambda-layers",
+      "version": "0.0.1",
+    },
     "packages/oracle": {
       "name": "@restate-tob/oracle",
       "version": "0.0.1",
@@ -61,11 +65,9 @@
       "name": "@restate-tob/shared",
       "version": "0.0.1",
       "dependencies": {
-        "luxon": "^3.7.2",
         "zod": "^4.1.0",
       },
       "devDependencies": {
-        "@types/luxon": "^3.7.1",
         "@types/node": "^20.14.2",
         "typescript": "^5.4.5",
       },
@@ -151,6 +153,8 @@
     "@isaacs/brace-expansion": ["@isaacs/brace-expansion@5.0.0", "", { "dependencies": { "@isaacs/balanced-match": "^4.0.1" } }, "sha512-ZT55BDLV0yv0RBm2czMiZ+SqCGO7AvmOM3G/w2xhVPH+te0aKgFjmBvGlL1dH+ql2tgGO3MVrbb3jCKyvpgnxA=="],
 
     "@restate-tob/finance": ["@restate-tob/finance@workspace:apps/finance"],
+
+    "@restate-tob/lambda-layers": ["@restate-tob/lambda-layers@workspace:packages/lambda-layers"],
 
     "@restate-tob/oracle": ["@restate-tob/oracle@workspace:packages/oracle"],
 

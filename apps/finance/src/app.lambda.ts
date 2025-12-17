@@ -1,11 +1,11 @@
 import { createEndpointHandler } from "@restatedev/restate-sdk/lambda";
-import { getOracleClient } from "./infrastructure/database.js";
+import { initOracleClient } from "./infrastructure/database.js";
 import {
   DailyClosingScheduler,
   dailyClosingWorkflow,
 } from "./modules/closing/index.js";
 
-getOracleClient();
+initOracleClient();
 
 export const handler = createEndpointHandler({
   services: [dailyClosingWorkflow, DailyClosingScheduler],

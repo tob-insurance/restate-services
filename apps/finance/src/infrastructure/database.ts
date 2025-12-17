@@ -36,6 +36,14 @@ export function getOracleClient(): OracleClient {
   return oracleClient;
 }
 
+/**
+ * Initializes the Oracle connection pool.
+ * Call this at module load time to warm up the connection pool on Lambda cold start.
+ */
+export function initOracleClient(): void {
+  getOracleClient();
+}
+
 export async function testConnections(): Promise<{
   postgres: boolean;
   oracle: boolean;

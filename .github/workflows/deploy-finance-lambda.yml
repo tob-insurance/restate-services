@@ -1,0 +1,92 @@
+name: Deploy Finance Lambda
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/finance/**"
+      - ".github/workflows/deploy-finance-lambda.yml"
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-southeast-1
+  LAMBDA_FUNCTION_NAME: finance-closing
+  LAMBDA_LAYER_NAME: oracle-instantclient
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build Lambda bundle
+        run: bun run --filter @finance/closing bundle:lambda
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy Lambda Function
+        id: deploy
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ env.LAMBDA_FUNCTION_NAME }} \
+            --zip-file fileb://apps/finance/dist-lambda/lambda.zip \
+            --publish \
+            --query 'FunctionArn' \
+            --output text
+
+      - name: Register with Restate
+        if: success()
+        env:
+          RESTATE_ADMIN_URL: ${{ secrets.RESTATE_ADMIN_URL }}
+          RESTATE_AUTH_TOKEN: ${{ secrets.RESTATE_AUTH_TOKEN }}
+        run: |
+          FUNCTION_ARN=$(aws lambda get-function --function-name ${{ env.LAMBDA_FUNCTION_NAME }} --query 'Configuration.FunctionArn' --output text)
+          npx -y @restatedev/restate deployments register -y "$FUNCTION_ARN" \
+            --assume-role-arn ${{ secrets.AWS_INVOKE_ROLE_ARN }}
+
+  build-layer:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Oracle Instant Client Layer
+        run: |
+          cd apps/finance
+          bash lambda-layer/build-layer.sh
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Publish Lambda Layer
+        run: |
+          aws lambda publish-layer-version \
+            --layer-name ${{ env.LAMBDA_LAYER_NAME }} \
+            --zip-file fileb://apps/finance/lambda-layer/output/oracle-instantclient-layer.zip \
+            --compatible-runtimes nodejs18.x nodejs20.x nodejs22.x \
+            --compatible-architectures x86_64

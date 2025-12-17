@@ -35,9 +35,63 @@ This guide explains how to deploy the `@finance/closing` Restate service to AWS 
 
 1. **AWS CLI** configured with appropriate credentials
 2. **Docker** (for building the Lambda Layer)
-3. **Oracle Instant Client Basic Lite** (Linux x86-64) downloaded from Oracle
 
-## Step 1: Build the Oracle Instant Client Lambda Layer
+## CI/CD with GitHub Actions
+
+The workflow at `.github/workflows/deploy-finance-lambda.yml` automates deployment.
+
+### Required GitHub Secrets
+
+| Secret | Description |
+|--------|-------------|
+| `AWS_DEPLOY_ROLE_ARN` | IAM role ARN for deploying Lambda (with OIDC trust) |
+| `AWS_INVOKE_ROLE_ARN` | IAM role ARN for Restate to invoke Lambda |
+| `RESTATE_ADMIN_URL` | Restate admin URL (from Dashboard) |
+| `RESTATE_AUTH_TOKEN` | Restate API key with Admin role |
+
+### Setup AWS OIDC for GitHub Actions
+
+```bash
+# Create OIDC provider (one-time)
+aws iam create-open-id-connect-provider \
+    --url https://token.actions.githubusercontent.com \
+    --client-id-list sts.amazonaws.com
+```
+
+### Deploy Role Trust Policy
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": "repo:tob-insurance/restate-services:*"
+        }
+      }
+    }
+  ]
+}
+```
+
+### Workflow Triggers
+
+- **Auto deploy**: Push to `main` with changes in `apps/finance/`
+- **Manual deploy**: Use "Run workflow" button in GitHub Actions
+- **Build layer**: Manual trigger only (workflow_dispatch)
+
+## Manual Deployment
+
+### Step 1: Build the Oracle Instant Client Lambda Layer
 
 ### 1.1 Download Oracle Instant Client
 

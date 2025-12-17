@@ -6,11 +6,15 @@
   "type": "commonjs",
   "scripts": {
     "build": "tsc --noEmitOnError",
-    "start": "node ./dist/app.js",
-    "dev": "tsx watch ./src/app.ts",
+    "start": "node ./dist/app.local.js",
+    "dev": "tsx watch ./src/app.local.ts",
     "prebundle": "rm -rf dist",
-    "bundle": "esbuild src/app.ts --bundle --minify --sourcemap --platform=node --target=es2020 --outfile=dist/app.js",
-    "postbundle": "cd dist && zip -r index.zip app.js*"
+    "bundle": "esbuild src/app.local.ts --bundle --minify --sourcemap --platform=node --target=es2020 --outfile=dist/app.js",
+    "postbundle": "cd dist && zip -r index.zip app.js*",
+    "prebundle:lambda": "rm -rf dist-lambda",
+    "bundle:lambda": "esbuild src/app.lambda.ts --bundle --minify --sourcemap --platform=node --target=es2020 --external:oracledb --outfile=dist-lambda/app.js",
+    "postbundle:lambda": "cd dist-lambda && zip -r lambda.zip app.js*",
+    "build:layer": "bash lambda-layer/build-layer.sh"
   },
   "dependencies": {
     "@restatedev/restate-sdk": "^1.9.1",

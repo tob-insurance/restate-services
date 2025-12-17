@@ -18,7 +18,6 @@ Promise.all([testConnection(), testOracleConnection()]).then(
     serve({
       services: [dailyClosingWorkflow, DailyClosingScheduler],
       port: 9080,
-      // identityKeys: ['']
     });
 
     console.log("✅ Server started on port 9080");

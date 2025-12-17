@@ -2,8 +2,8 @@ import { type ObjectContext, object } from "@restatedev/restate-sdk";
 import { dailyClosingWorkflow } from "../workflows/daily-closing";
 
 const SCHEDULE_CONFIG = {
-  hour: 13,
-  minute: 54,
+  hour: 0,
+  minute: 0,
 };
 
 export const DailyClosingScheduler = object({

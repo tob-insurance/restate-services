@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  finance-app:
+    build: .
+    image: finance-app
+    ports:
+      - "9080:9080"
+    env_file:
+      - .env
+    depends_on:
+      - restate
+    # Mount .env to ensure it's available if needed by logic, though env_file handles vars
+    # volumes:
+    #   - ./.env:/usr/src/app/.env 
+
+volumes:
+  restate_data:

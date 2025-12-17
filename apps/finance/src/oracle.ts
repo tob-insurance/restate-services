@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { config } from "dotenv";
 import oracledb, {
   type Connection,
@@ -9,11 +10,23 @@ import oracledb, {
 config();
 
 try {
-  const instantClientPath = process.env.ORACLE_INSTANT_CLIENT_PATH;
+  let instantClientPath = process.env.ORACLE_INSTANT_CLIENT_PATH;
 
-  oracledb.initOracleClient({ libDir: instantClientPath });
-  console.log("✅ Oracle Thick mode enabled");
-  console.log(`   Using Instant Client from: ${instantClientPath}`);
+  if (instantClientPath && !fs.existsSync(instantClientPath)) {
+    console.warn(
+      `⚠️  Path "${instantClientPath}" specified in ORACLE_INSTANT_CLIENT_PATH does not exist. Ignoring it.`
+    );
+    instantClientPath = undefined;
+  }
+
+  if (instantClientPath) {
+    oracledb.initOracleClient({ libDir: instantClientPath });
+    console.log("✅ Oracle Thick mode enabled");
+    console.log(`   Using Instant Client from: ${instantClientPath}`);
+  } else {
+    oracledb.initOracleClient();
+    console.log("✅ Oracle Thick mode enabled (using system library path)");
+  }
 } catch (err) {
   console.log("⚠️  Oracle Thick mode failed, running in Thin mode");
   console.log("   Thin mode only supports Oracle Database 12.1+");

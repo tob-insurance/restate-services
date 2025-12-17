@@ -2,8 +2,8 @@ import { type ObjectContext, object } from "@restatedev/restate-sdk";
 import { dailyClosingWorkflow } from "../workflows/daily-closing";
 
 const SCHEDULE_CONFIG = {
-  hour: 10,
-  minute: 24,
+  hour: 13,
+  minute: 54,
 };
 
 export const DailyClosingScheduler = object({
@@ -37,7 +37,7 @@ export const DailyClosingScheduler = object({
         date: dateStr,
         skipOracleClosing: false,
         skipFinancialMetrics: false,
-        userId: "ASK",
+        userId: "SYS",
       });
 
       // IMPORTANT: Await the rescheduling to ensure it persists

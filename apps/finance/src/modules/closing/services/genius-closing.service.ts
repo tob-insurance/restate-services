@@ -1,66 +1,29 @@
-import oracledb, { type Connection, OUT_FORMAT_OBJECT } from "oracledb";
-import { getOracleConnection } from "../oracle";
+import { withConnection } from "@restate-tob/oracle";
+import { parseDateParts } from "@restate-tob/shared";
+import { DateTime } from "luxon";
+import oracledb, { OUT_FORMAT_OBJECT } from "oracledb";
+import { getOracleClient } from "../../../infrastructure/database.js";
+import type {
+  GeniusClosingJobSubmit,
+  GeniusClosingResult,
+  GeniusJobStatus,
+  GeniusReadinessCheck,
+} from "../types.js";
 
-export type GeniusClosingResult = {
-  success: boolean;
-  startTime: Date;
-  endTime: Date;
-  duration: number;
-  message: string;
-  status?: string;
-  errorMessage?: string;
-};
-
-export type GeniusClosingJobSubmit = {
-  submitted: boolean;
-  jobName: string;
-  message: string;
-  startTime: Date;
-};
-
-/**
- * Helper to manage Oracle connection lifecycle
- */
-async function withOracleConnection<T>(
-  operation: (connection: Connection) => Promise<T>
-): Promise<T> {
-  let connection: Connection | null = null;
-  try {
-    connection = await getOracleConnection();
-    return await operation(connection);
-  } finally {
-    if (connection) {
-      try {
-        await connection.close();
-      } catch (err) {
-        console.error("Error closing Oracle connection:", err);
-      }
-    }
-  }
-}
-
-/**
- * Submit Genius closing job ke Oracle DBMS_SCHEDULER (fire-and-forget)
- * Job akan berjalan di background tanpa blocking workflow
- *
- * @param closingDate - Date in YYYY-MM-DD format
- * @param userId - User ID for the closing process (default: 'ASK')
- * @returns Job submission result
- */
 export async function submitGeniusClosingJob(
   closingDate: string,
-  userId = "ASK"
+  userId = "adm"
 ): Promise<GeniusClosingJobSubmit> {
-  const startTime = new Date();
+  const startTime = DateTime.now();
 
   try {
-    const [year, month] = closingDate.split("-");
-    const jobName = `GENIUS_CLOSING_${year}_${month}_${Date.now()}`;
+    const { year, month } = parseDateParts(closingDate);
+    const jobName = `GENIUS_CLOSING_${year}_${month}_${startTime.toMillis()}`;
 
     console.log(`🚀 Submitting Genius closing job: ${jobName}`);
     console.log(`   Year: ${year}, Month: ${month}, UserId: ${userId}`);
 
-    await withOracleConnection(async (connection) => {
+    await withConnection(getOracleClient(), async (connection) => {
       await connection.execute(
         `BEGIN
            DBMS_SCHEDULER.CREATE_JOB (
@@ -70,14 +33,14 @@ export async function submitGeniusClosingJob(
              number_of_arguments => 6,
              enabled    => FALSE
            );
-           
+
            DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 1, '${year}');
            DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 2, '${month}');
            DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 3, '${month}');
            DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 4, '${userId}');
            DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 5, NULL);
            DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 6, NULL);
-           
+
            DBMS_SCHEDULER.ENABLE('${jobName}');
          END;`,
         {},
@@ -105,26 +68,16 @@ export async function submitGeniusClosingJob(
   }
 }
 
-/**
- * Check status dari Oracle DBMS_SCHEDULER job
- *
- * @param jobName - Nama job dari submitGeniusClosingJob
- * @returns Job status information
- */
-export async function checkGeniusClosingJobStatus(jobName: string): Promise<{
-  status: string;
-  running: boolean;
-  completed: boolean;
-  failed: boolean;
-  message: string;
-}> {
+export async function checkGeniusClosingJobStatus(
+  jobName: string
+): Promise<GeniusJobStatus> {
   try {
-    return await withOracleConnection(async (connection) => {
+    return await withConnection(getOracleClient(), async (connection) => {
       const result = await connection.execute(
-        `SELECT state, error#, 
+        `SELECT state, error#,
                 TO_CHAR(last_start_date, 'YYYY-MM-DD HH24:MI:SS') as last_start,
                 TO_CHAR(last_run_duration, 'HH24:MI:SS') as duration
-         FROM user_scheduler_jobs 
+         FROM user_scheduler_jobs
          WHERE job_name = :jobName`,
         { jobName },
         { outFormat: OUT_FORMAT_OBJECT }
@@ -180,35 +133,25 @@ export async function checkGeniusClosingJobStatus(jobName: string): Promise<{
   }
 }
 
-/**
- * Execute Genius closing procedure in Oracle database (Package_Rpt_Ac_Fi806.get_master_data)
- * ⚠️ WARNING: This procedure can take up to 6 hours to complete and will BLOCK the workflow
- * Consider using submitGeniusClosingJob() instead for async execution
- *
- * Based on C# implementation in reference1.cs
- *
- * @param closingDate - Date in YYYY-MM-DD format
- * @param userId - User ID for the closing process (default: 'ASK')
- * @returns Result object with execution details
- */
 export async function executeGeniusClosing(
   closingDate: string,
   userId = "ASK"
 ): Promise<GeniusClosingResult> {
-  const startTime = new Date();
+  const startTime = DateTime.now();
 
   try {
-    const [year, month] = closingDate.split("-");
+    const { year, month } = parseDateParts(closingDate);
 
     console.log(
       "🔄 Starting Genius closing procedure (Package_Rpt_Ac_Fi806.get_master_data)"
     );
     console.log(`   Year: ${year}, Month: ${month}, UserId: ${userId}`);
 
-    const result = await withOracleConnection(
+    const result = await withConnection(
+      getOracleClient(),
       async (connection) =>
         await connection.execute(
-          `BEGIN 
+          `BEGIN
            Package_Rpt_Ac_Fi806.get_master_data(
              :p_year,
              :p_from_month,
@@ -216,7 +159,7 @@ export async function executeGeniusClosing(
              :p_userid,
              :p_status,
              :p_error_message
-           ); 
+           );
          END;`,
           {
             p_year: { val: year, type: oracledb.STRING, dir: oracledb.BIND_IN },
@@ -252,8 +195,8 @@ export async function executeGeniusClosing(
         )
     );
 
-    const endTime = new Date();
-    const duration = (endTime.getTime() - startTime.getTime()) / 1000;
+    const endTime = DateTime.now();
+    const duration = endTime.diff(startTime, "seconds").seconds;
 
     const outBinds = result.outBinds as {
       p_status?: string;
@@ -285,8 +228,8 @@ export async function executeGeniusClosing(
       errorMessage,
     };
   } catch (error) {
-    const endTime = new Date();
-    const duration = (endTime.getTime() - startTime.getTime()) / 1000;
+    const endTime = DateTime.now();
+    const duration = endTime.diff(startTime, "seconds").seconds;
 
     console.error("❌ Genius closing procedure failed with exception:", error);
 
@@ -302,18 +245,11 @@ export async function executeGeniusClosing(
   }
 }
 
-/**
- * Check if Genius system is ready for closing
- */
-export async function checkGeniusReadiness(): Promise<{
-  ready: boolean;
-  message: string;
-}> {
+export async function checkGeniusReadiness(): Promise<GeniusReadinessCheck> {
   try {
-    return await withOracleConnection(async (connection) => {
-      // Check if there are any pending transactions or locks
+    return await withConnection(getOracleClient(), async (connection) => {
       const result = await connection.execute(
-        `SELECT COUNT(*) as pending_count 
+        `SELECT COUNT(*) as pending_count
          FROM v$transaction`,
         [],
         { outFormat: OUT_FORMAT_OBJECT }

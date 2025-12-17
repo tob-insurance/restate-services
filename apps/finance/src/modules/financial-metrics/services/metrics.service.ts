@@ -1,54 +1,24 @@
-import type { PoolClient, QueryResult } from "pg";
-import { pool } from "../pg";
+import { isDataIntegrityError, withConnection } from "@restate-tob/postgres";
+import { DateTime } from "luxon";
+import type { QueryResult } from "pg";
+import { getPostgresClient } from "../../../infrastructure/database.js";
+import type { CalculationRunStatus, FinancialMetricsResult } from "../types.js";
 
-const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-
-export type FinancialMetricsResult = {
-  success: boolean;
-  startTime: Date;
-  endTime: Date;
-  duration: number;
-  rowsAffected?: number;
-  message: string;
-  runId?: string;
-};
-
-/**
- * Helper to manage PostgreSQL connection lifecycle
- */
-async function withPostgresConnection<T>(
-  operation: (client: PoolClient) => Promise<T>
-): Promise<T> {
-  const client = await pool.connect();
-  try {
-    return await operation(client);
-  } finally {
-    client.release();
-  }
-}
-
-/**
- * Execute PostgreSQL financial metrics calculation
- * This function calls the financial_report.calculate_financial_metrics stored function
- *
- * @param reportDate - Date in YYYY-MM-DD format
- * @returns Result object with execution details
- */
 export async function calculateFinancialMetrics(
   reportDate: string
 ): Promise<FinancialMetricsResult> {
-  const startTime = new Date();
+  const startTime = DateTime.now();
 
-  const date = new Date(reportDate);
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
+  const date = DateTime.fromISO(reportDate);
+  const year = date.year;
+  const month = date.month;
 
   console.log(
     `🔄 Calculating financial metrics for year: ${year}, month: ${month}`
   );
 
   try {
-    return await withPostgresConnection(async (client) => {
+    return await withConnection(getPostgresClient(), async (client) => {
       await client.query("SET search_path TO financial_report");
 
       const runIdResult = await client.query(
@@ -77,20 +47,13 @@ export async function calculateFinancialMetrics(
         console.error(`   Hint: ${pgError.hint || "N/A"}`);
         console.error(`   Run ID: ${runId}`);
 
-        // Check if this is a data integrity issue (not retryable)
-        const isDataError =
-          pgError.code === "23502" || // not_null_violation
-          pgError.code === "23503" || // foreign_key_violation
-          pgError.code === "23505" || // unique_violation
-          pgError.code === "23514"; // check_violation
-
-        if (isDataError) {
+        if (isDataIntegrityError(pgError.code)) {
           console.error(
             `   This is a data integrity error (code: ${pgError.code}), not retrying.`
           );
 
-          const endTime = new Date();
-          const duration = (endTime.getTime() - startTime.getTime()) / 1000;
+          const endTime = DateTime.now();
+          const duration = endTime.diff(startTime, "seconds").seconds;
 
           return {
             success: false,
@@ -105,8 +68,8 @@ export async function calculateFinancialMetrics(
         throw execError;
       }
 
-      const endTime = new Date();
-      const duration = (endTime.getTime() - startTime.getTime()) / 1000;
+      const endTime = DateTime.now();
+      const duration = endTime.diff(startTime, "seconds").seconds;
       const resultMessage = result.rows[0]?.result || "Completed";
 
       console.log(
@@ -131,20 +94,11 @@ export async function calculateFinancialMetrics(
   }
 }
 
-/**
- * Get calculation run status from PostgreSQL
- * Useful for checking detailed error information
- */
-export async function getCalculationRunStatus(runId: string): Promise<{
-  status: string;
-  completedSteps: number;
-  totalSteps: number;
-  errorCount: number;
-  warningCount: number;
-  metadata: Record<string, unknown>;
-} | null> {
+export async function getCalculationRunStatus(
+  runId: string
+): Promise<CalculationRunStatus | null> {
   try {
-    return await withPostgresConnection(async (client) => {
+    return await withConnection(getPostgresClient(), async (client) => {
       const result = await client.query(
         `SELECT status, completed_steps, total_steps, error_count, warning_count, metadata
          FROM financial_report.calculation_runs
@@ -170,16 +124,4 @@ export async function getCalculationRunStatus(runId: string): Promise<{
     console.error("Failed to get calculation run status:", error);
     return null;
   }
-}
-
-/**
- * Validate date format (YYYY-MM-DD)
- */
-export function validateDateFormat(date: string): boolean {
-  if (!DATE_REGEX.test(date)) {
-    return false;
-  }
-
-  const parsedDate = new Date(date);
-  return !Number.isNaN(parsedDate.getTime());
 }

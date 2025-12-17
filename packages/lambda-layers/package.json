@@ -1,0 +1,10 @@
+{
+  "name": "@restate-tob/lambda-layers",
+  "version": "0.0.1",
+  "description": "AWS Lambda Layer build scripts for native dependencies",
+  "private": true,
+  "scripts": {
+    "build:oracle": "bash oracle/build-layer.sh",
+    "build:oracle:arm64": "bash oracle/build-layer.sh --arm64"
+  }
+}

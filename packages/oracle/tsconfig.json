@@ -3,7 +3,6 @@
     "target": "esnext",
     "lib": ["esnext"],
     "module": "nodenext",
-    "allowJs": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -14,7 +13,6 @@
     "allowSyntheticDefaultImports": true,
     "strict": true,
     "skipLibCheck": true,
-    "skipDefaultLibCheck": true,
     "strictNullChecks": true
   },
   "include": ["src/"]

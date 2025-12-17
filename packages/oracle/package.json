@@ -1,0 +1,27 @@
+{
+  "name": "@restate-tob/oracle",
+  "version": "0.0.1",
+  "description": "Oracle connection utilities for Restate services",
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --noEmitOnError",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "oracledb": "^6.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.2",
+    "@types/oracledb": "^6.10.0",
+    "typescript": "^5.4.5"
+  }
+}

@@ -1,3 +1,4 @@
+import { formatStepResult } from "@restate-tob/shared";
 import {
   type WorkflowContext,
   type WorkflowSharedContext,
@@ -7,11 +8,11 @@ import { z } from "zod";
 import {
   calculateFinancialMetrics,
   type FinancialMetricsResult,
-} from "../services/financial-metrics";
+} from "../../financial-metrics/index.js";
 import {
   executeGeniusClosing,
   type GeniusClosingResult,
-} from "../services/genius-closing";
+} from "../services/index.js";
 
 export const DailyClosingInput = z.object({
   date: z.string(),
@@ -45,48 +46,6 @@ export const DailyClosingResult = z.object({
   totalDuration: z.number(),
 });
 
-/**
- * Safely convert Date to ISO string (handles both Date objects and strings from replay)
- */
-function toISOString(date: Date | string): string {
-  return typeof date === "string" ? date : date.toISOString();
-}
-
-/**
- * Format result object for the workflow output
- */
-function formatOracleResult(result: GeniusClosingResult | undefined) {
-  if (!result) {
-    return;
-  }
-  return {
-    success: result.success,
-    startTime: toISOString(result.startTime),
-    endTime: toISOString(result.endTime),
-    duration: result.duration,
-    message: result.message,
-  };
-}
-
-/**
- * Format financial metrics result for the workflow output
- */
-function formatMetricsResult(result: FinancialMetricsResult | undefined) {
-  if (!result) {
-    return;
-  }
-  return {
-    success: result.success,
-    startTime: toISOString(result.startTime),
-    endTime: toISOString(result.endTime),
-    duration: result.duration,
-    message: result.message,
-  };
-}
-
-/**
- * Execute Oracle Genius closing step
- */
 async function executeOracleStep(
   ctx: WorkflowContext,
   closingDate: string,
@@ -117,9 +76,6 @@ async function executeOracleStep(
   return result;
 }
 
-/**
- * Execute financial metrics calculation step
- */
 async function executeMetricsStep(
   ctx: WorkflowContext,
   closingDate: string,
@@ -178,7 +134,7 @@ export const dailyClosingWorkflow = workflow({
       const closingDate = input?.date || workflowId;
       const skipOracleClosing = input?.skipOracleClosing ?? false;
       const skipFinancialMetrics = input?.skipFinancialMetrics ?? false;
-      const userId = input?.userId || "ASK";
+      const userId = input?.userId || "adm";
 
       ctx.console.log(
         `📅 Starting daily closing workflow for date: ${closingDate}`
@@ -214,8 +170,8 @@ export const dailyClosingWorkflow = workflow({
         return {
           workflowId,
           date: closingDate,
-          oracleClosing: formatOracleResult(oracleResult),
-          financialMetrics: formatMetricsResult(financialMetricsResult),
+          oracleClosing: formatStepResult(oracleResult),
+          financialMetrics: formatStepResult(financialMetricsResult),
           overallSuccess: true,
           totalDuration,
         };
@@ -229,8 +185,8 @@ export const dailyClosingWorkflow = workflow({
         return {
           workflowId,
           date: closingDate,
-          oracleClosing: formatOracleResult(oracleResult),
-          financialMetrics: formatMetricsResult(financialMetricsResult),
+          oracleClosing: formatStepResult(oracleResult),
+          financialMetrics: formatStepResult(financialMetricsResult),
           overallSuccess: false,
           totalDuration,
         };

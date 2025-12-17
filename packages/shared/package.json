@@ -1,0 +1,36 @@
+{
+  "name": "@restate-tob/shared",
+  "version": "0.0.1",
+  "description": "Shared utilities and types for Restate services",
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/types/index.d.ts",
+      "require": "./dist/types/index.js"
+    },
+    "./utils": {
+      "types": "./dist/utils/index.d.ts",
+      "require": "./dist/utils/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --noEmitOnError",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "luxon": "^3.7.2",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/luxon": "^3.7.1",
+    "@types/node": "^20.14.2",
+    "typescript": "^5.4.5"
+  }
+}

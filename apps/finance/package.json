@@ -1,8 +1,8 @@
 {
-  "name": "@finance/closing",
+  "name": "@restate-tob/finance",
   "version": "0.0.1",
-  "description": "Template for JavaScript/TypeScript services running with Restate (https://github.com/restatedev/) ",
-  "main": "app.js",
+  "description": "Finance closing workflow service running with Restate",
+  "main": "dist/app.local.js",
   "type": "commonjs",
   "scripts": {
     "build": "tsc --noEmitOnError",
@@ -14,21 +14,23 @@
     "prebundle:lambda": "rm -rf dist-lambda",
     "bundle:lambda": "esbuild src/app.lambda.ts --bundle --minify --sourcemap --platform=node --target=es2020 --external:oracledb --outfile=dist-lambda/app.js",
     "postbundle:lambda": "cd dist-lambda && zip -r lambda.zip app.js*",
-    "build:layer": "bash lambda-layer/build-layer.sh"
+    "build:layer": "bun run --filter @restate-tob/lambda-layers build:oracle",
+    "clean": "rm -rf dist dist-lambda"
   },
   "dependencies": {
+    "@restate-tob/oracle": "workspace:*",
+    "@restate-tob/postgres": "workspace:*",
+    "@restate-tob/shared": "workspace:*",
     "@restatedev/restate-sdk": "^1.9.1",
     "@restatedev/restate-sdk-zod": "^1.9.1",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
-    "oracledb": "^6.10.0",
-    "pg": "^8.16.3",
+    "luxon": "^3.7.2",
     "zod": "^4.1.0"
   },
   "devDependencies": {
+    "@types/luxon": "^3.7.1",
     "@types/node": "^20.14.2",
-    "@types/oracledb": "^6.10.0",
-    "@types/pg": "^8.15.6",
     "esbuild": "^0.25.4",
     "tsx": "^4.19.2",
     "typescript": "^5.4.5"

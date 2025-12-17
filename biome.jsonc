@@ -11,6 +11,9 @@
           "fix": "none",
           "level": "error"
         }
+      },
+      "performance": {
+        "noBarrelFile": "off"
       }
     }
   }

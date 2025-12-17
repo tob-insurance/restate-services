@@ -1,27 +1,26 @@
 import { serve } from "@restatedev/restate-sdk";
-import { testOracleConnection } from "./oracle";
-import { testConnection } from "./pg";
-import { DailyClosingScheduler } from "./services/scheduler";
-import { dailyClosingWorkflow } from "./workflows/daily-closing";
+import { testConnections } from "./infrastructure/database.js";
+import {
+  DailyClosingScheduler,
+  dailyClosingWorkflow,
+} from "./modules/closing/index.js";
 
-Promise.all([testConnection(), testOracleConnection()]).then(
-  ([pgConnected, oracleConnected]) => {
-    if (!pgConnected) {
-      console.error(
-        "⚠️  PostgreSQL connection failed, but server will continue..."
-      );
-    }
-    if (!oracleConnected) {
-      console.error("⚠️  Oracle connection failed, but server will continue...");
-    }
-
-    serve({
-      services: [dailyClosingWorkflow, DailyClosingScheduler],
-      port: 9080,
-    });
-
-    console.log("✅ Server started on port 9080");
-    console.log("   - DailyClosing Workflow");
-    console.log("   - DailyClosing Scheduler (Virtual Object)");
+testConnections().then(({ postgres, oracle }) => {
+  if (!postgres) {
+    console.error(
+      "⚠️  PostgreSQL connection failed, but server will continue..."
+    );
   }
-);
+  if (!oracle) {
+    console.error("⚠️  Oracle connection failed, but server will continue...");
+  }
+
+  serve({
+    services: [dailyClosingWorkflow, DailyClosingScheduler],
+    port: 9080,
+  });
+
+  console.log("✅ Server started on port 9080");
+  console.log("   - DailyClosing Workflow");
+  console.log("   - DailyClosing Scheduler (Virtual Object)");
+});

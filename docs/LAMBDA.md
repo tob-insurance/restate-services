@@ -103,13 +103,12 @@ Choose version 19.x for best compatibility. Download the **Basic Light Package (
 ### 1.2 Build the Layer
 
 ```bash
-cd apps/finance/lambda-layer
+# From repository root
+bun run --filter @restate-tob/lambda-layers build:oracle
 
-# Place the downloaded zip here
-# e.g., instantclient-basiclite-linux.x64-19.23.0.0.0dbru.zip
-
-# Build the layer
-bash build-layer.sh
+# Or directly
+cd packages/lambda-layers
+bun run build:oracle
 ```
 
 ### 1.3 Publish the Layer to AWS
@@ -117,7 +116,7 @@ bash build-layer.sh
 ```bash
 aws lambda publish-layer-version \
   --layer-name oracle-instantclient \
-  --zip-file fileb://lambda-layer/output/oracle-instantclient-layer.zip \
+  --zip-file fileb://packages/lambda-layers/oracle/output/oracle-instantclient-layer.zip \
   --compatible-runtimes nodejs18.x nodejs20.x nodejs22.x \
   --compatible-architectures x86_64
 ```
@@ -297,19 +296,18 @@ apps/finance/
 ├── src/
 │   ├── app.lambda.ts      # Lambda handler entry point
 │   ├── app.local.ts       # Local development entry point
-│   ├── oracle.ts          # Oracle connection (auto-detects Lambda)
-│   ├── pg.ts              # PostgreSQL connection
-│   ├── services/
-│   │   ├── scheduler.ts
-│   │   ├── genius-closing.ts
-│   │   └── financial-metrics.ts
+│   ├── infrastructure/    # Database clients
+│   ├── modules/           # Business logic modules
 │   └── workflows/
 │       └── daily-closing.ts
-├── lambda-layer/
-│   ├── build-layer.sh     # Layer build script
-│   └── output/            # Built layer zip
 ├── dist-lambda/           # Lambda bundle output
 │   └── lambda.zip
+└── package.json
+
+packages/lambda-layers/
+├── oracle/
+│   ├── build-layer.sh     # Layer build script
+│   └── output/            # Built layer zip
 └── package.json
 ```
 

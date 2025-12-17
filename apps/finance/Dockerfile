@@ -47,4 +47,4 @@ ENV NODE_ENV=production
 
 EXPOSE 9080
 USER node
-CMD ["dumb-init", "node", "./dist/app.js"]
+CMD ["dumb-init", "node", "./dist/app.local.js"]

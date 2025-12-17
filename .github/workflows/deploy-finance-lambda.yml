@@ -1,12 +1,13 @@
 name: Deploy Finance Lambda
 
+# Temporarily disabled - re-enable when ready for deployment
 on:
-  push:
-    branches: [main]
-    paths:
-      - "apps/finance/**"
-      - ".github/workflows/deploy-finance-lambda.yml"
   workflow_dispatch:
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - "apps/finance/**"
+  #     - ".github/workflows/deploy-finance-lambda.yml"
 
 env:
   AWS_REGION: ap-southeast-1

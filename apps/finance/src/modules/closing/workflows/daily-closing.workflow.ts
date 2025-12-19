@@ -1,4 +1,5 @@
 import {
+  type Duration,
   TerminalError,
   type WorkflowContext,
   type WorkflowSharedContext,
@@ -29,7 +30,11 @@ type WorkflowState = {
   lastUpdate: string;
 };
 
-const GENIUS_JOB_CONFIG = {
+const GENIUS_JOB_CONFIG: {
+  initialDelay: Duration;
+  pollInterval: Duration;
+  maxPollAttempts: number;
+} = {
   initialDelay: { hours: 5 },
   pollInterval: { hours: 1 },
   maxPollAttempts: 7,
@@ -108,7 +113,7 @@ async function executeOracleStep(
     return;
   }
 
-  const startTime = DateTime.now();
+  const startTime = DateTime.fromMillis(await ctx.date.now());
 
   ctx.console.log("⏳ Step 1: Submitting Genius closing job...");
   ctx.console.log(
@@ -146,7 +151,7 @@ async function executeOracleStep(
     );
 
     if (status.completed) {
-      const endTime = DateTime.now();
+      const endTime = DateTime.fromMillis(await ctx.date.now());
       const duration = endTime.diff(startTime, "seconds").seconds;
 
       ctx.console.log(
@@ -171,18 +176,26 @@ async function executeOracleStep(
 
     if (attempt < GENIUS_JOB_CONFIG.maxPollAttempts - 1) {
       ctx.console.log(
-        `⏸️  Job still running. Sleeping for ${GENIUS_JOB_CONFIG.pollInterval.hours} hour...`
+        `⏸️  Job still running. Sleeping for ${GENIUS_JOB_CONFIG.pollInterval.hours} hour(s)...`
       );
       await ctx.sleep(GENIUS_JOB_CONFIG.pollInterval);
     }
   }
 
-  const maxHours =
-    GENIUS_JOB_CONFIG.initialDelay.hours +
-    GENIUS_JOB_CONFIG.maxPollAttempts * GENIUS_JOB_CONFIG.pollInterval.hours;
+  const initialDelayMinutes =
+    (GENIUS_JOB_CONFIG.initialDelay.hours || 0) * 60 +
+    (GENIUS_JOB_CONFIG.initialDelay.minutes || 0);
+  const pollIntervalMinutes =
+    (GENIUS_JOB_CONFIG.pollInterval.hours || 0) * 60 +
+    (GENIUS_JOB_CONFIG.pollInterval.minutes || 0);
+
+  const totalMinutes =
+    initialDelayMinutes +
+    GENIUS_JOB_CONFIG.maxPollAttempts * pollIntervalMinutes;
+  const totalHours = (totalMinutes / 60).toFixed(2);
 
   throw new TerminalError(
-    `Genius closing job timed out after ${maxHours} hours. Job: ${job.jobName}`,
+    `Genius closing job timed out after ${totalMinutes} minutes (${totalHours} hours). Job: ${job.jobName}`,
     { errorCode: 504 }
   );
 }
@@ -206,18 +219,32 @@ async function executeMetricsStep(
     async () => await calculateFinancialMetrics(closingDate)
   );
 
+  const typedResult = {
+    ...result,
+    startTime:
+      typeof result.startTime === "string"
+        ? DateTime.fromISO(result.startTime)
+        : result.startTime,
+    endTime:
+      typeof result.endTime === "string"
+        ? DateTime.fromISO(result.endTime)
+        : result.endTime,
+  } as FinancialMetricsResult;
+
   if (!result.success) {
     ctx.console.error(
-      `❌ Financial metrics calculation failed: ${result.message}`
+      `❌ Financial metrics calculation failed: ${typedResult.message}`
     );
-    throw new Error(`Financial metrics calculation failed: ${result.message}`);
+    throw new Error(
+      `Financial metrics calculation failed: ${typedResult.message}`
+    );
   }
 
   ctx.console.log(
-    `✅ Financial metrics calculated successfully in ${result.duration}s`
+    `✅ Financial metrics calculated successfully in ${typedResult.duration}s`
   );
 
-  return result;
+  return typedResult;
 }
 
 export const dailyClosingWorkflow = workflow({
@@ -240,7 +267,7 @@ export const dailyClosingWorkflow = workflow({
       input?: z.infer<typeof DailyClosingInput>
     ): Promise<z.infer<typeof DailyClosingResult>> => {
       const workflowId = ctx.key;
-      const workflowStartTime = DateTime.now();
+      const workflowStartTime = DateTime.fromMillis(await ctx.date.now());
 
       const closingDate = input?.date || workflowId;
       const skipOracleClosing = input?.skipOracleClosing ?? false;
@@ -251,23 +278,24 @@ export const dailyClosingWorkflow = workflow({
         `📅 Starting daily closing workflow for date: ${closingDate}`
       );
 
-      const updateState = (state: WorkflowState) => {
+      const updateState = async (state: WorkflowState) => {
         ctx.set("state", {
           ...state,
-          lastUpdate: DateTime.now().toISO() ?? "",
+          lastUpdate: DateTime.fromMillis(await ctx.date.now()).toISO() ?? "",
         });
       };
 
-      updateState({ currentStep: "idle", lastUpdate: "" });
+      await updateState({ currentStep: "idle", lastUpdate: "" });
 
       let oracleResult: OracleStepResult | undefined;
       let financialMetricsResult: FinancialMetricsResult | undefined;
 
       try {
         if (!skipOracleClosing) {
-          updateState({
+          await updateState({
             currentStep: "oracle-closing",
-            stepStartTime: DateTime.now().toISO() ?? "",
+            stepStartTime:
+              DateTime.fromMillis(await ctx.date.now()).toISO() ?? "",
             lastUpdate: "",
           });
         }
@@ -280,7 +308,7 @@ export const dailyClosingWorkflow = workflow({
         );
 
         if (oracleResult?.jobName) {
-          updateState({
+          await updateState({
             currentStep: "oracle-closing",
             oracleJobName: oracleResult.jobName,
             stepStartTime: oracleResult.startTime.toISO() ?? "",
@@ -289,10 +317,11 @@ export const dailyClosingWorkflow = workflow({
         }
 
         if (!skipFinancialMetrics) {
-          updateState({
+          await updateState({
             currentStep: "financial-metrics",
             oracleJobName: oracleResult?.jobName,
-            stepStartTime: DateTime.now().toISO() ?? "",
+            stepStartTime:
+              DateTime.fromMillis(await ctx.date.now()).toISO() ?? "",
             lastUpdate: "",
           });
         }
@@ -304,7 +333,7 @@ export const dailyClosingWorkflow = workflow({
         );
 
         if (financialMetricsResult?.runId) {
-          updateState({
+          await updateState({
             currentStep: "financial-metrics",
             oracleJobName: oracleResult?.jobName,
             metricsRunId: financialMetricsResult.runId,
@@ -313,12 +342,12 @@ export const dailyClosingWorkflow = workflow({
           });
         }
 
-        const totalDuration = DateTime.now().diff(
+        const totalDuration = DateTime.fromMillis(await ctx.date.now()).diff(
           workflowStartTime,
           "seconds"
         ).seconds;
 
-        updateState({
+        await updateState({
           currentStep: "completed",
           oracleJobName: oracleResult?.jobName,
           metricsRunId: financialMetricsResult?.runId,
@@ -338,14 +367,14 @@ export const dailyClosingWorkflow = workflow({
           totalDuration,
         };
       } catch (error) {
-        const totalDuration = DateTime.now().diff(
+        const totalDuration = DateTime.fromMillis(await ctx.date.now()).diff(
           workflowStartTime,
           "seconds"
         ).seconds;
         const errorMessage =
           error instanceof Error ? error.message : "Unknown error";
 
-        updateState({
+        await updateState({
           currentStep: "failed",
           oracleJobName: oracleResult?.jobName,
           metricsRunId: financialMetricsResult?.runId,

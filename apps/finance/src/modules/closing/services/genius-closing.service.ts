@@ -1,5 +1,5 @@
 import { withConnection } from "@restate-tob/oracle";
-import { parseDateParts } from "@restate-tob/shared";
+import { parseDateParts, validateDateFormat } from "@restate-tob/shared";
 import { DateTime } from "luxon";
 import { OUT_FORMAT_OBJECT } from "oracledb";
 import { getOracleClient } from "../../../infrastructure/database.js";
@@ -12,8 +12,16 @@ export async function submitGeniusClosingJob(
   const startTime = DateTime.now();
 
   try {
+    if (!validateDateFormat(closingDate)) {
+      throw new Error(
+        `Invalid date format: "${closingDate}". Expected format: YYYY-MM-DD`
+      );
+    }
+
     const { year, month } = parseDateParts(closingDate);
-    const jobName = `GENIUS_CLOSING_${year}_${month}_${startTime.toMillis()}`;
+    const shortYear = String(year).slice(-2);
+    const uniqueSuffix = startTime.toMillis().toString(36).toUpperCase();
+    const jobName = `GNS_${shortYear}${month}_${uniqueSuffix}`;
 
     console.log(`🚀 Submitting Genius closing job: ${jobName}`);
     console.log(`   Year: ${year}, Month: ${month}, UserId: ${userId}`);
@@ -24,19 +32,14 @@ export async function submitGeniusClosingJob(
            DBMS_SCHEDULER.CREATE_JOB (
              job_name   => '${jobName}',
              job_type   => 'PLSQL_BLOCK',
-             job_action => 'BEGIN Package_Rpt_Ac_Fi806.get_master_data(:1, :2, :3, :4, :5, :6); END;',
-             number_of_arguments => 6,
-             enabled    => FALSE
+             job_action => 'DECLARE
+               l_out_1 VARCHAR2(4000);
+               l_out_2 VARCHAR2(4000);
+             BEGIN
+               Package_Rpt_Ac_Fi806.get_master_data(''${year}'', ''${month}'', ''${month}'', ''${userId}'', l_out_1, l_out_2);
+             END;',
+             enabled    => TRUE
            );
-
-           DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 1, '${year}');
-           DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 2, '${month}');
-           DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 3, '${month}');
-           DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 4, '${userId}');
-           DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 5, NULL);
-           DBMS_SCHEDULER.SET_JOB_ARGUMENT_VALUE('${jobName}', 6, NULL);
-
-           DBMS_SCHEDULER.ENABLE('${jobName}');
          END;`,
         {},
         { autoCommit: true }
@@ -69,7 +72,7 @@ export async function checkGeniusClosingJobStatus(
   try {
     return await withConnection(getOracleClient(), async (connection) => {
       const result = await connection.execute(
-        `SELECT state, error#,
+        `SELECT state, failure_count,
                 TO_CHAR(last_start_date, 'YYYY-MM-DD HH24:MI:SS') as last_start,
                 TO_CHAR(last_run_duration, 'HH24:MI:SS') as duration
          FROM user_scheduler_jobs
@@ -90,18 +93,18 @@ export async function checkGeniusClosingJobStatus(
 
       const row = result.rows[0] as {
         STATE: string;
-        "ERROR#": number;
+        FAILURE_COUNT: number;
         LAST_START: string;
         DURATION: string;
       };
       const state = row.STATE;
-      const error = row["ERROR#"];
+      const failureCount = row.FAILURE_COUNT;
       const lastStart = row.LAST_START;
       const duration = row.DURATION;
 
       const running = state === "RUNNING";
       const completed = state === "SUCCEEDED" || state === "COMPLETED";
-      const failed = state === "FAILED" || error > 0;
+      const failed = state === "FAILED" || failureCount > 0;
 
       let message = `Job ${jobName}: ${state}`;
       if (lastStart) {
@@ -110,8 +113,8 @@ export async function checkGeniusClosingJobStatus(
       if (duration) {
         message += ` (duration: ${duration})`;
       }
-      if (error) {
-        message += ` [Error: ${error}]`;
+      if (failureCount) {
+        message += ` [Failures: ${failureCount}]`;
       }
 
       return {

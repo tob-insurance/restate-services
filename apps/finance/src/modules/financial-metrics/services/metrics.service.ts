@@ -1,15 +1,43 @@
 import { isDataIntegrityError, withConnection } from "@restate-tob/postgres";
+import { TerminalError } from "@restatedev/restate-sdk";
 import { DateTime } from "luxon";
 import type { QueryResult } from "pg";
+import { z } from "zod";
 import { getPostgresClient } from "../../../infrastructure/database.js";
 import type { CalculationRunStatus, FinancialMetricsResult } from "../types.js";
 
-export async function calculateFinancialMetrics(
-  reportDate: string
-): Promise<FinancialMetricsResult> {
-  const startTime = DateTime.now();
+const CalculateMetricsInputSchema = z.object({
+  reportDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format. Expected YYYY-MM-DD"),
+  currentTimeMillis: z.number().optional(),
+});
 
-  const date = DateTime.fromISO(reportDate);
+const RunIdSchema = z.string().uuid("Invalid run ID format");
+
+const CalculationRunStatusRowSchema = z.object({
+  status: z.string(),
+  completed_steps: z.number(),
+  total_steps: z.number(),
+  error_count: z.number(),
+  warning_count: z.number(),
+  metadata: z.any().optional(),
+});
+
+export async function calculateFinancialMetrics(
+  reportDate: string,
+  currentTimeMillis?: number
+): Promise<FinancialMetricsResult> {
+  const validated = CalculateMetricsInputSchema.parse({
+    reportDate,
+    currentTimeMillis,
+  });
+
+  const startTime = validated.currentTimeMillis
+    ? DateTime.fromMillis(validated.currentTimeMillis)
+    : DateTime.now();
+
+  const date = DateTime.fromISO(validated.reportDate);
   const year = date.year;
   const month = date.month;
 
@@ -52,23 +80,18 @@ export async function calculateFinancialMetrics(
             `   This is a data integrity error (code: ${pgError.code}), not retrying.`
           );
 
-          const endTime = DateTime.now();
-          const duration = endTime.diff(startTime, "seconds").seconds;
-
-          return {
-            success: false,
-            startTime,
-            endTime,
-            duration,
-            message: `Data integrity error: ${pgError.message || "Unknown error"}. Check calculation_runs table for run_id: ${runId}`,
-            runId,
-          };
+          throw new TerminalError(
+            `Data integrity error: ${pgError.message || "Unknown error"}. Check calculation_runs table for run_id: ${runId}`,
+            { errorCode: 422 }
+          );
         }
 
         throw execError;
       }
 
-      const endTime = DateTime.now();
+      const endTime = validated.currentTimeMillis
+        ? DateTime.fromMillis(validated.currentTimeMillis)
+        : DateTime.now();
       const duration = endTime.diff(startTime, "seconds").seconds;
       const resultMessage = result.rows[0]?.result || "Completed";
 
@@ -88,6 +111,12 @@ export async function calculateFinancialMetrics(
       };
     });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new TerminalError(
+        `Validation error: ${error.issues.map((e: z.ZodIssue) => e.message).join(", ")}`,
+        { errorCode: 400 }
+      );
+    }
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("❌ Financial metrics calculation failed:", errorMessage);
     throw error;
@@ -98,19 +127,21 @@ export async function getCalculationRunStatus(
   runId: string
 ): Promise<CalculationRunStatus | null> {
   try {
+    const validated = RunIdSchema.parse(runId);
+
     return await withConnection(getPostgresClient(), async (client) => {
       const result = await client.query(
         `SELECT status, completed_steps, total_steps, error_count, warning_count, metadata
          FROM financial_report.calculation_runs
          WHERE id = $1`,
-        [runId]
+        [validated]
       );
 
       if (result.rows.length === 0) {
         return null;
       }
 
-      const row = result.rows[0];
+      const row = CalculationRunStatusRowSchema.parse(result.rows[0]);
       return {
         status: row.status,
         completedSteps: row.completed_steps,
@@ -121,6 +152,10 @@ export async function getCalculationRunStatus(
       };
     });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      console.error("Invalid run ID format:", error);
+      return null;
+    }
     console.error("Failed to get calculation run status:", error);
     return null;
   }

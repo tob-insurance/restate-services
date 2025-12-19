@@ -1,47 +1,80 @@
 import { withConnection } from "@restate-tob/oracle";
-import { parseDateParts, validateDateFormat } from "@restate-tob/shared";
+import { parseDateParts } from "@restate-tob/shared";
+import { TerminalError } from "@restatedev/restate-sdk";
 import { DateTime } from "luxon";
 import { OUT_FORMAT_OBJECT } from "oracledb";
+import { z } from "zod";
 import { getOracleClient } from "../../../infrastructure/database.js";
 import type { GeniusClosingJobSubmit, GeniusJobStatus } from "../types.js";
 
+const SubmitJobInputSchema = z.object({
+  closingDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format. Expected YYYY-MM-DD"),
+  userId: z
+    .string()
+    .regex(
+      /^[a-zA-Z0-9_]+$/,
+      "UserId can only contain alphanumeric characters and underscores"
+    ),
+  currentTimeMillis: z.number().optional(),
+});
+
+const JobNameSchema = z
+  .string()
+  .regex(/^[A-Z0-9_]+$/, "Invalid job name format");
+
 export async function submitGeniusClosingJob(
   closingDate: string,
-  userId = "adm"
+  userId = "adm",
+  currentTimeMillis?: number
 ): Promise<GeniusClosingJobSubmit> {
-  const startTime = DateTime.now();
+  const validated = SubmitJobInputSchema.parse({
+    closingDate,
+    userId,
+    currentTimeMillis,
+  });
+
+  const startTime = validated.currentTimeMillis
+    ? DateTime.fromMillis(validated.currentTimeMillis)
+    : DateTime.now();
 
   try {
-    if (!validateDateFormat(closingDate)) {
-      throw new Error(
-        `Invalid date format: "${closingDate}". Expected format: YYYY-MM-DD`
-      );
-    }
-
-    const { year, month } = parseDateParts(closingDate);
+    const { year, month } = parseDateParts(validated.closingDate);
     const shortYear = String(year).slice(-2);
     const uniqueSuffix = startTime.toMillis().toString(36).toUpperCase();
     const jobName = `GNS_${shortYear}${month}_${uniqueSuffix}`;
 
     console.log(`🚀 Submitting Genius closing job: ${jobName}`);
-    console.log(`   Year: ${year}, Month: ${month}, UserId: ${userId}`);
+    console.log(
+      `   Year: ${year}, Month: ${month}, UserId: ${validated.userId}`
+    );
 
     await withConnection(getOracleClient(), async (connection) => {
+      const plsqlBlock = `DECLARE
+  l_out_1 VARCHAR2(4000);
+  l_out_2 VARCHAR2(4000);
+BEGIN
+  Package_Rpt_Ac_Fi806.get_master_data(:year, :month, :month, :userId, l_out_1, l_out_2);
+END;`;
+
       await connection.execute(
         `BEGIN
            DBMS_SCHEDULER.CREATE_JOB (
-             job_name   => '${jobName}',
+             job_name   => :jobName,
              job_type   => 'PLSQL_BLOCK',
-             job_action => 'DECLARE
-               l_out_1 VARCHAR2(4000);
-               l_out_2 VARCHAR2(4000);
-             BEGIN
-               Package_Rpt_Ac_Fi806.get_master_data(''${year}'', ''${month}'', ''${month}'', ''${userId}'', l_out_1, l_out_2);
-             END;',
+             job_action => :jobAction,
              enabled    => TRUE
            );
          END;`,
-        {},
+        {
+          jobName,
+          jobAction: plsqlBlock
+            .replace(":year", `'${year}'`)
+            .replace(":month", `'${month}'`)
+            .replace(":month", `'${month}'`)
+            .replace(":userId", `'${validated.userId}'`),
+        },
         { autoCommit: true }
       );
     });
@@ -61,6 +94,12 @@ export async function submitGeniusClosingJob(
       startTime,
     };
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new TerminalError(
+        `Validation error: ${error.issues.map((e: z.ZodIssue) => e.message).join(", ")}`,
+        { errorCode: 400 }
+      );
+    }
     console.error("❌ Failed to submit Genius closing job:", error);
     throw error;
   }
@@ -70,6 +109,8 @@ export async function checkGeniusClosingJobStatus(
   jobName: string
 ): Promise<GeniusJobStatus> {
   try {
+    const validated = JobNameSchema.parse(jobName);
+
     return await withConnection(getOracleClient(), async (connection) => {
       const result = await connection.execute(
         `SELECT state, failure_count,
@@ -77,7 +118,7 @@ export async function checkGeniusClosingJobStatus(
                 TO_CHAR(last_run_duration, 'HH24:MI:SS') as duration
          FROM user_scheduler_jobs
          WHERE job_name = :jobName`,
-        { jobName },
+        { jobName: validated },
         { outFormat: OUT_FORMAT_OBJECT }
       );
 
@@ -87,7 +128,7 @@ export async function checkGeniusClosingJobStatus(
           running: false,
           completed: false,
           failed: false,
-          message: `Job ${jobName} not found. It may have been completed and cleaned up.`,
+          message: `Job ${validated} not found. It may have been completed and cleaned up.`,
         };
       }
 
@@ -106,7 +147,7 @@ export async function checkGeniusClosingJobStatus(
       const completed = state === "SUCCEEDED" || state === "COMPLETED";
       const failed = state === "FAILED" || failureCount > 0;
 
-      let message = `Job ${jobName}: ${state}`;
+      let message = `Job ${validated}: ${state}`;
       if (lastStart) {
         message += ` (started: ${lastStart})`;
       }
@@ -126,6 +167,11 @@ export async function checkGeniusClosingJobStatus(
       };
     });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new TerminalError(`Invalid job name: ${jobName}`, {
+        errorCode: 400,
+      });
+    }
     console.error("❌ Failed to check job status:", error);
     throw error;
   }

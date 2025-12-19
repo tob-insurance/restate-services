@@ -3,10 +3,41 @@ import { DateTime } from "luxon";
 import { JAKARTA_ZONE } from "../../../constants.js";
 import { dailyClosingWorkflow } from "../workflows/index.js";
 
-const SCHEDULE_CONFIG = {
-  hour: 0,
-  minute: 0,
-};
+const TIME_FORMAT_REGEX = /^(\d{1,2}):(\d{2})$/;
+
+function getScheduleConfig() {
+  const scheduleTime = process.env.DAILY_CLOSING_SCHEDULE_TIME || "00:00";
+  const timeMatch = scheduleTime.match(TIME_FORMAT_REGEX);
+
+  if (!timeMatch) {
+    throw new Error(
+      `Invalid DAILY_CLOSING_SCHEDULE_TIME: "${scheduleTime}". Expected format: HH:mm (e.g., "02:30", "14:00")`
+    );
+  }
+
+  const hour = Number.parseInt(timeMatch[1], 10);
+  const minute = Number.parseInt(timeMatch[2], 10);
+
+  if (hour < 0 || hour > 23) {
+    throw new Error(
+      `Invalid hour in DAILY_CLOSING_SCHEDULE_TIME: "${scheduleTime}". Hour must be 0-23.`
+    );
+  }
+
+  if (minute < 0 || minute > 59) {
+    throw new Error(
+      `Invalid minute in DAILY_CLOSING_SCHEDULE_TIME: "${scheduleTime}". Minute must be 0-59.`
+    );
+  }
+
+  return { hour, minute };
+}
+
+const SCHEDULE_CONFIG = getScheduleConfig();
+
+console.log(
+  `📅 Daily closing scheduled for ${String(SCHEDULE_CONFIG.hour).padStart(2, "0")}:${String(SCHEDULE_CONFIG.minute).padStart(2, "0")} Jakarta Time`
+);
 
 export const DailyClosingScheduler = object({
   name: "DailyClosingScheduler",
@@ -17,7 +48,9 @@ export const DailyClosingScheduler = object({
     },
 
     trigger: async (ctx: ObjectContext) => {
-      const nowJakarta = DateTime.now().setZone(JAKARTA_ZONE);
+      const nowJakarta = DateTime.fromMillis(await ctx.date.now()).setZone(
+        JAKARTA_ZONE
+      );
       const dateStr = nowJakarta.toFormat("yyyy-MM-dd");
 
       ctx.console.log(

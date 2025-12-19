@@ -50,6 +50,7 @@ export function createOracleClient(config: OracleConfig): OracleClient {
   initThickMode(config.instantClientPath);
 
   let pool: Pool | null = null;
+  let poolInitializing = false;
 
   const poolConfig = {
     user: config.user,
@@ -59,11 +60,21 @@ export function createOracleClient(config: OracleConfig): OracleClient {
     poolMax: config.poolMax ?? (isLambda ? 1 : 10),
     poolIncrement: 1,
     poolTimeout: 60,
+    queueTimeout: 60_000,
+    connectionTimeout: 60_000,
   };
 
   async function initPool(): Promise<void> {
-    pool = await oracledb.createPool(poolConfig);
-    console.log("✅ Oracle connection pool created");
+    if (pool || poolInitializing) {
+      return;
+    }
+    poolInitializing = true;
+    try {
+      pool = await oracledb.createPool(poolConfig);
+      console.log("✅ Oracle connection pool created");
+    } finally {
+      poolInitializing = false;
+    }
   }
 
   return {

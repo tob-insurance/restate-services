@@ -76,7 +76,32 @@ This codebase uses [Restate](https://restate.dev) for durable execution. Key con
 - Use `ctx.sleep()` instead of `setTimeout`
 - Use `ctx.date.now()` instead of `Date.now()` for deterministic replay
 - Use `RestatePromise.all/race/any` instead of native `Promise` methods
-- Throw `TerminalError` for non-retryable failures
+- Throw `TerminalError` for non-retryable failures (validation errors, data integrity errors)
+- Always propagate errors - do not catch and return success:false in workflows
+
+### Error Recovery Strategy
+
+**Non-Retryable Errors (use `TerminalError`):**
+- Input validation failures (invalid date formats, malformed IDs)
+- Data integrity violations (foreign key constraints, unique violations)
+- Authorization/authentication failures
+- Business logic violations
+
+**Retryable Errors (throw regular Error):**
+- Network timeouts
+- Database connection failures
+- Temporary service unavailability
+
+**Connection Timeouts:**
+- PostgreSQL: 10s connection, 300s statement timeout
+- Oracle: 60s connection, 60s queue timeout
+- All database operations wrapped in connection helpers for proper cleanup
+
+**Workflow State Management:**
+- Workflow state persisted at each major step
+- State includes: current step, job/run IDs, timestamps
+- Failed workflows update state to "failed" before throwing error
+- Use `getStatus` handler to query workflow progress at any time
 
 ### Finance App (`apps/finance`)
 
@@ -106,6 +131,17 @@ src/
 Required for `apps/finance`:
 
 ```env
+# Database Configuration
 PG_HOST, PG_PORT, PG_DATABASE, PG_USER, PG_PASSWORD, PG_SCHEMA
 ORACLE_USER, ORACLE_PASSWORD, ORACLE_CONNECT_STRING
+
+# Optional: Oracle Instant Client Path (for macOS/Windows)
+ORACLE_INSTANT_CLIENT_PATH=/path/to/instantclient
+
+# Scheduler Configuration (Jakarta Time)
+DAILY_CLOSING_SCHEDULE_TIME=00:00    # Default: 00:00 (midnight)
 ```
+
+**Schedule Configuration:**
+- `DAILY_CLOSING_SCHEDULE_TIME`: Time in HH:mm format (24-hour) in Jakarta timezone
+- Examples: `00:00` (midnight), `02:30` (2:30 AM), `18:00` (6:00 PM)

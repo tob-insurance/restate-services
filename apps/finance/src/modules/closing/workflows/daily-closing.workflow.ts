@@ -121,7 +121,7 @@ async function executeOracleStep(
   );
 
   const job = await ctx.run("submit-genius-job", async () =>
-    submitGeniusClosingJob(closingDate, userId)
+    submitGeniusClosingJob(closingDate, userId, await ctx.date.now())
   );
 
   if (!job.submitted) {
@@ -216,7 +216,8 @@ async function executeMetricsStep(
 
   const result = await ctx.run(
     "financial-metrics",
-    async () => await calculateFinancialMetrics(closingDate)
+    async () =>
+      await calculateFinancialMetrics(closingDate, await ctx.date.now())
   );
 
   const typedResult = {
@@ -367,13 +368,6 @@ export const dailyClosingWorkflow = workflow({
           totalDuration,
         };
       } catch (error) {
-        const totalDuration = DateTime.fromMillis(await ctx.date.now()).diff(
-          workflowStartTime,
-          "seconds"
-        ).seconds;
-        const errorMessage =
-          error instanceof Error ? error.message : "Unknown error";
-
         await updateState({
           currentStep: "failed",
           oracleJobName: oracleResult?.jobName,
@@ -381,16 +375,11 @@ export const dailyClosingWorkflow = workflow({
           lastUpdate: "",
         });
 
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
         ctx.console.error(`❌ Daily closing workflow failed: ${errorMessage}`);
 
-        return {
-          workflowId,
-          date: closingDate,
-          oracleClosing: formatStepResult(oracleResult),
-          financialMetrics: formatStepResult(financialMetricsResult),
-          overallSuccess: false,
-          totalDuration,
-        };
+        throw error;
       }
     },
 

@@ -1,3 +1,4 @@
+import "varlock/auto-load";
 import { serve } from "@restatedev/restate-sdk";
 import { testConnections } from "./infrastructure/database.js";
 import {

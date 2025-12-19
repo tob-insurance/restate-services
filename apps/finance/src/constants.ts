@@ -1,1 +1,1 @@
-export const JAKARTA_ZONE = "Asia/Jakarta";
+export const TIMEZONE = process.env.TZ || "Asia/Jakarta";

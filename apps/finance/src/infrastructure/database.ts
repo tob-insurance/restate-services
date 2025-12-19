@@ -3,9 +3,6 @@ import {
   createPostgresClient,
   type PostgresClient,
 } from "@restate-tob/postgres";
-import { config } from "dotenv";
-
-config();
 
 let postgresClient: PostgresClient | null = null;
 let oracleClient: OracleClient | null = null;

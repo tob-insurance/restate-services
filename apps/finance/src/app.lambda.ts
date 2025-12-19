@@ -1,3 +1,4 @@
+import "varlock/auto-load";
 import { createEndpointHandler } from "@restatedev/restate-sdk/lambda";
 import { initOracleClient } from "./infrastructure/database.js";
 import {

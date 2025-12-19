@@ -8,6 +8,10 @@ dist
 # Environment
 .env*
 !.env.example
+!.env.schema
+
+# Varlock generated types
+env.d.ts
 
 # Logs
 npm-debug.log*

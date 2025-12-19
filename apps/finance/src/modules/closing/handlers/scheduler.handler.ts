@@ -1,6 +1,6 @@
 import { type ObjectContext, object } from "@restatedev/restate-sdk";
 import { DateTime } from "luxon";
-import { JAKARTA_ZONE } from "../../../constants.js";
+import { TIMEZONE } from "../../../constants.js";
 import { dailyClosingWorkflow } from "../workflows/index.js";
 
 const TIME_FORMAT_REGEX = /^(\d{1,2}):(\d{2})$/;
@@ -36,7 +36,7 @@ function getScheduleConfig() {
 const SCHEDULE_CONFIG = getScheduleConfig();
 
 console.log(
-  `📅 Daily closing scheduled for ${String(SCHEDULE_CONFIG.hour).padStart(2, "0")}:${String(SCHEDULE_CONFIG.minute).padStart(2, "0")} Jakarta Time`
+  `📅 Daily closing scheduled for ${String(SCHEDULE_CONFIG.hour).padStart(2, "0")}:${String(SCHEDULE_CONFIG.minute).padStart(2, "0")} (${TIMEZONE})`
 );
 
 export const DailyClosingScheduler = object({
@@ -48,10 +48,8 @@ export const DailyClosingScheduler = object({
     },
 
     trigger: async (ctx: ObjectContext) => {
-      const nowJakarta = DateTime.fromMillis(await ctx.date.now()).setZone(
-        JAKARTA_ZONE
-      );
-      const dateStr = nowJakarta.toFormat("yyyy-MM-dd");
+      const now = DateTime.fromMillis(await ctx.date.now()).setZone(TIMEZONE);
+      const dateStr = now.toFormat("yyyy-MM-dd");
 
       ctx.console.log(
         `⏰ Triggering Daily Closing Workflow for date: ${dateStr}`
@@ -71,28 +69,28 @@ export const DailyClosingScheduler = object({
 
 async function scheduleNextRun(ctx: ObjectContext) {
   const currentTime = await ctx.date.now();
-  const nowJakarta = DateTime.fromMillis(currentTime).setZone(JAKARTA_ZONE);
+  const now = DateTime.fromMillis(currentTime).setZone(TIMEZONE);
 
   ctx.console.log(
     `[DEBUG] Current Time (UTC): ${DateTime.fromMillis(currentTime).toISO()}`
   );
   ctx.console.log(
-    `[DEBUG] Current Jakarta Time: ${nowJakarta.toFormat("yyyy-MM-dd HH:mm")}`
+    `[DEBUG] Current Local Time: ${now.toFormat("yyyy-MM-dd HH:mm")}`
   );
 
-  let targetTime = nowJakarta.set({
+  let targetTime = now.set({
     hour: SCHEDULE_CONFIG.hour,
     minute: SCHEDULE_CONFIG.minute,
     second: 0,
     millisecond: 0,
   });
 
-  if (targetTime <= nowJakarta) {
+  if (targetTime <= now) {
     targetTime = targetTime.plus({ days: 1 });
   }
 
-  const delayMs = targetTime.diff(nowJakarta, "milliseconds").milliseconds;
-  const targetTimeStr = `${targetTime.toFormat("yyyy-MM-dd HH:mm")} (Jakarta Time)`;
+  const delayMs = targetTime.diff(now, "milliseconds").milliseconds;
+  const targetTimeStr = `${targetTime.toFormat("yyyy-MM-dd HH:mm")} (${TIMEZONE})`;
 
   ctx.console.log(
     `📅 Next run scheduled for: ${targetTimeStr} (in ${Math.round(delayMs / 1000 / 60)} minutes)`

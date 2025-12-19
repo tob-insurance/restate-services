@@ -7,6 +7,7 @@ import {
 } from "@restatedev/restate-sdk";
 import { DateTime } from "luxon";
 import { z } from "zod";
+import { DEFAULT_USER_ID, GENIUS_JOB_CONFIG } from "../../../constants.js";
 import {
   calculateFinancialMetrics,
   type FinancialMetricsResult,
@@ -30,21 +31,21 @@ type WorkflowState = {
   lastUpdate: string;
 };
 
-const GENIUS_JOB_CONFIG: {
+const getGeniusJobDurations = (): {
   initialDelay: Duration;
   pollInterval: Duration;
   maxPollAttempts: number;
-} = {
-  initialDelay: { hours: 5 },
-  pollInterval: { hours: 1 },
-  maxPollAttempts: 7,
-};
+} => ({
+  initialDelay: { hours: GENIUS_JOB_CONFIG.initialDelayHours },
+  pollInterval: { hours: GENIUS_JOB_CONFIG.pollIntervalHours },
+  maxPollAttempts: GENIUS_JOB_CONFIG.maxPollAttempts,
+});
 
 export const DailyClosingInput = z.object({
   date: z.string(),
   skipOracleClosing: z.boolean().optional().default(false),
   skipFinancialMetrics: z.boolean().optional().default(false),
-  userId: z.string().optional().default("adm"),
+  userId: z.string().optional(),
 });
 
 export const DailyClosingResult = z.object({
@@ -113,11 +114,12 @@ async function executeOracleStep(
     return;
   }
 
+  const jobConfig = getGeniusJobDurations();
   const startTime = DateTime.fromMillis(await ctx.date.now());
 
   ctx.console.log("⏳ Step 1: Submitting Genius closing job...");
   ctx.console.log(
-    `   Initial delay: ${GENIUS_JOB_CONFIG.initialDelay.hours}h, Poll interval: ${GENIUS_JOB_CONFIG.pollInterval.hours}h`
+    `   Initial delay: ${GENIUS_JOB_CONFIG.initialDelayHours}h, Poll interval: ${GENIUS_JOB_CONFIG.pollIntervalHours}h`
   );
 
   const job = await ctx.run("submit-genius-job", async () =>
@@ -132,18 +134,14 @@ async function executeOracleStep(
 
   ctx.console.log(`✅ Job ${job.jobName} submitted successfully`);
   ctx.console.log(
-    `⏸️  Waiting ${GENIUS_JOB_CONFIG.initialDelay.hours} hours before first status check...`
+    `⏸️  Waiting ${GENIUS_JOB_CONFIG.initialDelayHours} hours before first status check...`
   );
 
-  await ctx.sleep(GENIUS_JOB_CONFIG.initialDelay);
+  await ctx.sleep(jobConfig.initialDelay);
 
-  for (
-    let attempt = 0;
-    attempt < GENIUS_JOB_CONFIG.maxPollAttempts;
-    attempt++
-  ) {
+  for (let attempt = 0; attempt < jobConfig.maxPollAttempts; attempt++) {
     ctx.console.log(
-      `🔍 Checking job status (attempt ${attempt + 1}/${GENIUS_JOB_CONFIG.maxPollAttempts})...`
+      `🔍 Checking job status (attempt ${attempt + 1}/${jobConfig.maxPollAttempts})...`
     );
 
     const status = await ctx.run(`check-job-status-${attempt}`, async () =>
@@ -174,24 +172,19 @@ async function executeOracleStep(
       });
     }
 
-    if (attempt < GENIUS_JOB_CONFIG.maxPollAttempts - 1) {
+    if (attempt < jobConfig.maxPollAttempts - 1) {
       ctx.console.log(
-        `⏸️  Job still running. Sleeping for ${GENIUS_JOB_CONFIG.pollInterval.hours} hour(s)...`
+        `⏸️  Job still running. Sleeping for ${GENIUS_JOB_CONFIG.pollIntervalHours} hour(s)...`
       );
-      await ctx.sleep(GENIUS_JOB_CONFIG.pollInterval);
+      await ctx.sleep(jobConfig.pollInterval);
     }
   }
 
-  const initialDelayMinutes =
-    (GENIUS_JOB_CONFIG.initialDelay.hours || 0) * 60 +
-    (GENIUS_JOB_CONFIG.initialDelay.minutes || 0);
-  const pollIntervalMinutes =
-    (GENIUS_JOB_CONFIG.pollInterval.hours || 0) * 60 +
-    (GENIUS_JOB_CONFIG.pollInterval.minutes || 0);
+  const initialDelayMinutes = GENIUS_JOB_CONFIG.initialDelayHours * 60;
+  const pollIntervalMinutes = GENIUS_JOB_CONFIG.pollIntervalHours * 60;
 
   const totalMinutes =
-    initialDelayMinutes +
-    GENIUS_JOB_CONFIG.maxPollAttempts * pollIntervalMinutes;
+    initialDelayMinutes + jobConfig.maxPollAttempts * pollIntervalMinutes;
   const totalHours = (totalMinutes / 60).toFixed(2);
 
   throw new TerminalError(
@@ -236,8 +229,9 @@ async function executeMetricsStep(
     ctx.console.error(
       `❌ Financial metrics calculation failed: ${typedResult.message}`
     );
-    throw new Error(
-      `Financial metrics calculation failed: ${typedResult.message}`
+    throw new TerminalError(
+      `Financial metrics calculation failed: ${typedResult.message}`,
+      { errorCode: 500 }
     );
   }
 
@@ -273,7 +267,7 @@ export const dailyClosingWorkflow = workflow({
       const closingDate = input?.date || workflowId;
       const skipOracleClosing = input?.skipOracleClosing ?? false;
       const skipFinancialMetrics = input?.skipFinancialMetrics ?? false;
-      const userId = input?.userId || "adm";
+      const userId = input?.userId || DEFAULT_USER_ID;
 
       ctx.console.log(
         `📅 Starting daily closing workflow for date: ${closingDate}`

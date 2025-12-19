@@ -51,11 +51,18 @@ export async function submitGeniusClosingJob(
     );
 
     await withConnection(getOracleClient(), async (connection) => {
+      const escapeOracleString = (value: string): string =>
+        value.replace(/'/g, "''");
+
+      const safeYear = escapeOracleString(String(year));
+      const safeMonth = escapeOracleString(String(month));
+      const safeUserId = escapeOracleString(validated.userId);
+
       const plsqlBlock = `DECLARE
   l_out_1 VARCHAR2(4000);
   l_out_2 VARCHAR2(4000);
 BEGIN
-  Package_Rpt_Ac_Fi806.get_master_data(:year, :month, :month, :userId, l_out_1, l_out_2);
+  Package_Rpt_Ac_Fi806.get_master_data('${safeYear}', '${safeMonth}', '${safeMonth}', '${safeUserId}', l_out_1, l_out_2);
 END;`;
 
       await connection.execute(
@@ -69,11 +76,7 @@ END;`;
          END;`,
         {
           jobName,
-          jobAction: plsqlBlock
-            .replace(":year", `'${year}'`)
-            .replace(":month", `'${month}'`)
-            .replace(":month", `'${month}'`)
-            .replace(":userId", `'${validated.userId}'`),
+          jobAction: plsqlBlock,
         },
         { autoCommit: true }
       );
@@ -126,9 +129,9 @@ export async function checkGeniusClosingJobStatus(
         return {
           status: "NOT_FOUND",
           running: false,
-          completed: false,
+          completed: true,
           failed: false,
-          message: `Job ${validated} not found. It may have been completed and cleaned up.`,
+          message: `Job ${validated} not found. It likely completed successfully and was cleaned up by the scheduler.`,
         };
       }
 

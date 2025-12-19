@@ -89,9 +89,7 @@ export async function calculateFinancialMetrics(
         throw execError;
       }
 
-      const endTime = validated.currentTimeMillis
-        ? DateTime.fromMillis(validated.currentTimeMillis)
-        : DateTime.now();
+      const endTime = DateTime.now();
       const duration = endTime.diff(startTime, "seconds").seconds;
       const resultMessage = result.rows[0]?.result || "Completed";
 

@@ -12,24 +12,28 @@ let oracleClient: OracleClient | null = null;
 
 export function getPostgresClient(): PostgresClient {
   if (!postgresClient) {
-    postgresClient = createPostgresClient({
-      host: process.env.PG_HOST || "127.0.0.1",
-      port: Number.parseInt(process.env.PG_PORT || "5432", 10),
-      database: process.env.PG_DATABASE || "postgres",
-      user: process.env.PG_USER || "postgres",
-      password: process.env.PG_PASSWORD,
-      schema: process.env.PG_SCHEMA || "public",
-    });
+    const connectionString = process.env.POSTGRES_URL;
+    if (!connectionString) {
+      throw new Error("POSTGRES_URL environment variable is required");
+    }
+    postgresClient = createPostgresClient({ connectionString });
   }
   return postgresClient;
 }
 
 export function getOracleClient(): OracleClient {
   if (!oracleClient) {
+    const connectionString = process.env.ORACLE_URL;
+    if (!connectionString) {
+      throw new Error("ORACLE_URL environment variable is required");
+    }
+
+    // Parse oracle://user:password@host:port/service
+    const url = new URL(connectionString);
     oracleClient = createOracleClient({
-      user: process.env.ORACLE_USER || "",
-      password: process.env.ORACLE_PASSWORD || "",
-      connectString: process.env.ORACLE_CONNECT_STRING || "",
+      user: decodeURIComponent(url.username),
+      password: decodeURIComponent(url.password),
+      connectString: `${url.hostname}:${url.port || "1521"}${url.pathname}`,
       instantClientPath: process.env.ORACLE_INSTANT_CLIENT_PATH,
     });
   }

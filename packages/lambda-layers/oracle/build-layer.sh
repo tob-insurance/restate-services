@@ -57,9 +57,9 @@ if [ -z "$EXTRACTED_DIR" ]; then
     exit 1
 fi
 
-# Copy required libraries
+# Copy required libraries (preserve symlinks to avoid duplicating large files)
 echo "📋 Copying required libraries..."
-cp "${EXTRACTED_DIR}"/*.so* "${BUILD_DIR}/lib/" 2>/dev/null || true
+cp -a "${EXTRACTED_DIR}"/*.so* "${BUILD_DIR}/lib/" 2>/dev/null || true
 
 # Get libaio from Amazon Linux container
 echo "🐧 Fetching libaio.so.1 from Amazon Linux..."
@@ -82,11 +82,11 @@ echo ""
 echo "📚 Libraries included in layer:"
 ls -lh "${BUILD_DIR}/lib/"
 
-# Create layer zip
+# Create layer zip (with symlinks preserved)
 echo ""
 echo "📦 Creating Lambda Layer zip..."
 cd "${BUILD_DIR}"
-zip -r "${OUTPUT_DIR}/oracle-instantclient-layer.zip" lib/
+zip -ry "${OUTPUT_DIR}/oracle-instantclient-layer.zip" lib/
 
 # Get final size
 LAYER_SIZE=$(du -h "${OUTPUT_DIR}/oracle-instantclient-layer.zip" | cut -f1)

@@ -4,25 +4,19 @@ import { TerminalError } from "@restatedev/restate-sdk";
 import { DateTime } from "luxon";
 import { OUT_FORMAT_OBJECT } from "oracledb";
 import { z } from "zod";
-import { getOracleClient } from "../../../infrastructure/database.js";
+import {
+  DateStringSchema,
+  getOracleClient,
+  JobNameSchema,
+  UserIdSchema,
+} from "../../../infrastructure/index.js";
 import type { GeniusClosingJobSubmit, GeniusJobStatus } from "../types.js";
 
 const SubmitJobInputSchema = z.object({
-  closingDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format. Expected YYYY-MM-DD"),
-  userId: z
-    .string()
-    .regex(
-      /^[a-zA-Z0-9_]+$/,
-      "UserId can only contain alphanumeric characters and underscores"
-    ),
+  closingDate: DateStringSchema,
+  userId: UserIdSchema,
   currentTimeMillis: z.number().optional(),
 });
-
-const JobNameSchema = z
-  .string()
-  .regex(/^[A-Z0-9_]+$/, "Invalid job name format");
 
 export async function submitGeniusClosingJob(
   closingDate: string,
@@ -103,7 +97,6 @@ END;`;
         { errorCode: 400 }
       );
     }
-    console.error("❌ Failed to submit Genius closing job:", error);
     throw error;
   }
 }
@@ -175,7 +168,6 @@ export async function checkGeniusClosingJobStatus(
         errorCode: 400,
       });
     }
-    console.error("❌ Failed to check job status:", error);
     throw error;
   }
 }

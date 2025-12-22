@@ -207,10 +207,16 @@ async function executeMetricsStep(
 
   ctx.console.log("⏳ Step 2: Calculating financial metrics...");
 
+  const metricsRunId = ctx.rand.uuidv4();
+
   const result = await ctx.run(
     "financial-metrics",
     async () =>
-      await calculateFinancialMetrics(closingDate, await ctx.date.now())
+      await calculateFinancialMetrics(
+        closingDate,
+        metricsRunId,
+        await ctx.date.now()
+      )
   );
 
   const typedResult = {

@@ -115,7 +115,8 @@ async function executeOracleStep(
   }
 
   const jobConfig = getGeniusJobDurations();
-  const startTime = DateTime.fromMillis(await ctx.date.now());
+  const currentTime = await ctx.date.now();
+  const startTime = DateTime.fromMillis(currentTime);
 
   ctx.console.log("⏳ Step 1: Submitting Genius closing job...");
   ctx.console.log(
@@ -123,7 +124,7 @@ async function executeOracleStep(
   );
 
   const job = await ctx.run("submit-genius-job", async () =>
-    submitGeniusClosingJob(closingDate, userId, await ctx.date.now())
+    submitGeniusClosingJob(closingDate, userId, currentTime)
   );
 
   if (!job.submitted) {

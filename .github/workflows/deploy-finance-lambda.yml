@@ -74,12 +74,25 @@ jobs:
       - name: Deploy Lambda Function
         id: deploy
         run: |
+          # Get latest Oracle layer version
+          LAYER_ARN=$(aws lambda list-layer-versions \
+            --layer-name ${{ env.LAMBDA_LAYER_NAME }} \
+            --query 'LayerVersions[0].LayerVersionArn' \
+            --output text)
+          echo "Using Oracle layer: $LAYER_ARN"
+          
+          # Update function code
           aws lambda update-function-code \
             --function-name ${{ env.LAMBDA_FUNCTION_NAME }} \
-            --zip-file fileb://apps/finance/dist-lambda/lambda.zip \
-            --publish \
-            --query 'FunctionArn' \
-            --output text
+            --zip-file fileb://apps/finance/dist-lambda/lambda.zip
+          
+          # Wait for code update to complete
+          aws lambda wait function-updated --function-name ${{ env.LAMBDA_FUNCTION_NAME }}
+          
+          # Attach layer to function
+          aws lambda update-function-configuration \
+            --function-name ${{ env.LAMBDA_FUNCTION_NAME }} \
+            --layers "$LAYER_ARN"
 
       - name: Register with Restate
         if: success()

@@ -96,10 +96,7 @@ jobs:
             # Escape special JSON characters
             value=$(echo "$value" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g')
             echo "\"$key\":\"$value\","
-          done >> /tmp/env.json
-          # Add Oracle library path for Lambda layer
-          echo '"LD_LIBRARY_PATH":"/opt/lib",' >> /tmp/env.json
-          echo '"ORACLE_INSTANT_CLIENT_PATH":"/opt/lib"' >> /tmp/env.json
+          done | sed '$ s/,$//' >> /tmp/env.json
           echo '}}' >> /tmp/env.json
           
           echo "Environment variables:"

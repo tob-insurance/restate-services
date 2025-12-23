@@ -98,7 +98,7 @@ jobs:
           echo "Registering Lambda ARN: $VERSIONED_ARN"
           RESPONSE=$(curl -s -w "\n%{http_code}" -u "$RESTATE_BASIC_AUTH" -X POST "$RESTATE_ADMIN_URL/deployments" \
             -H "Content-Type: application/json" \
-            -d "{\"arn\": \"$VERSIONED_ARN\", \"force\": true}")
+            -d "{\"arn\": \"$VERSIONED_ARN\", \"assume_role_arn\": \"${{ secrets.AWS_INVOKE_ROLE_ARN }}\", \"force\": true}")
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | sed '$d')
           echo "Response: $BODY"

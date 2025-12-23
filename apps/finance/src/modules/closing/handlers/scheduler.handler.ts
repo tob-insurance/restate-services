@@ -55,13 +55,11 @@ export const DailyClosingScheduler = object({
         `⏰ Triggering Daily Closing Workflow for date: ${dateStr}`
       );
 
-      await ctx.run("trigger-workflow", () => {
-        ctx.workflowSendClient(dailyClosingWorkflow, dateStr).run({
-          date: dateStr,
-          skipOracleClosing: false,
-          skipFinancialMetrics: false,
-          userId: "adm",
-        });
+      ctx.workflowSendClient(dailyClosingWorkflow, dateStr).run({
+        date: dateStr,
+        skipOracleClosing: false,
+        skipFinancialMetrics: false,
+        userId: "adm",
       });
 
       await scheduleNextRun(ctx);

@@ -1,0 +1,86 @@
+name: Build Oracle Lambda Layer
+
+on:
+  workflow_dispatch:
+    inputs:
+      architecture:
+        description: "Target architecture"
+        required: true
+        default: "x86_64"
+        type: choice
+        options:
+          - x86_64
+          - arm64
+  push:
+    branches: [main]
+    paths:
+      - "packages/lambda-layers/oracle/**"
+      - ".github/workflows/build-oracle-layer.yml"
+
+env:
+  AWS_REGION: ap-southeast-3
+  LAMBDA_LAYER_NAME: oracle-instantclient
+
+jobs:
+  build-layer:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set architecture flag
+        id: arch
+        run: |
+          if [ "${{ inputs.architecture }}" = "arm64" ]; then
+            echo "flag=--arm64" >> $GITHUB_OUTPUT
+            echo "arch=arm64" >> $GITHUB_OUTPUT
+          else
+            echo "flag=" >> $GITHUB_OUTPUT
+            echo "arch=x86_64" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Oracle Instant Client Layer
+        run: bash packages/lambda-layers/oracle/build-layer.sh ${{ steps.arch.outputs.flag }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Publish Lambda Layer
+        id: publish
+        run: |
+          LAYER_VERSION=$(aws lambda publish-layer-version \
+            --layer-name ${{ env.LAMBDA_LAYER_NAME }} \
+            --zip-file fileb://packages/lambda-layers/oracle/output/oracle-instantclient-layer.zip \
+            --compatible-runtimes nodejs18.x nodejs20.x nodejs22.x \
+            --compatible-architectures ${{ steps.arch.outputs.arch }} \
+            --query 'Version' \
+            --output text)
+          
+          LAYER_ARN=$(aws lambda list-layer-versions \
+            --layer-name ${{ env.LAMBDA_LAYER_NAME }} \
+            --query 'LayerVersions[0].LayerVersionArn' \
+            --output text)
+          
+          echo "layer_version=$LAYER_VERSION" >> $GITHUB_OUTPUT
+          echo "layer_arn=$LAYER_ARN" >> $GITHUB_OUTPUT
+          
+          echo "✅ Published layer version: $LAYER_VERSION"
+          echo "   Layer ARN: $LAYER_ARN"
+
+      - name: Summary
+        run: |
+          echo "## Oracle Lambda Layer Published 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Layer Name | \`${{ env.LAMBDA_LAYER_NAME }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | \`${{ steps.publish.outputs.layer_version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Architecture | \`${{ steps.arch.outputs.arch }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| ARN | \`${{ steps.publish.outputs.layer_arn }}\` |" >> $GITHUB_STEP_SUMMARY

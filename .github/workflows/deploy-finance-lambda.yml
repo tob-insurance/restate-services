@@ -3,6 +3,16 @@ name: Deploy Finance Lambda
 # Temporarily disabled - re-enable when ready for deployment
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy"
+        required: true
+        default: "prod"
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
   # push:
   #   branches: [main]
   #   paths:
@@ -10,7 +20,7 @@ on:
   #     - ".github/workflows/deploy-finance-lambda.yml"
 
 env:
-  AWS_REGION: ap-southeast-1
+  AWS_REGION: ap-southeast-3
   LAMBDA_FUNCTION_NAME: finance-closing
   LAMBDA_LAYER_NAME: oracle-instantclient
 
@@ -25,6 +35,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Fetch secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.9
+        with:
+          method: "oidc"
+          identity-id: ${{ secrets.INFISICAL_MACHINE_IDENTITY_ID }}
+          domain: "https://infisical.tob-insurance.com"
+          project-slug: ${{ vars.INFISICAL_PROJECT_SLUG }}
+          env-slug: ${{ inputs.environment || 'prod' }}
+          export-type: "file"
+          file-output-path: "apps/finance/.env"
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -34,7 +55,7 @@ jobs:
         run: bun install
 
       - name: Build Lambda bundle
-        run: bun run --filter @finance/closing bundle:lambda
+        run: bun run --filter @restate-tob/finance bundle:lambda
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -56,11 +77,12 @@ jobs:
         if: success()
         env:
           RESTATE_ADMIN_URL: ${{ secrets.RESTATE_ADMIN_URL }}
-          RESTATE_AUTH_TOKEN: ${{ secrets.RESTATE_AUTH_TOKEN }}
+          RESTATE_BASIC_AUTH: ${{ secrets.RESTATE_BASIC_AUTH }}
         run: |
           FUNCTION_ARN=$(aws lambda get-function --function-name ${{ env.LAMBDA_FUNCTION_NAME }} --query 'Configuration.FunctionArn' --output text)
-          npx -y @restatedev/restate deployments register -y "$FUNCTION_ARN" \
-            --assume-role-arn ${{ secrets.AWS_INVOKE_ROLE_ARN }}
+          curl -f -u "$RESTATE_BASIC_AUTH" -X POST "$RESTATE_ADMIN_URL/deployments" \
+            -H "Content-Type: application/json" \
+            -d "{\"arn\": \"$FUNCTION_ARN\", \"assume_role_arn\": \"${{ secrets.AWS_INVOKE_ROLE_ARN }}\", \"force\": true}"
 
   build-layer:
     runs-on: ubuntu-latest

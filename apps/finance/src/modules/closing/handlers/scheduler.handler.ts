@@ -1,12 +1,12 @@
 import { type ObjectContext, object } from "@restatedev/restate-sdk";
 import { DateTime } from "luxon";
-import { TIMEZONE } from "../../../constants.js";
+import { DAILY_CLOSING_SCHEDULE_TIME, TIMEZONE } from "../../../constants.js";
 import { dailyClosingWorkflow } from "../workflows/index.js";
 
 const TIME_FORMAT_REGEX = /^(\d{1,2}):(\d{2})$/;
 
 function getScheduleConfig() {
-  const scheduleTime = process.env.DAILY_CLOSING_SCHEDULE_TIME || "00:00";
+  const scheduleTime = DAILY_CLOSING_SCHEDULE_TIME;
   const timeMatch = scheduleTime.match(TIME_FORMAT_REGEX);
 
   if (!timeMatch) {

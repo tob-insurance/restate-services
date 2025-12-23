@@ -89,18 +89,24 @@ jobs:
           # Wait for code update to complete
           aws lambda wait function-updated --function-name ${{ env.LAMBDA_FUNCTION_NAME }}
           
-          # Build environment variables from .env file (KEY=value format for AWS CLI)
-          ENV_VARS=$(cat ${{ github.workspace }}/apps/finance/.env | grep -v '^#' | grep -v '^$' | grep '=' | while IFS='=' read -r key value; do
-            # Remove quotes from value if present
+          # Build environment variables JSON file from .env
+          echo '{"Variables":{' > /tmp/env.json
+          cat ${{ github.workspace }}/apps/finance/.env | grep -v '^#' | grep -v '^$' | grep '=' | while IFS='=' read -r key value; do
             value=$(echo "$value" | sed 's/^["'"'"']//' | sed 's/["'"'"']$//')
-            echo "$key=$value"
-          done | paste -sd ',' -)
+            # Escape special JSON characters
+            value=$(echo "$value" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g')
+            echo "\"$key\":\"$value\","
+          done | sed '$ s/,$//' >> /tmp/env.json
+          echo '}}' >> /tmp/env.json
+          
+          echo "Environment variables:"
+          cat /tmp/env.json
           
           # Attach layer and set environment variables
           aws lambda update-function-configuration \
             --function-name ${{ env.LAMBDA_FUNCTION_NAME }} \
             --layers "$LAYER_ARN" \
-            --environment "Variables={$ENV_VARS}"
+            --environment file:///tmp/env.json
 
       - name: Register with Restate
         if: success()

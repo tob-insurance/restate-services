@@ -89,10 +89,18 @@ jobs:
           # Wait for code update to complete
           aws lambda wait function-updated --function-name ${{ env.LAMBDA_FUNCTION_NAME }}
           
-          # Attach layer to function
+          # Build environment variables JSON from .env file
+          ENV_VARS=$(cat ${{ github.workspace }}/apps/finance/.env | grep -v '^#' | grep '=' | while IFS='=' read -r key value; do
+            # Remove quotes from value if present
+            value=$(echo "$value" | sed 's/^["'"'"']//' | sed 's/["'"'"']$//')
+            echo "\"$key\":\"$value\""
+          done | paste -sd ',' -)
+          
+          # Attach layer and set environment variables
           aws lambda update-function-configuration \
             --function-name ${{ env.LAMBDA_FUNCTION_NAME }} \
-            --layers "$LAYER_ARN"
+            --layers "$LAYER_ARN" \
+            --environment "Variables={$ENV_VARS}"
 
       - name: Register with Restate
         if: success()

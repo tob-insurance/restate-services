@@ -61,14 +61,19 @@ fi
 echo "📋 Copying required libraries..."
 cp -a "${EXTRACTED_DIR}"/*.so* "${BUILD_DIR}/lib/" 2>/dev/null || true
 
-# Get libaio from Amazon Linux container
-echo "🐧 Fetching libaio.so.1 from Amazon Linux..."
+# Get libaio and libnsl from Amazon Linux container
+echo "🐧 Fetching libaio.so.1 and libnsl.so.1 from Amazon Linux..."
 docker run --rm --platform linux/${LAMBDA_ARCH} -v "${BUILD_DIR}/lib:/output" amazonlinux:2 \
-    bash -c "yum install -y libaio > /dev/null 2>&1 && cp /lib64/libaio.so.1 /output/"
+    bash -c "yum install -y libaio libnsl > /dev/null 2>&1 && cp /lib64/libaio.so.1 /lib64/libnsl.so.1 /output/"
 
-# Verify libaio was copied
+# Verify libraries were copied
 if [ ! -f "${BUILD_DIR}/lib/libaio.so.1" ]; then
     echo "❌ Error: Failed to get libaio.so.1"
+    exit 1
+fi
+
+if [ ! -f "${BUILD_DIR}/lib/libnsl.so.1" ]; then
+    echo "❌ Error: Failed to get libnsl.so.1"
     exit 1
 fi
 

@@ -78,6 +78,44 @@ This codebase uses [Restate](https://restate.dev) for durable execution. Key con
 - Use `RestatePromise.all/race/any` instead of native `Promise` methods
 - Throw `TerminalError` for non-retryable failures (validation errors, data integrity errors)
 - Always propagate errors - do not catch and return success:false in workflows
+- **NEVER call Restate context methods inside `ctx.run()` callbacks** (see below)
+
+**ctx.run() Side Effect Rules (CRITICAL for Lambda):**
+
+On AWS Lambda, Restate uses suspension semantics. Calling context methods inside `ctx.run()` causes deadlocks because the Lambda suspends while the side effect is waiting for context operations that can't complete.
+
+```typescript
+// ❌ WRONG - ctx.date.now() inside ctx.run() causes deadlock on Lambda
+const result = await ctx.run("my-side-effect", async () =>
+  doSomething(await ctx.date.now())  // Will hang on Lambda!
+);
+
+// ✅ CORRECT - Get context values BEFORE entering ctx.run()
+const currentTime = await ctx.date.now();
+const result = await ctx.run("my-side-effect", async () =>
+  doSomething(currentTime)
+);
+
+// ❌ WRONG - ctx.workflowSendClient() inside ctx.run()
+await ctx.run("trigger", () => {
+  ctx.workflowSendClient(workflow, key).run(input);  // Will hang!
+});
+
+// ✅ CORRECT - Call context methods directly (they're already durable)
+ctx.workflowSendClient(workflow, key).run(input);
+```
+
+**Context methods that CANNOT be used inside `ctx.run()`:**
+- `ctx.date.now()`
+- `ctx.rand.uuidv4()` / `ctx.rand.random()`
+- `ctx.sleep()`
+- `ctx.workflowSendClient()` / `ctx.serviceSendClient()` / `ctx.objectSendClient()`
+- `ctx.get()` / `ctx.set()` / `ctx.clear()`
+- Any other `ctx.*` method
+
+**Why this works locally but fails on Lambda:**
+- Local: Restate runs as persistent process, context is always available
+- Lambda: Restate suspends function between operations, context methods inside side effects cause deadlock
 
 ### Error Recovery Strategy
 

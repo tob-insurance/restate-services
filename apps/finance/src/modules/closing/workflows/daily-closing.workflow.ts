@@ -134,6 +134,21 @@ async function executeOracleStep(
   }
 
   ctx.console.log(`✅ Job ${job.jobName} submitted successfully`);
+
+  const initialStatus = await ctx.run("verify-job-started", async () =>
+    checkGeniusClosingJobStatus(job.jobName)
+  );
+
+  if (!(initialStatus.running || initialStatus.completed)) {
+    throw new TerminalError(
+      `Job ${job.jobName} not found in scheduler after submission. Status: ${initialStatus.status}`,
+      { errorCode: 500 }
+    );
+  }
+
+  ctx.console.log(
+    `✅ Verified job ${job.jobName} is running (status: ${initialStatus.status})`
+  );
   ctx.console.log(
     `⏸️  Waiting ${GENIUS_JOB_CONFIG.initialDelayHours} hours before first status check...`
   );

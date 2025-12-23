@@ -83,9 +83,17 @@ jobs:
           RESTATE_BASIC_AUTH: ${{ secrets.RESTATE_BASIC_AUTH }}
         run: |
           FUNCTION_ARN=$(aws lambda get-function --function-name ${{ env.LAMBDA_FUNCTION_NAME }} --query 'Configuration.FunctionArn' --output text)
-          curl -f -u "$RESTATE_BASIC_AUTH" -X POST "$RESTATE_ADMIN_URL/deployments" \
+          echo "Registering Lambda ARN: $FUNCTION_ARN"
+          RESPONSE=$(curl -s -w "\n%{http_code}" -u "$RESTATE_BASIC_AUTH" -X POST "$RESTATE_ADMIN_URL/deployments" \
             -H "Content-Type: application/json" \
-            -d "{\"arn\": \"$FUNCTION_ARN\", \"assume_role_arn\": \"${{ secrets.AWS_INVOKE_ROLE_ARN }}\", \"force\": true}"
+            -d "{\"arn\": \"$FUNCTION_ARN\", \"assume_role_arn\": \"${{ secrets.AWS_INVOKE_ROLE_ARN }}\", \"force\": true}")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          echo "Response: $BODY"
+          if [ "$HTTP_CODE" -ge 400 ]; then
+            echo "Error: HTTP $HTTP_CODE"
+            exit 1
+          fi
 
   build-layer:
     runs-on: ubuntu-latest

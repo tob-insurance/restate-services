@@ -25,6 +25,10 @@ function initThickMode(instantClientPath?: string): void {
   const isLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
   const isLinux = os.platform() === "linux";
 
+  console.log(
+    `[Oracle] Initializing Thick mode - Lambda: ${isLambda}, Linux: ${isLinux}, LD_LIBRARY_PATH: ${process.env.LD_LIBRARY_PATH || "not set"}`
+  );
+
   try {
     if (isLambda || isLinux) {
       oracledb.initOracleClient();
@@ -37,9 +41,10 @@ function initThickMode(instantClientPath?: string): void {
         `✅ Oracle Thick mode enabled${instantClientPath ? `: ${instantClientPath}` : ""}`
       );
     }
-  } catch {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.warn(
-      "⚠️  Oracle Thick mode failed, using Thin mode (requires Oracle 12.1+)"
+      `⚠️  Oracle Thick mode failed: ${errorMessage}. Using Thin mode (requires Oracle 12.1+)`
     );
   }
 }

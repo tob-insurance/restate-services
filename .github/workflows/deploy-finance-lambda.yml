@@ -44,7 +44,7 @@ jobs:
           project-slug: ${{ vars.INFISICAL_PROJECT_SLUG }}
           env-slug: ${{ inputs.environment || 'prod' }}
           export-type: "file"
-          file-output-path: "${{ github.workspace }}/apps/finance/.env"
+          file-output-path: "/apps/finance/.env"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2

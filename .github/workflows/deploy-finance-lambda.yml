@@ -83,6 +83,11 @@ jobs:
           RESTATE_BASIC_AUTH: ${{ secrets.RESTATE_BASIC_AUTH }}
         run: |
           FUNCTION_ARN=$(aws lambda get-function --function-name ${{ env.LAMBDA_FUNCTION_NAME }} --query 'Configuration.FunctionArn' --output text)
+          
+          # Wait for Lambda update to complete
+          echo "Waiting for Lambda to be ready..."
+          aws lambda wait function-updated --function-name ${{ env.LAMBDA_FUNCTION_NAME }}
+          
           VERSION=$(aws lambda publish-version --function-name ${{ env.LAMBDA_FUNCTION_NAME }} --query 'Version' --output text)
           VERSIONED_ARN="${FUNCTION_ARN}:${VERSION}"
           echo "Registering Lambda ARN: $VERSIONED_ARN"

@@ -13,6 +13,7 @@ import {
   type FinancialMetricsResult,
   getCalculationRunStatus,
 } from "../../financial-metrics/index.js";
+import { syncTrialBalanceFromGeniusAndCalculateMetrics } from "../../trial-balance-sync/index.js";
 import {
   checkGeniusClosingJobStatus,
   submitGeniusClosingJob,
@@ -22,6 +23,7 @@ type WorkflowState = {
   currentStep:
     | "idle"
     | "oracle-closing"
+    | "sync-trial-balance"
     | "financial-metrics"
     | "completed"
     | "failed";
@@ -157,7 +159,9 @@ async function executeOracleStep(
 
   for (let attempt = 0; attempt < jobConfig.maxPollAttempts; attempt++) {
     ctx.console.log(
-      `🔍 Checking job status (attempt ${attempt + 1}/${jobConfig.maxPollAttempts})...`
+      `🔍 Checking job status (attempt ${attempt + 1}/${
+        jobConfig.maxPollAttempts
+      })...`
     );
 
     const status = await ctx.run(`check-job-status-${attempt}`, async () =>
@@ -209,6 +213,57 @@ async function executeOracleStep(
   );
 }
 
+/**
+ * Step 2: Sync trial balance from Genius (Oracle) to PostgreSQL.
+ * This ensures the financial metrics calculation uses the latest data from Genius.
+ */
+async function executeSyncTrialBalanceStep(
+  ctx: WorkflowContext,
+  closingDate: string,
+  skip: boolean
+): Promise<boolean> {
+  if (skip) {
+    ctx.console.log(
+      "⏭️  Skipping trial balance sync (skipFinancialMetrics=true)"
+    );
+    return true;
+  }
+
+  ctx.console.log(
+    "🔄 Step 2: Syncing trial balance from Genius to PostgreSQL..."
+  );
+
+  const currentTime = await ctx.date.now();
+
+  try {
+    const result = await ctx.run(
+      "sync-trial-balance",
+      async () =>
+        await syncTrialBalanceFromGeniusAndCalculateMetrics(
+          closingDate,
+          currentTime
+        )
+    );
+
+    if (!result.success) {
+      ctx.console.error(`❌ Trial balance sync failed: ${result.message}`);
+      return false;
+    }
+
+    ctx.console.log(
+      `✅ Trial balance sync completed successfully: ${result.message}`
+    );
+    return true;
+  } catch (error) {
+    ctx.console.error(
+      `❌ Trial balance sync failed: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+    return false;
+  }
+}
+
 async function executeMetricsStep(
   ctx: WorkflowContext,
   closingDate: string,
@@ -221,7 +276,7 @@ async function executeMetricsStep(
     return;
   }
 
-  ctx.console.log("⏳ Step 2: Calculating financial metrics...");
+  ctx.console.log("⏳ Step 3: Calculating financial metrics...");
 
   const metricsRunId = ctx.rand.uuidv4();
   const currentTime = await ctx.date.now();
@@ -258,6 +313,110 @@ async function executeMetricsStep(
 
   return typedResult;
 }
+async function updateWorkflowState(
+  ctx: WorkflowContext,
+  updates: Partial<WorkflowState>
+) {
+  const currentState = (await ctx.get<WorkflowState>("state")) ?? {
+    currentStep: "idle",
+    lastUpdate: "",
+  };
+
+  ctx.set("state", {
+    ...currentState,
+    ...updates,
+    lastUpdate: DateTime.fromMillis(await ctx.date.now()).toISO() ?? "",
+  });
+}
+
+async function processOracleStep(
+  ctx: WorkflowContext,
+  params: {
+    closingDate: string;
+    userId: string;
+    skip: boolean;
+  }
+) {
+  const { closingDate, userId, skip } = params;
+
+  if (!skip) {
+    await updateWorkflowState(ctx, {
+      currentStep: "oracle-closing",
+      stepStartTime: DateTime.fromMillis(await ctx.date.now()).toISO() ?? "",
+    });
+  }
+
+  const result = await executeOracleStep(ctx, closingDate, userId, skip);
+
+  if (result?.jobName) {
+    await updateWorkflowState(ctx, {
+      currentStep: "oracle-closing",
+      oracleJobName: result.jobName,
+      stepStartTime: result.startTime.toISO() ?? "",
+    });
+  }
+
+  return result;
+}
+
+async function processSyncTrialBalanceStep(
+  ctx: WorkflowContext,
+  params: {
+    closingDate: string;
+    skip: boolean;
+    oracleJobName?: string;
+  }
+) {
+  const { closingDate, skip, oracleJobName } = params;
+
+  if (!skip) {
+    await updateWorkflowState(ctx, {
+      currentStep: "sync-trial-balance",
+      oracleJobName,
+      stepStartTime: DateTime.fromMillis(await ctx.date.now()).toISO() ?? "",
+    });
+  }
+
+  const success = await executeSyncTrialBalanceStep(ctx, closingDate, skip);
+
+  if (!success) {
+    throw new TerminalError("Trial balance sync failed", {
+      errorCode: 500,
+    });
+  }
+}
+
+async function processFinancialMetricsStep(
+  ctx: WorkflowContext,
+  params: {
+    closingDate: string;
+    skip: boolean;
+    oracleJobName?: string;
+  }
+) {
+  const { closingDate, skip, oracleJobName } = params;
+
+  if (!skip) {
+    await updateWorkflowState(ctx, {
+      currentStep: "financial-metrics",
+      oracleJobName,
+      stepStartTime: DateTime.fromMillis(await ctx.date.now()).toISO() ?? "",
+    });
+  }
+
+  const result = await executeMetricsStep(ctx, closingDate, skip);
+
+  if (result?.runId) {
+    await updateWorkflowState(ctx, {
+      currentStep: "financial-metrics",
+      oracleJobName,
+      metricsRunId: result.runId,
+      stepStartTime: result.startTime.toISO() ?? "",
+    });
+  }
+
+  return result;
+}
 
 export const dailyClosingWorkflow = workflow({
   name: "DailyClosing",
@@ -290,80 +449,39 @@ export const dailyClosingWorkflow = workflow({
         `📅 Starting daily closing workflow for date: ${closingDate}`
       );
 
-      const updateState = async (state: WorkflowState) => {
-        ctx.set("state", {
-          ...state,
-          lastUpdate: DateTime.fromMillis(await ctx.date.now()).toISO() ?? "",
-        });
-      };
-
-      await updateState({ currentStep: "idle", lastUpdate: "" });
+      await updateWorkflowState(ctx, { currentStep: "idle" });
 
       let oracleResult: OracleStepResult | undefined;
       let financialMetricsResult: FinancialMetricsResult | undefined;
 
       try {
-        if (!skipOracleClosing) {
-          await updateState({
-            currentStep: "oracle-closing",
-            stepStartTime:
-              DateTime.fromMillis(await ctx.date.now()).toISO() ?? "",
-            lastUpdate: "",
-          });
-        }
-
-        oracleResult = await executeOracleStep(
-          ctx,
+        oracleResult = await processOracleStep(ctx, {
           closingDate,
           userId,
-          skipOracleClosing
-        );
+          skip: skipOracleClosing,
+        });
 
-        if (oracleResult?.jobName) {
-          await updateState({
-            currentStep: "oracle-closing",
-            oracleJobName: oracleResult.jobName,
-            stepStartTime: oracleResult.startTime.toISO() ?? "",
-            lastUpdate: "",
-          });
-        }
-
-        if (!skipFinancialMetrics) {
-          await updateState({
-            currentStep: "financial-metrics",
-            oracleJobName: oracleResult?.jobName,
-            stepStartTime:
-              DateTime.fromMillis(await ctx.date.now()).toISO() ?? "",
-            lastUpdate: "",
-          });
-        }
-
-        financialMetricsResult = await executeMetricsStep(
-          ctx,
+        await processSyncTrialBalanceStep(ctx, {
           closingDate,
-          skipFinancialMetrics
-        );
+          skip: skipFinancialMetrics,
+          oracleJobName: oracleResult?.jobName,
+        });
 
-        if (financialMetricsResult?.runId) {
-          await updateState({
-            currentStep: "financial-metrics",
-            oracleJobName: oracleResult?.jobName,
-            metricsRunId: financialMetricsResult.runId,
-            stepStartTime: financialMetricsResult.startTime.toISO() ?? "",
-            lastUpdate: "",
-          });
-        }
+        financialMetricsResult = await processFinancialMetricsStep(ctx, {
+          closingDate,
+          skip: skipFinancialMetrics,
+          oracleJobName: oracleResult?.jobName,
+        });
 
         const totalDuration = DateTime.fromMillis(await ctx.date.now()).diff(
           workflowStartTime,
           "seconds"
         ).seconds;
 
-        await updateState({
+        await updateWorkflowState(ctx, {
           currentStep: "completed",
           oracleJobName: oracleResult?.jobName,
           metricsRunId: financialMetricsResult?.runId,
-          lastUpdate: "",
         });
 
         ctx.console.log(
@@ -379,11 +497,10 @@ export const dailyClosingWorkflow = workflow({
           totalDuration,
         };
       } catch (error) {
-        await updateState({
+        await updateWorkflowState(ctx, {
           currentStep: "failed",
           oracleJobName: oracleResult?.jobName,
           metricsRunId: financialMetricsResult?.runId,
-          lastUpdate: "",
         });
 
         const errorMessage =

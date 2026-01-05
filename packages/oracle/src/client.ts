@@ -2,6 +2,8 @@ import os from "node:os";
 import oracledb, { type Connection, type Pool } from "oracledb";
 import type { OracleClient, OracleConfig } from "./types.js";
 
+export type { Connection } from "oracledb";
+
 export async function withConnection<T>(
   client: OracleClient,
   operation: (connection: Connection) => Promise<T>
@@ -10,6 +12,25 @@ export async function withConnection<T>(
   try {
     connection = await client.getConnection();
     return await operation(connection);
+  } finally {
+    if (connection) {
+      try {
+        await connection.close();
+      } catch (err) {
+        console.error("Error closing Oracle connection:", err);
+      }
+    }
+  }
+}
+
+export async function* withConnectionGenerator<T>(
+  client: OracleClient,
+  operation: (connection: Connection) => AsyncGenerator<T>
+): AsyncGenerator<T> {
+  let connection: Connection | null = null;
+  try {
+    connection = await client.getConnection();
+    yield* operation(connection);
   } finally {
     if (connection) {
       try {

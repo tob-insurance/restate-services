@@ -69,7 +69,9 @@ export async function calculateFinancialMetrics(
 
         if (isDataIntegrityError(pgError.code)) {
           throw new TerminalError(
-            `Data integrity error: ${pgError.message || "Unknown error"}. Check calculation_runs table for run_id: ${validated.runId}`,
+            `Data integrity error: ${
+              pgError.message || "Unknown error"
+            }. Check calculation_runs table for run_id: ${validated.runId}`,
             { errorCode: 422 }
           );
         }
@@ -99,7 +101,9 @@ export async function calculateFinancialMetrics(
   } catch (error) {
     if (error instanceof z.ZodError) {
       throw new TerminalError(
-        `Validation error: ${error.issues.map((e: z.ZodIssue) => e.message).join(", ")}`,
+        `Validation error: ${error.issues
+          .map((e: z.ZodIssue) => e.message)
+          .join(", ")}`,
         { errorCode: 400 }
       );
     }

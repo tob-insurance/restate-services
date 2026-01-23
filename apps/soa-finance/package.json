@@ -1,0 +1,23 @@
+{
+  "name": "@restate-tob/soa-finance",
+  "version": "0.0.1",
+  "description": "SOA Finance service running with Restate",
+  "main": "dist/app.js",
+  "type": "commonjs",
+  "scripts": {
+    "build": "tsc",
+    "start": "node ./dist/app.js",
+    "dev": "tsx watch ./src/app.ts",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@restatedev/restate-sdk": "^1.9.1",
+    "@restatedev/restate-sdk-zod": "^1.9.1",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.4.5"
+  }
+}

@@ -37,6 +37,20 @@
         "varlock": "^0.1.3",
       },
     },
+    "apps/soa-finance": {
+      "name": "@restate-tob/soa-finance",
+      "version": "0.0.1",
+      "dependencies": {
+        "@restatedev/restate-sdk": "^1.9.1",
+        "@restatedev/restate-sdk-zod": "^1.9.1",
+        "zod": "^4.1.0",
+      },
+      "devDependencies": {
+        "@types/node": "^20.14.2",
+        "tsx": "^4.19.2",
+        "typescript": "^5.4.5",
+      },
+    },
     "packages/lambda-layers": {
       "name": "@restate-tob/lambda-layers",
       "version": "0.0.1",
@@ -167,6 +181,8 @@
     "@restate-tob/postgres": ["@restate-tob/postgres@workspace:packages/postgres"],
 
     "@restate-tob/shared": ["@restate-tob/shared@workspace:packages/shared"],
+
+    "@restate-tob/soa-finance": ["@restate-tob/soa-finance@workspace:apps/soa-finance"],
 
     "@restatedev/restate-sdk": ["@restatedev/restate-sdk@1.9.1", "", { "dependencies": { "@restatedev/restate-sdk-core": "^1.9.1" } }, "sha512-8w6t7cG5mXMgI+YPxIuPuplVX12lKbgne1byzmkQtif9lpPT6gjd7ce1EmWrUtsD25WCL+lf4iKU/usfqaXQCg=="],
 

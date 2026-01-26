@@ -11,8 +11,16 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@azure/storage-blob": "^12.30.0",
     "@restatedev/restate-sdk": "^1.9.1",
     "@restatedev/restate-sdk-zod": "^1.9.1",
+    "@types/oracledb": "^6.10.1",
+    "apache-arrow": "^21.1.0",
+    "liquidjs": "^10.24.0",
+    "parquet-wasm": "^0.7.1",
+    "puppeteer": "^24.36.0",
+    "uuid": "^13.0.0",
+    "xlsx": "^0.18.5",
     "zod": "^4.1.0"
   },
   "devDependencies": {

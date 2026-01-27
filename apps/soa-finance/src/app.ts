@@ -1,11 +1,8 @@
-import { type Context, endpoint, service } from "@restatedev/restate-sdk";
+import { serve } from "@restatedev/restate-sdk";
+import { batchWorkflow } from "./module/workflows/batch-workflow";
+import { soaWorkflow } from "./module/workflows/soa-workflow";
 
-const greeter = service({
-  name: "Greeter",
-  handlers: {
-    greet: async (_ctx: Context, name: string) =>
-      `Hello, ${name}! Welcome to SOA Finance.`,
-  },
+serve({
+  services: [soaWorkflow, batchWorkflow],
+  port: 9080,
 });
-
-endpoint().bind(greeter).listen(9080);

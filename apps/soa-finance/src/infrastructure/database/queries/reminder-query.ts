@@ -1,3 +1,5 @@
+import { v4 as uuidv4 } from "uuid";
+import { formatUUID } from "../../../module/utils/formater";
 import { executeQuery } from "../database";
 
 type DcNoteRow = { DC_NOTE_ID: string };
@@ -30,4 +32,54 @@ export const getDcNoteIdsByCustomer = async (
     [];
 
   return dcNoteIds;
+};
+
+/**
+ * Insert a new reminder and return its ID
+ */
+export const insertReminder = async (
+  cmCode: string,
+  timePeriod: string,
+  officeId: string
+): Promise<string> => {
+  // Generate UUID in JavaScript to avoid RETURNING INTO binding issues
+  const id = formatUUID(uuidv4());
+
+  const sql = `
+    INSERT INTO SOA_REMINDER (ID, CM_CODE, TIME_PERIOD, OFFICE_ID)
+    VALUES (hextoraw(:id), :cmCode, :timePeriod, :officeId)
+  `;
+
+  await executeQuery(
+    sql,
+    {
+      id,
+      cmCode,
+      timePeriod,
+      officeId: officeId || null,
+    },
+    { autoCommit: true }
+  );
+
+  return id;
+};
+
+/**
+ * Insert reminder detail
+ */
+export const insertReminderDetail = async (
+  dcNoteId: string,
+  reminderId: string,
+  isPaid = "N"
+): Promise<void> => {
+  const sql = `
+    INSERT INTO SOA_REMINDER_DETAIL (DC_NOTE_ID, REMINDER_ID, IS_PAID)
+    VALUES (:dcNoteId, hextoraw(:reminderId), :isPaid)
+  `;
+
+  await executeQuery(
+    sql,
+    { dcNoteId, reminderId, isPaid },
+    { autoCommit: true }
+  );
 };

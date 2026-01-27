@@ -1,3 +1,7 @@
-export type { IEmailAttachment, IEmailMessage } from "../types/email";
-export { getGraphClient } from "./graph-client";
-export { sendEmail } from "./sender";
+// Email Templates - Re-export from templates folder
+export {
+  generateReminderEmailHtml,
+  generateSoaEmailHtml,
+  getReminderEmailSubject,
+  type SoaEmailData,
+} from "./templates";

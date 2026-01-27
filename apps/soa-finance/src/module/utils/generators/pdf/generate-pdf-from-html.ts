@@ -1,6 +1,10 @@
+/**
+ * Generate PDF from HTML using Puppeteer
+ */
+
 import type { Page } from "puppeteer";
 import puppeteer from "puppeteer";
-import { renderTemplate } from "../../core/template-engine";
+import { renderTemplate } from "../../template";
 import type { IReportOptions } from "../../types";
 
 export async function generatePdfFromHtml(
@@ -46,9 +50,6 @@ export async function generatePdfFromHtml(
   }
 }
 
-/**
- * Generate PDF from template and data
- */
 export async function generatePdf(
   template: string,
   data: Record<string, unknown>,

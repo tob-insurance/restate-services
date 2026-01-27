@@ -1,8 +1,12 @@
+/**
+ * Generate Collection PDF from HTML template
+ */
+
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { CONTENT_TYPES } from "../../constants";
-import { renderTemplate } from "../../core/template-engine";
-import { formatIndonesianDate } from "../../formater";
+import { formatIndonesianDate } from "../../formatter";
+import { renderTemplate } from "../../template";
 import type { ISoaFileResult } from "../../types";
 import { generatePdfFromHtml } from "./generate-pdf-from-html";
 

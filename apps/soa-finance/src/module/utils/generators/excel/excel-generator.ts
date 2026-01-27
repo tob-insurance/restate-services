@@ -1,4 +1,4 @@
-import { book_new, utils, write } from "xlsx";
+import { utils, write } from "xlsx";
 import { NUMBER_FORMATS } from "../../constants";
 import type { IExcelColumn, IExcelSheetData } from "../../types";
 
@@ -41,7 +41,7 @@ function createWorksheet(sheet: IExcelSheetData): WorksheetType {
 }
 
 export function excelGenerate(sheets: IExcelSheetData[]): Buffer {
-  const workbook = book_new();
+  const workbook = utils.book_new();
 
   for (const sheet of sheets) {
     const worksheet = createWorksheet(sheet);

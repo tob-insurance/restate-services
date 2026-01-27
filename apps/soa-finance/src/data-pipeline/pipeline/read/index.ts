@@ -14,9 +14,3 @@ export function streamSoaData(asAtDate: Date) {
     },
   });
 }
-
-// 1 bulan (4 fase)
-// 1. SOA
-// 2. RL1
-// 3. RL2
-// 4. WL

@@ -10,10 +10,9 @@ import {
   formatDateToUnixTimestamp,
   formatTimePeriod,
   formatUUID,
-  parseSoaType,
 } from "../utils/formater";
 
-import type { IAccount, soaSchema } from "../utils/types";
+import type { IAccount, SoaType, soaSchema } from "../utils/types";
 import { type SoaWorkflow, soaWorkflow } from "./soa-workflow";
 
 export const batchWorkflow = workflow({
@@ -29,7 +28,7 @@ export const batchWorkflow = workflow({
       const toDate = formatDateToUnixTimestamp(dateNow);
       const maxRetries = 3;
       const processingDate = dateNow.toISOString();
-      const processingType = parseSoaType(type.type);
+      const processingType = type.type as SoaType;
 
       // Get Customers
       const customers = await ctx.run(

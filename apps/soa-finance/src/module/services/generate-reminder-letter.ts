@@ -16,7 +16,6 @@ import {
   type ISoaItem,
   type ISoaReminder,
   SoaPhase,
-  SoaType,
 } from "../utils/types";
 import { sendReminderEmail } from "./send-reminder-email";
 
@@ -27,7 +26,7 @@ type GenerateReminderLetterParams = {
 };
 
 export const generateReminderLetter = async (
-  params: GenerateReminderLetterParams,
+  params: GenerateReminderLetterParams
 ): Promise<IGenerateReminderResult | null> => {
   const { customer, reminder, item } = params;
   const dateNow = new Date();
@@ -44,9 +43,9 @@ export const generateReminderLetter = async (
   const expectedType = item.processingType - 1;
 
   // Skip conditions
-  if (item.processingType === SoaType.SOA) {
+  if (item.processingType === 1) {
     console.log(
-      `Skipping ${customer.code}: Type is SOA but has existing reminders`,
+      `Skipping ${customer.code}: Type is SOA but has existing reminders`
     );
     return null;
   }
@@ -88,18 +87,18 @@ export const generateReminderLetter = async (
   const soaDcNotes = soaList.map((s) => s.debitAndCreditNoteNo);
 
   const dcNotesPaid = existingDcNotes.filter(
-    (dc) => !soaDcNotes.some((soa) => soa.toLowerCase() === dc.toLowerCase()),
+    (dc) => !soaDcNotes.some((soa) => soa.toLowerCase() === dc.toLowerCase())
   );
   // Step 6: Generate Letter Number
   const letterNo = await generateLetterNo(reminderCount.toString(), dateNow);
   // Step 7: Insert Reminder Letter record
-  await insertReminderLetter(
-    reminder.id,
-    reminderCount.toString(),
+  await insertReminderLetter({
+    reminderId: reminder.id,
+    type: reminderCount.toString(),
     letterNo,
-    latestLetter ? reminder.id : null,
-    dateNow,
-  );
+    referenceId: latestLetter ? reminder.id : null,
+    sentDate: dateNow,
+  });
 
   // Step 8: Generate Files (Phase: GeneratingFiles)
   await insertJobPhase(jobId, SoaPhase.GeneratingFiles);
@@ -114,7 +113,7 @@ export const generateReminderLetter = async (
     customer.code,
     customer.fullName,
     dateToString,
-    customer.virtualAccount || "-",
+    customer.virtualAccount || "-"
   );
   await completeJobPhase(jobId, SoaPhase.GeneratingFiles);
 
@@ -124,13 +123,13 @@ export const generateReminderLetter = async (
   await uploadFile(
     { ...excelFile, fileName: `${prefix}${excelFile.fileName}` },
     customer.code,
-    "excel",
+    "excel"
   );
 
   await uploadFile(
     { ...pdfFile, fileName: `${prefix}${pdfFile.fileName}` },
     customer.code,
-    "pdf",
+    "pdf"
   );
 
   await completeJobPhase(jobId, SoaPhase.UploadingToAzure);

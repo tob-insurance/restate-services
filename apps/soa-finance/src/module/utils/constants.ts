@@ -1,20 +1,5 @@
 import type { IExcelColumn } from "./types";
 
-export const ROMAN_MONTHS = [
-  "I",
-  "II",
-  "III",
-  "IV",
-  "V",
-  "VI",
-  "VII",
-  "VIII",
-  "IX",
-  "X",
-  "XI",
-  "XII",
-];
-
 export const INDONESIAN_MONTHS = [
   "Januari",
   "Februari",
@@ -28,14 +13,22 @@ export const INDONESIAN_MONTHS = [
   "Oktober",
   "November",
   "Desember",
-];
+] as const;
 
-export const NUMBER_FORMATS = {
-  number: "#,##0",
-  currency: "#,##0.00",
-  date: "yyyy-mm-dd",
-  text: "@",
-};
+export const ROMAN_MONTHS = [
+  "I",
+  "II",
+  "III",
+  "IV",
+  "V",
+  "VI",
+  "VII",
+  "VIII",
+  "IX",
+  "X",
+  "XI",
+  "XII",
+] as const;
 
 export const CONTENT_TYPES = {
   PDF: "application/pdf",
@@ -44,7 +37,14 @@ export const CONTENT_TYPES = {
   HTML: "text/html",
   CSV: "text/csv",
   OCTET_STREAM: "application/octet-stream",
-};
+} as const;
+
+export const NUMBER_FORMATS = {
+  number: "#,##0",
+  currency: "#,##0.00",
+  date: "yyyy-mm-dd",
+  text: "@",
+} as const;
 
 export const excelColumns: IExcelColumn[] = [
   { header: "DC Note", key: "debitAndCreditNoteNo", width: 18 },
@@ -102,3 +102,30 @@ export const excelColumns: IExcelColumn[] = [
   { header: "Installment", key: "installment", width: 12, format: "number" },
   { header: "Due Date", key: "dueDate", width: 12 },
 ];
+
+export function bufferToBase64(buffer: Buffer): string {
+  return buffer.toString("base64");
+}
+
+export function getContentType(filename: string): string {
+  const ext = filename.split(".").pop()?.toLowerCase();
+  switch (ext) {
+    case "pdf":
+      return CONTENT_TYPES.PDF;
+    case "xlsx":
+      return CONTENT_TYPES.XLSX;
+    case "xls":
+      return CONTENT_TYPES.XLS;
+    case "html":
+      return CONTENT_TYPES.HTML;
+    case "csv":
+      return CONTENT_TYPES.CSV;
+    default:
+      return CONTENT_TYPES.OCTET_STREAM;
+  }
+}
+
+export type NumberFormat = (typeof NUMBER_FORMATS)[keyof typeof NUMBER_FORMATS];
+export type ContentType = (typeof CONTENT_TYPES)[keyof typeof CONTENT_TYPES];
+export type IndonesianMonth = (typeof INDONESIAN_MONTHS)[number];
+export type RomanMonth = (typeof ROMAN_MONTHS)[number];

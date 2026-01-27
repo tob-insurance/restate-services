@@ -2,7 +2,8 @@ import { v4 as uuidv4 } from "uuid";
 import { formatUUID } from "../../../module/utils/formater";
 import { executeQuery } from "../database";
 
-type ReminderLetterParams = {
+type LatestLetterResult = { type: string; sentDate: Date; letterNo: string };
+export type ReminderLetterParams = {
   reminderId: string;
   type: string;
   letterNo: string;
@@ -10,22 +11,9 @@ type ReminderLetterParams = {
   sentDate: Date;
 };
 
-export const insertReminderLetter = async (
-  reminderId: string,
-  type: string,
-  letterNo: string,
-  referenceId: string | null,
-  sentDate: Date
-): Promise<string> => {
-  const params: ReminderLetterParams = {
-    reminderId,
-    type,
-    letterNo,
-    referenceId,
-    sentDate,
-  };
-  return insertReminderLetterInternal(params);
-};
+export const insertReminderLetter = (
+  params: ReminderLetterParams
+): Promise<string> => insertReminderLetterInternal(params);
 
 async function insertReminderLetterInternal(
   params: ReminderLetterParams
@@ -39,7 +27,7 @@ async function insertReminderLetterInternal(
             ${referenceId ? "hextoraw(:referenceId)" : "NULL"}, :sentDate)
   `;
 
-  const binds: Record<string, unknown> = {
+  const binds: Record<string, undefined | string | Date> = {
     id,
     reminderId,
     type,
@@ -55,8 +43,6 @@ async function insertReminderLetterInternal(
 
   return id;
 }
-
-type LatestLetterResult = { type: string; sentDate: Date; letterNo: string };
 
 export const getLatestLetter = async (
   reminderId: string | undefined

@@ -11,7 +11,9 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@azure/identity": "^4.13.0",
     "@azure/storage-blob": "^12.30.0",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
     "@restatedev/restate-sdk": "^1.9.1",
     "@restatedev/restate-sdk-zod": "^1.9.1",
     "@types/oracledb": "^6.10.1",

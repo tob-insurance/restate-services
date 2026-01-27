@@ -1,9 +1,4 @@
 import { INDONESIAN_MONTHS } from "./constants";
-import { SoaType } from "./types";
-
-type OracleDate = Date | string | number | null | undefined;
-type OracleNumber = number | string | null | undefined;
-type OracleString = string | number | null | undefined;
 
 export const formatUUID = (uuid: string) =>
   uuid.replace(/-/g, "").toUpperCase();
@@ -22,9 +17,6 @@ export const formatTimePeriod = (date: Date) => date.toISOString().slice(0, 7);
 export const formatDateToUnixTimestamp = (date: Date) =>
   Math.floor(date.getTime() / 1000);
 
-export const parseSoaType = (type: string) =>
-  SoaType[type as keyof typeof SoaType];
-
 export const formatIndonesianDate = (date: Date): string => {
   const day = date.getDate().toString().padStart(2, "0");
   const month = INDONESIAN_MONTHS[date.getMonth()];
@@ -32,7 +24,7 @@ export const formatIndonesianDate = (date: Date): string => {
   return `Jakarta, ${day} ${month} ${year}`;
 };
 
-export function parseNumber(value: OracleNumber): number {
+export function parseNumber(value: unknown): number {
   if (value === null || value === undefined) {
     return 0;
   }
@@ -41,7 +33,7 @@ export function parseNumber(value: OracleNumber): number {
   return Number.isNaN(num) ? 0 : num;
 }
 
-export function parseString(value: OracleString): string {
+export function parseString(value: unknown): string {
   if (value === null || value === undefined) {
     return "";
   }
@@ -49,7 +41,7 @@ export function parseString(value: OracleString): string {
   return value.toString().trim();
 }
 
-export function parseDate(value: OracleDate): Date {
+export function parseDate(value: unknown): Date {
   if (!value) {
     return new Date(0);
   }
@@ -57,5 +49,5 @@ export function parseDate(value: OracleDate): Date {
     return value;
   }
 
-  return new Date(value);
+  return new Date(value as string | number);
 }

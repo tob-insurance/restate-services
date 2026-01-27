@@ -16,11 +16,13 @@ export type {
 } from "./report";
 export {
   column,
+  type IFileData,
   type IGenerateReminderResult,
   type IProcessReminder,
   type ISoaItem,
   type ISoaReminder,
   type IStatementOfAccountModel,
+  multiBranchCodes,
   SoaPhase,
   SoaType,
 } from "./soa";

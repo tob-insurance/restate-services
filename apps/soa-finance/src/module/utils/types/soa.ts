@@ -15,7 +15,10 @@ export const SoaPhase = {
   UploadingToAzure: "UploadingToAzure",
   SendingEmail: "SendingEmail",
 };
+
 export type SoaPhase = (typeof SoaPhase)[keyof typeof SoaPhase];
+
+export const multiBranchCodes = ["DIC", "DIP", "DIG", "DID"];
 
 export type ISoaItem = {
   customerId: string;
@@ -95,6 +98,14 @@ export type IStatementOfAccountModel = {
   customerCode: string;
   officeCode?: string;
   distributionCode?: string;
+};
+
+export type IFileData = {
+  fileName: string;
+  bytes: Buffer;
+  contentType: string;
+  isInline?: boolean;
+  contentId?: string;
 };
 
 export const column = {

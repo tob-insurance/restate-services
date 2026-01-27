@@ -1,7 +1,4 @@
-import oracledb from "oracledb";
-
-type OracleBinds = Record<string, unknown>;
-type OracleOptions = Record<string, unknown>;
+import oracledb, { type BindParameters, type ExecuteOptions } from "oracledb";
 
 type ProcedureOutBinds = {
   p_status: string;
@@ -29,8 +26,8 @@ export const initOracleClient = async () => {
 
 export async function executeQuery(
   sql: string,
-  binds: OracleBinds = {},
-  options: OracleOptions = {}
+  binds: BindParameters = {},
+  options: ExecuteOptions = {}
 ) {
   await initOracleClient();
 
@@ -46,7 +43,7 @@ export async function executeQuery(
 
 export async function executeProcedure(
   procedureName: string,
-  binds: OracleBinds = {}
+  binds: BindParameters = {}
 ) {
   await initOracleClient();
   const connection = await oracledb.getConnection("default");

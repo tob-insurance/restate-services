@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PERINGATAN TERAKHIR - PT. ASURANSI TOTAL BERSAMA</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        line-height: 1.6;
+        background-color: #f5f5f5;
+        padding: 20px;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        padding: 60px;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        border-top: 5px solid #dc3545;
+      }
+      .header {
+        text-align: left;
+        margin-bottom: 30px;
+      }
+      .letter-info {
+        margin-bottom: 20px;
+        font-size: 13px;
+        color: #666;
+      }
+      .date {
+        margin-bottom: 30px;
+        font-size: 14px;
+      }
+      .recipient {
+        font-weight: bold;
+        margin-bottom: 20px;
+      }
+      .content {
+        text-align: justify;
+        margin-bottom: 20px;
+        font-size: 14px;
+      }
+      .danger-box {
+        background-color: #f8d7da;
+        padding: 15px;
+        border-left: 4px solid #dc3545;
+        margin: 20px 0;
+      }
+      .virtual-account {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-left: 4px solid #dc3545;
+        margin: 20px 0;
+      }
+      .highlight {
+        font-weight: bold;
+        color: #dc3545;
+      }
+      .footer {
+        margin-top: 40px;
+      }
+      .signature {
+        margin-top: 60px;
+      }
+      .bank-accounts {
+        margin: 20px 0;
+      }
+      .bank-account {
+        margin: 15px 0;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+      }
+      .bank-account-item {
+        margin: 5px 0;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1 style="color: #dc3545; font-size: 24px; margin-bottom: 10px">
+          PT. ASURANSI TOTAL BERSAMA
+        </h1>
+        <h2 style="color: #dc3545; font-size: 16px">
+          ⚠️ PERINGATAN TERAKHIR / SOMASI ⚠️
+        </h2>
+      </div>
+
+      <div class="letter-info">
+        No. Surat: {{ letterNo }}<br />
+        {% if previousLetterNo %}Ref: {{ previousLetterNo }}{% endif %}
+      </div>
+
+      <div class="date">Jakarta, {{ formattedDate }}</div>
+
+      <div class="recipient">Kepada Yth. {{ customerName }},</div>
+
+      <div class="content">
+        <p style="margin-bottom: 15px">
+          Menindaklanjuti surat-surat kami sebelumnya yang
+          <strong>TIDAK MENDAPAT TANGGAPAN</strong>, dengan ini kami sampaikan
+          <strong style="color: #dc3545">PERINGATAN TERAKHIR</strong>.
+        </p>
+
+        <div class="danger-box">
+          <strong style="color: #dc3545">🚨 PERINGATAN KERAS:</strong>
+          <p style="margin-top: 10px">
+            Apabila dalam waktu <strong>7 (tujuh) hari kalender</strong> sejak
+            surat ini Anda tidak melakukan pembayaran, maka kami akan mengambil
+            langkah-langkah sebagai berikut:
+          </p>
+          <ul style="margin-top: 10px; padding-left: 20px">
+            <li><strong>Pembatalan polis asuransi secara sepihak</strong></li>
+            <li>Pencabutan seluruh perlindungan asuransi</li>
+            <li>Pencantuman dalam daftar hitam nasabah</li>
+            <li><strong>Penyelesaian melalui jalur hukum</strong></li>
+          </ul>
+        </div>
+
+        <p style="margin-bottom: 15px; font-weight: bold; color: #dc3545">
+          Segala akibat hukum dan kerugian yang timbul menjadi tanggung jawab
+          Anda sepenuhnya.
+        </p>
+      </div>
+
+      <div class="payment-section">
+        <p style="margin-bottom: 15px; font-weight: 600">
+          SEGERA lakukan pembayaran melalui BCA VIRTUAL ACCOUNT:
+        </p>
+
+        <div class="virtual-account">
+          <div class="bank-account-item">
+            <strong>No. Virtual Account:</strong>
+            <span class="highlight">{{ virtualAccount }}</span>
+          </div>
+          <div class="bank-account-item">
+            <strong>Atas Nama:</strong> {{ customerName }}
+          </div>
+        </div>
+
+        <p style="margin: 20px 0; font-size: 14px">
+          Jika Virtual Account tidak bisa digunakan, maka dapat dibayarkan pada
+          pilihan rekening kami sebagai berikut:
+        </p>
+        <div class="bank-accounts">
+          <div class="bank-account">
+            <div class="bank-account-item">
+              <strong>1. No Rekening:</strong> 879-209-1333
+            </div>
+            <div class="bank-account-item" style="padding-left: 15px">
+              <strong>Nama Rekening:</strong> PT. ASURANSI TOTAL BERSAMA
+            </div>
+            <div class="bank-account-item" style="padding-left: 15px">
+              <strong>Bank:</strong> BCA Cab. WTC Mangga Dua
+            </div>
+          </div>
+          <div class="bank-account">
+            <div class="bank-account-item">
+              <strong>2. No Rekening:</strong> 120-00-3588888-7 (MANDIRI USD)
+            </div>
+            <div class="bank-account-item" style="padding-left: 15px">
+              <strong>Nama Rekening:</strong> PT. ASURANSI TOTAL BERSAMA
+            </div>
+            <div class="bank-account-item" style="padding-left: 15px">
+              <strong>Bank:</strong> Mandiri USD cab Sunter Permai
+            </div>
+          </div>
+          <div class="bank-account">
+            <div class="bank-account-item">
+              <strong>3. No Rekening:</strong> 120-00-3288888-0 (MANDIRI IDR)
+            </div>
+            <div class="bank-account-item" style="padding-left: 15px">
+              <strong>Nama Rekening:</strong> PT. ASURANSI TOTAL BERSAMA
+            </div>
+            <div class="bank-account-item" style="padding-left: 15px">
+              <strong>Bank:</strong> Mandiri Cab Sunter Permai
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <p style="margin-bottom: 15px; font-weight: bold">
+          Ini adalah PERINGATAN TERAKHIR. Mohon SEGERA lakukan pembayaran.
+        </p>
+
+        <p style="margin-bottom: 15px">
+          Setelah pembayaran dilakukan, <strong>WAJIB</strong> informasikan ke
+          <a href="mailto:finance@tob-ins.com" style="color: #dc3545"
+            >finance@tob-ins.com</a
+          >
+        </p>
+
+        <p style="margin-bottom: 30px">
+          Demikian surat peringatan ini kami sampaikan. Atas perhatiannya kami
+          ucapkan terima kasih.
+        </p>
+
+        <div class="signature">
+          <p style="font-weight: 600">Hormat kami,</p>
+          <p style="margin-top: 60px; font-weight: 600">
+            Finance & Collection Dept.
+          </p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

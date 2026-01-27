@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <style>
+    body {
+      font-family: "Times New Roman", Times, serif;
+      font-size: 12pt;
+      line-height: 1.5;
+      margin: 0;
+      padding: 0;
+    }
+    .highlight {
+      background-color: yellow;
+      font-weight: bold;
+    }
+    .info-table {
+      margin: 15px 0;
+    }
+    .info-table td {
+      padding: 2px 0;
+      vertical-align: top;
+    }
+    .info-table .label {
+      width: 120px;
+    }
+    .info-table .separator {
+      width: 15px;
+    }
+    .bank-section {
+      margin: 15px 0;
+    }
+    .bank-item {
+      margin-bottom: 10px;
+    }
+    .bank-item td {
+      padding: 1px 0;
+      vertical-align: top;
+    }
+    .bank-item .label {
+      width: 100px;
+    }
+    .bank-item .separator {
+      width: 15px;
+    }
+    .signature-section {
+      margin-top: 30px;
+    }
+    .signature-box {
+      border: 1px solid #000;
+      width: 120px;
+      height: 60px;
+      margin: 10px 0;
+    }
+    a {
+      color: blue;
+      text-decoration: underline;
+    }
+    </style>
+  </head>
+  <body>
+    <p>{{ letterDate }}</p>
+
+    <p>Dear {{ customerName }},</p>
+
+    <p>
+      Sebelumnya kami mengucapkan terima kasih atas kepercayaan dan kerjasama
+      yang telah terjalin selama ini dengan PT. ASURANSI TOTAL BERSAMA.<br />
+      Berdasarkan catatan kami per tanggal {{ statementDate }}, terlampir adalah
+      rincian tagihan premi.
+    </p>
+
+    <p>
+      Besar harapan kami kepada Bpk/Ibu dapat melakukan pembayaran atas premi,
+      <span class="highlight"
+        >terutama tagihan yang melewati tanggal jatuh tempo</span
+      >
+    </p>
+
+    <p>Premi dapat dibayarkan ke BCA VIRTUAL ACCOUNT sebagai berikut:</p>
+
+    <table class="info-table">
+      <tr>
+        <td class="label">No. Virtual Account</td>
+        <td class="separator">:</td>
+        <td>{{ virtualAccount }}</td>
+      </tr>
+      <tr>
+        <td class="label">Atas Nama</td>
+        <td class="separator">:</td>
+        <td>{{ customerName }}</td>
+      </tr>
+    </table>
+
+    <p>
+      <strong
+        >Jika Virtual Account tidak bisa digunakan, maka dapat dibayarkan pada
+        pilihan rekening kami sebagai berikut:</strong
+      >
+    </p>
+
+    <div class="bank-section">
+      <div class="bank-item">
+        <table>
+          <tr>
+            <td colspan="3">
+              <strong>1. No Rekening</strong>
+            </td>
+          </tr>
+          <tr>
+            <td class="label">No Rekening</td>
+            <td class="separator">:</td>
+            <td>879-209-1333</td>
+          </tr>
+          <tr>
+            <td class="label">Nama Rekening</td>
+            <td class="separator">:</td>
+            <td>PT. ASURANSI TOTAL BERSAMA</td>
+          </tr>
+          <tr>
+            <td class="label">Bank</td>
+            <td class="separator">:</td>
+            <td>BCA Cab. WTC Mangga Dua</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="bank-item">
+        <table>
+          <tr>
+            <td colspan="3">
+              <strong>2. No Rekening</strong>
+            </td>
+          </tr>
+          <tr>
+            <td class="label">No Rekening</td>
+            <td class="separator">:</td>
+            <td>120-00-3588888-7 (MANDIRI USD)</td>
+          </tr>
+          <tr>
+            <td class="label">Nama Rekening</td>
+            <td class="separator">:</td>
+            <td>PT. ASURANSI TOTAL BERSAMA</td>
+          </tr>
+          <tr>
+            <td class="label">Bank</td>
+            <td class="separator">:</td>
+            <td>Mandiri USD cab Sunter Permai</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="bank-item">
+        <table>
+          <tr>
+            <td colspan="3">
+              <strong>3. No Rekening</strong>
+            </td>
+          </tr>
+          <tr>
+            <td class="label">No Rekening</td>
+            <td class="separator">:</td>
+            <td>120-00-3288888-0 (MANDIRI IDR)</td>
+          </tr>
+          <tr>
+            <td class="label">Nama Rekening</td>
+            <td class="separator">:</td>
+            <td>PT. ASURANSI TOTAL BERSAMA</td>
+          </tr>
+          <tr>
+            <td class="label">Bank</td>
+            <td class="separator">:</td>
+            <td>Mandiri Cab Sunter Permai</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <p>Kami harap dapat dilakukan pembayaran dalam waktu dekat.</p>
+
+    <p>
+      Apabila pembayaran telah dilakukan mohon dapat diinfokan ke
+      <a href="mailto:finance@tob-ins.com">finance@tob-ins.com</a>
+    </p>
+
+    <p>
+      Jika tagihan tersebut telah dibayarkan sebelum surat ini diterima, mohon
+      untuk menginformasikannya kepada kami dan abaikan surat tagihan ini.
+      <br>
+      Demikian kami sampaikan, atas perhatian dan kerjasamanya kami ucapkan
+      terima kasih.
+    </p>
+
+    <div class="signature-section">
+      <p>Hormat kami,</p>
+      <div class="signature-box"></div>
+      <p>
+        <strong>Finance Dept.</strong>
+      </p>
+    </div>
+  </body>
+</html>

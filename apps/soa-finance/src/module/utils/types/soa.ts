@@ -1,11 +1,11 @@
 export const SoaType = {
-  SOA: 1,
-  RL1: 2,
-  RL2: 3,
-  RL3: 4,
-} as const;
+  1: "SOA",
+  2: "RL1",
+  3: "RL2",
+  4: "RL3",
+};
 
-export type SoaType = (typeof SoaType)[keyof typeof SoaType];
+export type SoaType = keyof typeof SoaType;
 
 export const SoaPhase = {
   RetrievingCustomerData: "RetrievingCustomerData",
@@ -14,8 +14,7 @@ export const SoaPhase = {
   GeneratingFiles: "GeneratingFiles",
   UploadingToAzure: "UploadingToAzure",
   SendingEmail: "SendingEmail",
-} as const;
-
+};
 export type SoaPhase = (typeof SoaPhase)[keyof typeof SoaPhase];
 
 export type ISoaItem = {
@@ -35,10 +34,10 @@ export type ISoaItem = {
 };
 
 export type ISoaReminder = {
-  id?: string;
-  customerCode?: string;
-  timePeriod?: string;
-  officeId?: string;
+  id: string;
+  customerCode: string;
+  timePeriod: string;
+  officeId: string;
 };
 
 export type IProcessReminder = {

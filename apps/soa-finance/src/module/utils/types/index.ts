@@ -1,9 +1,11 @@
 export type { IAccount, IBranch, IGetSoaJob } from "./customer";
+export type { IEmailAttachment, IEmailMessage } from "./email";
 export type {
   IOracleStreamOptions,
   IPartitionedFile,
   ISoaPipelineResult,
 } from "./pipeline";
+export type { IReminderEmailData } from "./reminder";
 export type {
   IExcelColumn,
   IExcelSheetData,

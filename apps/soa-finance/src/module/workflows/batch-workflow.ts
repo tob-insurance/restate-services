@@ -10,7 +10,7 @@ import {
   formatDateToUnixTimestamp,
   formatTimePeriod,
   formatUUID,
-} from "../utils/formater";
+} from "../utils/formatter";
 
 import type { IAccount, SoaType, soaSchema } from "../utils/types";
 import { type SoaWorkflow, soaWorkflow } from "./soa-workflow";

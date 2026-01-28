@@ -39,6 +39,12 @@ export const soaWorkflow = workflow({
         async () => await ensureJobExists(batchId, customerId)
       );
 
+      // Create processing item with jobId included
+      const processingItem: ISoaItem = {
+        ...params,
+        jobId,
+      };
+
       const currentRetryAttempt = retryAttempt;
       let success = false;
 
@@ -75,9 +81,9 @@ export const soaWorkflow = workflow({
           );
 
           if (shouldDoReminder) {
-            await processReminder(ctx, customerData, params);
+            await processReminder(ctx, customerData, processingItem);
           } else {
-            await orchestrateNewSoa(ctx, customerData, params, jobId);
+            await orchestrateNewSoa(ctx, customerData, processingItem, jobId);
           }
 
           success = true;

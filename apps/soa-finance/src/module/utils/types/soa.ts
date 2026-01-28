@@ -97,7 +97,7 @@ export type IStatementOfAccountModel = {
   classOfBusiness?: string;
   customerCode: string;
   officeCode?: string;
-  distributionCode?: string;
+  distributionCode: string;
 };
 
 export type IFileData = {

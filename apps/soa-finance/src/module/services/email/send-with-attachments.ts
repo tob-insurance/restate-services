@@ -2,7 +2,6 @@
  * Download files from Azure and send SOA email
  */
 
-import { v4 as uuid } from "uuid";
 import { downloadSoaFiles } from "../../../infrastructure/azure";
 import type { IAccount } from "../../utils/types";
 import { sendSoaEmail } from "./send-soa";
@@ -25,8 +24,7 @@ export async function sendWithAttachments({
   testMode,
   jobId,
 }: SendWithAttachmentsParams): Promise<SendEmailResult> {
-  const uniqueId = uuid().replace(/-/g, "");
-  const excelFileName = `Outstanding-SOA--${customerId}-${uniqueId}.xlsx`;
+  const excelFileName = `Outstanding-SOA--${customerId}.xlsx`;
   const pdfFileName = `Collection_Letter_${customerId}.pdf`;
 
   try {

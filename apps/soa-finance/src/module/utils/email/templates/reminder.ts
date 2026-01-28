@@ -8,7 +8,7 @@ import { formatDateIndonesian } from "../../formatter";
 import { renderTemplate } from "../../template";
 import type { IReminderEmailData } from "../../types/reminder";
 
-const TEMPLATES_DIR = join(__dirname, "../html");
+const TEMPLATES_DIR = join(__dirname, "html");
 
 function loadTemplate(name: string): string {
   return readFileSync(join(TEMPLATES_DIR, `${name}.html`), "utf-8");
@@ -80,6 +80,6 @@ export function getReminderEmailSubject(
     case "3":
       return `[PERINGATAN TERAKHIR] Tagihan Premi - ${customerName}`;
     default:
-      return `[REMINDER] Tagihan Premi - ${customerName}`;
+      return `Tagihan Premi - ${customerName}`;
   }
 }

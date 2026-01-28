@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { formatDateIndonesian } from "../../formatter";
 import { renderTemplate } from "../../template";
 
-const TEMPLATES_DIR = join(__dirname, "../templates");
+const TEMPLATES_DIR = join(__dirname, "html");
 
 export type SoaEmailData = {
   customerName: string;

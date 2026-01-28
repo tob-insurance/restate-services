@@ -50,7 +50,7 @@ export const getAccountEmails = async (
       AND EMAIL IS NOT NULL
   `;
 
-  const binds: Record<string, unknown> = { cmCode };
+  const binds: Record<string, string> = { cmCode };
 
   if (officeCode && officeCode !== "ALL") {
     query += " AND OFFICE_CODE = :officeCode";

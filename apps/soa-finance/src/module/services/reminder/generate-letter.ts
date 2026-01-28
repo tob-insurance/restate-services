@@ -75,9 +75,8 @@ export const generateLetter = async (
 
   // Step 4: Get SOA data (Phase: GetSoa)
   await insertJobPhase(jobId, SoaPhase.GetSoa);
-  const fullName = customer.fullName.replace(/\s+/g, "");
 
-  const soaList = readSoaParquet(fullName);
+  const soaList = readSoaParquet(customer.code);
 
   await completeJobPhase(jobId, SoaPhase.GetSoa);
   if (soaList.length === 0) {

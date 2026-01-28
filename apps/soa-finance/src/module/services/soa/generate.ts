@@ -49,10 +49,9 @@ export const generateSoa = async (
   // ========== Phase: Get SOA Data ==========
   await insertJobPhase(jobId, SoaPhase.GetSoa);
   console.log(`Getting SOA data for ${customer.code}`);
-  const fullName = customer.fullName.replace(/\s+/g, "");
 
   const toDateObj = new Date(toDate * 1000);
-  let soaList = await readSoaParquet(fullName);
+  let soaList = await readSoaParquet(customer.code);
 
   // Filter by aging >= 60 days (skip if skipAgingFilter is true)
   if (skipAgingFilter) {

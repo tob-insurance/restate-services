@@ -10,7 +10,7 @@ import { renderTemplate } from "../../template";
 import type { ISoaFileResult } from "../../types";
 import { generatePdfFromHtml } from "./generate-pdf-from-html";
 
-const TEMPLATES_DIR = join(__dirname, "../templates");
+const TEMPLATES_DIR = join(__dirname, "../../email/templates/html");
 
 function loadTemplate(name: string): string {
   return readFileSync(join(TEMPLATES_DIR, `${name}.html`), "utf-8");

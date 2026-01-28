@@ -1,7 +1,5 @@
-import { v4 as uuidv4 } from "uuid";
-import { CONTENT_TYPES } from "../../constants";
+import { CONTENT_TYPES, excelColumns } from "../../constants";
 import type { ISoaFileResult, IStatementOfAccountModel } from "../../types";
-import { EXCEL_COLUMNS } from "..";
 import { excelGenerate } from "./excel-generator";
 
 type GenerateSoaExcelParams = {
@@ -11,8 +9,7 @@ type GenerateSoaExcelParams = {
 
 export function generateExcel(params: GenerateSoaExcelParams): ISoaFileResult {
   const { soaData, customerId } = params;
-  const uniqueId = uuidv4().replace(/-/g, "");
-  const fileName = `Outstanding-SOA--${customerId}-${uniqueId}.xlsx`;
+  const fileName = `Outstanding-SOA--${customerId}.xlsx`;
 
   const rows: Record<string, unknown>[] = soaData.map((soa) => ({
     debitAndCreditNoteNo: soa.debitAndCreditNoteNo,
@@ -56,7 +53,7 @@ export function generateExcel(params: GenerateSoaExcelParams): ISoaFileResult {
   const buffer = excelGenerate([
     {
       sheetName: "Statement of Account",
-      columns: EXCEL_COLUMNS,
+      columns: excelColumns,
       rows,
     },
   ]);

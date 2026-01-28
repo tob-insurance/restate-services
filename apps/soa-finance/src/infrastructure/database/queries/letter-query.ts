@@ -2,7 +2,13 @@ import { v4 as uuidv4 } from "uuid";
 import { formatUUID } from "../../../module/utils/formatter";
 import { executeQuery } from "../database";
 
-type LatestLetterResult = { type: string; sentDate: Date; letterNo: string };
+type LatestLetterResult = {
+  id: string;
+  type: string;
+  sentDate: Date;
+  letterNo: string;
+};
+
 export type ReminderLetterParams = {
   reminderId: string;
   type: string;
@@ -12,11 +18,11 @@ export type ReminderLetterParams = {
 };
 
 export const insertReminderLetter = (
-  params: ReminderLetterParams
+  params: ReminderLetterParams,
 ): Promise<string> => insertReminderLetterInternal(params);
 
 async function insertReminderLetterInternal(
-  params: ReminderLetterParams
+  params: ReminderLetterParams,
 ): Promise<string> {
   const { reminderId, type, letterNo, referenceId, sentDate } = params;
   const id = formatUUID(uuidv4());
@@ -45,15 +51,15 @@ async function insertReminderLetterInternal(
 }
 
 export const getLatestLetter = async (
-  reminderId: string | undefined
+  reminderId: string | undefined,
 ): Promise<LatestLetterResult | null> => {
   if (!reminderId) {
     return null;
   }
 
   const query = `
-    SELECT TYPE as type, SENT_DATE as sentDate, LETTER_NO as letterNo FROM (
-      SELECT TYPE, SENT_DATE, LETTER_NO
+    SELECT "id", "type", "sentDate", "letterNo" FROM (
+      SELECT RAWTOHEX(ID) as "id", TYPE as "type", SENT_DATE as "sentDate", LETTER_NO as "letterNo"
       FROM SOA_REMINDER_LETTER
       WHERE REMINDER_ID = hextoraw(:reminderId)
       ORDER BY SENT_DATE DESC
@@ -69,7 +75,7 @@ export const getLatestLetter = async (
 export const getNextLetterSequence = async (
   type: string,
   year: number,
-  month: number
+  month: number,
 ): Promise<number> => {
   const query = `
     SELECT COUNT(*) + 1 AS NEXT_NO

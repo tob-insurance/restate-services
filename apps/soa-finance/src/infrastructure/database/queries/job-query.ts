@@ -7,7 +7,7 @@ import { executeQuery } from "../database";
 export const insertJob = async (
   jobId: string,
   batchId: string,
-  customerId: string
+  customerId: string,
 ) => {
   const sql = `
     INSERT INTO SOA_PROCESSING_JOBS
@@ -22,7 +22,7 @@ export const insertJob = async (
 
 export const getJobByBatchAndCustomer = async (
   batchId: string,
-  customerId: string
+  customerId: string,
 ): Promise<IGetSoaJob | null> => {
   const query = `
     SELECT RAWTOHEX(JOB_ID) AS "jobId",
@@ -51,7 +51,7 @@ export const updateJobStatus = async (
   jobId: string,
   status: string,
   errorMessage?: string,
-  retryAttempt?: number
+  retryAttempt?: number,
 ) => {
   const query = `
     UPDATE SOA_PROCESSING_JOBS
@@ -70,7 +70,7 @@ export const updateJobStatus = async (
       err: errorMessage ?? null,
       retry: retryAttempt ?? null,
     },
-    { autoCommit: true }
+    { autoCommit: true },
   );
 };
 
@@ -90,7 +90,7 @@ export const insertJobPhase = async (jobId: string, phase: string) => {
 export const completeJobPhase = async (
   jobId: string,
   phase: string,
-  errorMessage?: string
+  errorMessage?: string,
 ) => {
   const query = `
     UPDATE SOA_PROCESSING_JOB_DETAILS
@@ -104,6 +104,6 @@ export const completeJobPhase = async (
   await executeQuery(
     query,
     { jobId, phase, errorMessage: errorMessage ?? null },
-    { autoCommit: true }
+    { autoCommit: true },
   );
 };

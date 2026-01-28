@@ -2,14 +2,17 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tableFromIPC } from "apache-arrow";
 import { readParquet } from "parquet-wasm";
+
 import type { IStatementOfAccountModel } from "../../../module/utils/types";
 
 export function readSoaParquet(
-  accountName: string
+  accountCode: string
 ): IStatementOfAccountModel[] {
-  const formatedName = accountName.replace(/\s+/g, "");
-  const fileName = `soa_${formatedName}.parquet`;
-  const filePath = join(process.cwd(), "data", fileName);
+  const filePath = join(
+    process.cwd(),
+    "src/data-pipeline/datas",
+    `soa_${accountCode}.parquet`
+  );
 
   if (!existsSync(filePath)) {
     console.warn(`Parquet file not found: ${filePath}`);

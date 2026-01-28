@@ -1,4 +1,4 @@
-import { formatDuration } from "../../module/utils/formater";
+import { formatDuration } from "../../module/utils/formatter";
 import type { ISoaPipelineResult } from "../../module/utils/types/pipeline";
 import { streamSoaData } from "./read";
 import { transformSoaStream } from "./transform";
@@ -13,11 +13,11 @@ export async function generateSoaPipeline(
   console.log("Starting SOA pipeline");
 
   // Create pipeline: Reader → Transformer
-  const oracleStream = streamSoaData(asAtDate); // get all data from package
-  const transformedStream = transformSoaStream(oracleStream); // transform data to SOA model
+  const oracleStream = streamSoaData(asAtDate);
+  const transformedStream = transformSoaStream(oracleStream);
 
   // Write to Parquet
-  await writeToParquet(transformedStream); // write to parquet file by distribution code
+  await writeToParquet(transformedStream);
 
   const endTime = Date.now();
   const duration = formatDuration(endTime - startTime);

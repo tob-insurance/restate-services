@@ -12,7 +12,7 @@ export async function writeToParquet(
   const datasAccount = new Map<string, IStatementOfAccountModel[]>();
 
   for await (const row of source) {
-    const accountCode = row.customerCode;
+    const accountCode = row.distributionCode;
 
     if (!datasAccount.has(accountCode)) {
       datasAccount.set(accountCode, []);
@@ -25,7 +25,7 @@ export async function writeToParquet(
 
   for (const [distributionCode, rows] of datasAccount) {
     const fileName = `soa_${distributionCode}.parquet`;
-    const localPath = join(process.cwd(), "data");
+    const localPath = join(process.cwd(), "src/data-pipeline/datas");
     const filePath = join(localPath, fileName);
 
     writeSoaParquet(rows, filePath);

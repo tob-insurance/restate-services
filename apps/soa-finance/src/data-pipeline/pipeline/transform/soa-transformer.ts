@@ -2,7 +2,7 @@ import {
   parseDate,
   parseNumber,
   parseString,
-} from "../../../module/utils/formater";
+} from "../../../module/utils/formatter";
 import {
   column,
   type IStatementOfAccountModel,

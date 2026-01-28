@@ -6,22 +6,29 @@ type ProcedureOutBinds = {
   p_cursor: oracledb.ResultSet<unknown[]>;
 };
 
-const pool: oracledb.Pool | null = null;
+let initPromise: Promise<void> | null = null;
 
-export const initOracleClient = async () => {
-  if (pool) {
-    return;
+export const oracleClient = oracledb.initOracleClient({
+  libDir: "C:/Program Files/instantclient_23_0",
+});
+
+export const initOracleClient = () => {
+  // If already initializing or initialized, return the same promise
+  if (initPromise) {
+    return initPromise;
   }
 
-  await oracledb.createPool({
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    connectString: process.env.DB_CONNECT_STRING,
-  });
+  // Create initialization promise (singleton pattern)
+  initPromise = (async () => {
+    await oracledb.createPool({
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      connectString: process.env.DB_CONNECT_STRING,
+    });
+    console.log("Oracle DB Pool Initialized");
+  })();
 
-  console.log("Oracle DB Pool Initialized");
-
-  return pool;
+  return initPromise;
 };
 
 export async function executeQuery(

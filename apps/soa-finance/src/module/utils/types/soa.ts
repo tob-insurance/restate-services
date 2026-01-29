@@ -2,7 +2,7 @@ export const SoaType = {
   1: "SOA",
   2: "RL1",
   3: "RL2",
-  4: "RL3",
+  4: "WL",
 };
 
 export type SoaType = keyof typeof SoaType;

@@ -9,7 +9,7 @@ type BatchStatusRow = {
 export const insertBatch = async (
   batchId: string,
   total: number,
-  status: string,
+  status: string
 ) => {
   const query = `
     INSERT INTO SOA_PROCESSING_BATCHES
@@ -37,14 +37,14 @@ export const updateBatchStatus = async (batchId: string, status: string) => {
  * Returns true if this was the last customer to complete
  */
 export const incrementProcessedAndCheckComplete = async (
-  batchId: string,
+  batchId: string
 ): Promise<{ isComplete: boolean; status: string }> => {
   await executeQuery(
     `UPDATE SOA_PROCESSING_BATCHES
      SET PROCESSED_CUSTOMERS = PROCESSED_CUSTOMERS + 1
      WHERE BATCH_ID = hextoraw(:batchId)`,
     { batchId },
-    { autoCommit: true },
+    { autoCommit: true }
   );
 
   // Get current status
@@ -54,7 +54,7 @@ export const incrementProcessedAndCheckComplete = async (
             FAILED_CUSTOMERS as "failedCustomers"
      FROM SOA_PROCESSING_BATCHES
      WHERE BATCH_ID = hextoraw(:batchId)`,
-    { batchId },
+    { batchId }
   );
 
   const row = result.rows?.[0] as BatchStatusRow | undefined;

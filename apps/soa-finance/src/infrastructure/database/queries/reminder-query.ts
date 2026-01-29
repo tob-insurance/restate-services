@@ -7,7 +7,7 @@ type DcNoteRow = { DC_NOTE_ID: string };
 
 export const getReminderByCustomerAndPeriod = async (
   customerCode: string,
-  timePeriod: string,
+  timePeriod: string
 ) => {
   const query =
     'SELECT ID as "id", CM_CODE as "customerCode", TIME_PERIOD as "timePeriod", OFFICE_ID as "officeId" FROM SOA_REMINDER WHERE CM_CODE = :customerCode AND TIME_PERIOD = :timePeriod';
@@ -17,7 +17,7 @@ export const getReminderByCustomerAndPeriod = async (
 };
 
 export const getDcNoteIdsByCustomer = async (
-  cmCode: string,
+  cmCode: string
 ): Promise<string[]> => {
   const query = `
     SELECT srd.DC_NOTE_ID 
@@ -37,7 +37,7 @@ export const getDcNoteIdsByCustomer = async (
 export const insertReminder = async (
   cmCode: string,
   timePeriod: string,
-  officeId: string,
+  officeId: string
 ): Promise<string> => {
   // Generate UUID in JavaScript to avoid RETURNING INTO binding issues
   const id = formatUUID(uuidv4());
@@ -55,7 +55,7 @@ export const insertReminder = async (
       timePeriod,
       officeId: officeId || null,
     },
-    { autoCommit: true },
+    { autoCommit: true }
   );
 
   return id;
@@ -64,7 +64,7 @@ export const insertReminder = async (
 export const insertReminderDetail = async (
   dcNoteId: string,
   reminderId: string,
-  isPaid = "N",
+  isPaid = "N"
 ): Promise<void> => {
   const sql = `
     INSERT INTO SOA_REMINDER_DETAIL (DC_NOTE_ID, REMINDER_ID, IS_PAID)
@@ -74,13 +74,13 @@ export const insertReminderDetail = async (
   await executeQuery(
     sql,
     { dcNoteId, reminderId, isPaid },
-    { autoCommit: true },
+    { autoCommit: true }
   );
 };
 
 export const updatePaymentStatus = async (
   dcNoteId: string,
-  isPaid: string,
+  isPaid: string
 ): Promise<void> => {
   const query = `
     UPDATE SOA_REMINDER_DETAIL 

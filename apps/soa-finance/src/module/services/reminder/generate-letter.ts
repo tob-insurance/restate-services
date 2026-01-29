@@ -22,6 +22,7 @@ import {
   SoaPhase,
 } from "../../utils/types";
 import { sendReminderEmail } from "../email/send-reminder";
+import { reconcilePayment } from "../payment/reconcile-payment";
 
 type GenerateLetterParams = {
   customer: IAccount;
@@ -84,11 +85,18 @@ export const generateLetter = async (
   }
 
   // Step 5: Compare DC Notes (Paid vs Unpaid)
-  const existingDcNotes = await getDcNoteIdsByCustomer(customer.code);
-  const soaDcNotes = soaList.map((s) => s.debitAndCreditNoteNo);
+  // const existingDcNotes = await getDcNoteIdsByCustomer(customer.code);
+  // const soaDcNotes = soaList.map((s) => s.debitAndCreditNoteNo);
 
-  const dcNotesPaid = existingDcNotes.filter(
-    (dc) => !soaDcNotes.some((soa) => soa.toLowerCase() === dc.toLowerCase())
+  // const dcNotesPaid = existingDcNotes.filter(
+  //   (dc) => !soaDcNotes.some((soa) => soa.toLowerCase() === dc.toLowerCase()),
+  // );
+
+  // Step 5: Compare DC Notes (Paid vs Unpaid)
+  const currentParquetDcNotes = soaList.map((s) => s.debitAndCreditNoteNo);
+  const dcNotesPaid = await reconcilePayment(
+    reminder.id,
+    currentParquetDcNotes
   );
 
   // Step 6: Generate Letter Number
@@ -102,7 +110,7 @@ export const generateLetter = async (
     reminderId: reminder.id,
     type: reminderCount.toString(),
     letterNo,
-    referenceId: latestLetter ? reminder.id : null,
+    referenceId: latestLetter ? latestLetter.id : null,
     sentDate: dateNow,
   });
 

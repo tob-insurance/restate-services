@@ -8,7 +8,6 @@ import type { WorkflowContext } from "@restatedev/restate-sdk";
 import { isMultiBranchCustomer, sendWithAttachments } from "../../services";
 import type { IAccount, ISoaItem } from "../../utils/types";
 import { runReminderSchedule } from "../reminder/run-schedule";
-import { completeWorkflow } from "../workflow/complete";
 import { processMultiBranchSoa } from "./process-multi-branch";
 import { processSingleBranchSoa } from "./process-single-branch";
 
@@ -39,7 +38,4 @@ export async function orchestrateNewSoa(
 
   // Run reminder schedule
   await runReminderSchedule({ ctx, customerData, params });
-
-  // Complete workflow
-  await completeWorkflow({ ctx, jobId, batchId: params.batchId });
 }

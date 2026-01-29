@@ -10,6 +10,7 @@ import {
   updateJobStatus,
 } from "../../infrastructure/database/queries";
 import {
+  completeWorkflow,
   handleErrorWithRetry,
   orchestrateNewSoa,
   processReminder,
@@ -88,6 +89,9 @@ export const soaWorkflow = workflow({
 
           success = true;
           ctx.console.log(`Completed: ${customerId}`);
+
+          // Complete workflow (handles both SOA and Reminder paths)
+          await completeWorkflow({ ctx, jobId, batchId });
         } catch (error: unknown) {
           const errorResult = await handleErrorWithRetry({
             ctx,

@@ -1,13 +1,14 @@
-import { formatDuration } from "../../module/utils/formatter";
 import type { ISoaPipelineResult } from "../../module/utils/types/pipeline";
-import { streamSoaData } from "./read";
+import { formatDuration } from "../../module/utils/formatter";
+
 import { transformSoaStream } from "./transform";
 import { writeToParquet } from "./write";
+import { streamSoaData } from "./read";
 
 // Run complete SOA pipeline: Oracle → Transform → Parquet by account code → save to local file
 
 export async function generateSoaPipeline(
-  asAtDate: Date
+  asAtDate: Date,
 ): Promise<ISoaPipelineResult> {
   const startTime = Date.now();
   console.log("Starting SOA pipeline");

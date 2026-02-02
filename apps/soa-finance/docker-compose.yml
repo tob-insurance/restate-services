@@ -1,0 +1,31 @@
+# Docker Compose for Restate + Gotenberg
+services:
+  restate:
+    container_name: restate_dev
+    image: docker.restate.dev/restatedev/restate:latest
+    ports:
+      - "8080:8080" # HTTP ingress
+      - "9070:9070" # Admin API
+      - "9071:9071" # Metrics
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - restate-network
+    restart: unless-stopped
+
+  gotenberg:
+    container_name: gotenberg_dev
+    image: gotenberg/gotenberg:8
+    ports:
+      - "3000:3000"
+    environment:
+      - CHROMIUM_DISABLE_WEB_SECURITY=true
+      - DISABLE_GOOGLE_CHROME=1
+      - CHROMIUM_ALLOW_LIST=^file:///tmp/.*
+    networks:
+      - restate-network
+    restart: unless-stopped
+
+networks:
+  restate-network:
+    driver: bridge

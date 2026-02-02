@@ -24,6 +24,10 @@ export const initOracleClient = () => {
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
       connectString: process.env.DB_CONNECT_STRING,
+      poolMin: 10,
+      poolMax: 50,
+      poolIncrement: 5,
+      queueTimeout: 120_000,
     });
     console.log("Oracle DB Pool Initialized");
   })();
@@ -39,13 +43,34 @@ export async function executeQuery(
   await initOracleClient();
 
   const connection = await oracledb.getConnection("default");
-  const result = await connection.execute(sql, binds, {
-    outFormat: oracledb.OUT_FORMAT_OBJECT,
-    ...options,
-  });
+  try {
+    const result = await connection.execute(sql, binds, {
+      outFormat: oracledb.OUT_FORMAT_OBJECT,
+      ...options,
+    });
+    return result;
+  } finally {
+    await connection.close();
+  }
+}
 
-  await connection.close();
-  return result;
+export async function executeMany(
+  sql: string,
+  binds: BindParameters[],
+  options: ExecuteOptions = {}
+) {
+  await initOracleClient();
+
+  const connection = await oracledb.getConnection("default");
+  try {
+    const result = await connection.executeMany(sql, binds, {
+      autoCommit: true,
+      ...options,
+    });
+    return result;
+  } finally {
+    await connection.close();
+  }
 }
 
 export async function executeProcedure(

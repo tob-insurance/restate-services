@@ -1,12 +1,6 @@
-/**
- * Send SOA email with attachments
- */
-
-import {
-  completeJobPhase,
-  insertJobPhase,
-} from "../../../infrastructure/database/queries";
+import { completeJobPhase } from "../../../infrastructure/database/queries";
 import { sendEmail } from "../../../infrastructure/email";
+
 import { generateSoaEmailHtml } from "../../utils/email";
 import {
   type IAccount,
@@ -40,8 +34,6 @@ export const sendSoaEmail = async (
   // In testMode, always use provided email; otherwise use customer email or fallback
   const recipientEmail = testMode ? toEmail : customer.email || toEmail;
 
-  await completeJobPhase(jobId, SoaPhase.SendingEmail);
-
   // Prepare email message
   const message: IEmailMessage = {
     to: [recipientEmail],
@@ -63,8 +55,12 @@ export const sendSoaEmail = async (
     ],
   };
 
-  await insertJobPhase(jobId, SoaPhase.SendingEmail);
-
   console.log(`Sending SOA email for ${customer.code} to: ${recipientEmail}`);
-  return await sendEmail(message);
+  const sent = await sendEmail(message);
+
+  if (sent) {
+    await completeJobPhase(jobId, SoaPhase.SendingEmail);
+  }
+
+  return sent;
 };

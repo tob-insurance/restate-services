@@ -26,6 +26,7 @@ export type ISoaItem = {
   processingDate: string;
   batchId: string;
   jobId?: string;
+  chunkNumber: number;
   classOfBusiness: string;
   branch: string;
   toDate: number;

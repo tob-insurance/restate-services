@@ -15,7 +15,8 @@ export type JobInfo = {
 
 export async function ensureJobExists(
   batchId: string,
-  customerId: string
+  customerId: string,
+  chunkNumber: number
 ): Promise<JobInfo> {
   const existingJob = await getJobByBatchAndCustomer(batchId, customerId);
 
@@ -28,7 +29,7 @@ export async function ensureJobExists(
   const retry = existingJob?.retryAttempt || 0;
 
   if (!existingJob) {
-    await insertJob(newJobId, batchId, customerId);
+    await insertJob(newJobId, batchId, customerId, chunkNumber);
   }
 
   return { jobId: newJobId, retryAttempt: retry };

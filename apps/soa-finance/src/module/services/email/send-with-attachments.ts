@@ -3,6 +3,7 @@
  */
 
 import { downloadSoaFiles } from "../../../infrastructure/azure";
+import { excelSoaName, letterSoaPdfName } from "../../utils/formatter/naming";
 import type { IAccount } from "../../utils/types";
 import { sendSoaEmail } from "./send-soa";
 
@@ -11,6 +12,7 @@ export type SendWithAttachmentsParams = {
   customerData: IAccount;
   testMode: boolean;
   jobId: string;
+  date: Date;
 };
 
 export type SendEmailResult = {
@@ -23,9 +25,10 @@ export async function sendWithAttachments({
   customerData,
   testMode,
   jobId,
+  date,
 }: SendWithAttachmentsParams): Promise<SendEmailResult> {
-  const excelFileName = `Outstanding-SOA--${customerId}.xlsx`;
-  const pdfFileName = `Collection_Letter_${customerId}.pdf`;
+  const excelFileName = excelSoaName(customerData.code, date);
+  const pdfFileName = letterSoaPdfName(customerData.code);
 
   try {
     const { excelBuffer, pdfBuffer } = await downloadSoaFiles(

@@ -1,8 +1,3 @@
-/**
- * Orchestrate new SOA processing flow
- * Coordinates SOA generation, email sending, and reminder scheduling
- */
-
 import type { WorkflowContext } from "@restatedev/restate-sdk";
 
 import { isMultiBranchCustomer, sendWithAttachments } from "../../services";
@@ -11,20 +6,24 @@ import { runReminderSchedule } from "../reminder/run-schedule";
 import { processMultiBranchSoa } from "./process-multi-branch";
 import { processSingleBranchSoa } from "./process-single-branch";
 
-export async function orchestrateNewSoa(
-  ctx: WorkflowContext,
-  customerData: IAccount,
-  params: ISoaItem,
-  jobId: string
-): Promise<void> {
-  // Process SOA based on customer type
+type newSoaParams = {
+  ctx: WorkflowContext;
+  customerData: IAccount;
+  params: ISoaItem;
+  jobId: string;
+};
+
+export async function newSoa(parameters: newSoaParams): Promise<void> {
+  const { ctx, customerData, params, jobId } = parameters;
+
   if (isMultiBranchCustomer(customerData.actingCode)) {
     await processMultiBranchSoa({ ctx, customerData, params });
   } else {
     await processSingleBranchSoa({ ctx, customerData, params });
   }
 
-  // Send Email
+  const dateNow = new Date(params.processingDate);
+
   await ctx.run(
     "send-email",
     async () =>
@@ -33,9 +32,9 @@ export async function orchestrateNewSoa(
         customerData,
         testMode: params.testMode,
         jobId,
+        date: dateNow,
       })
   );
 
-  // Run reminder schedule
   await runReminderSchedule({ ctx, customerData, params });
 }

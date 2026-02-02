@@ -15,13 +15,32 @@ export async function generatePdfFromHtml(
     executablePath:
       "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     headless: true,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage", // Menggunakan /tmp daripada shared memory
+      "--disable-accelerated-2d-canvas",
+      "--no-first-run",
+      "--no-zygote",
+      "--single-process", // Lebih hemat RAM untuk rendering PDF tunggal
+      "--disable-gpu",
+    ],
   });
 
   let page: Page | undefined;
 
   try {
     page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+
+    // Set longer timeout for safety
+    await page.setDefaultNavigationTimeout(90_000);
+
+    // Use domcontentloaded since our HTML has no external resources
+    // This is much faster than networkidle0/networkidle2
+    await page.setContent(html, {
+      waitUntil: "domcontentloaded",
+      timeout: 90_000,
+    });
 
     const pdfBuffer = await page.pdf({
       format: options?.format ?? "A4",
@@ -46,6 +65,9 @@ export async function generatePdfFromHtml(
   } finally {
     if (page) {
       await page.close();
+    }
+    if (browser) {
+      await browser.close();
     }
   }
 }

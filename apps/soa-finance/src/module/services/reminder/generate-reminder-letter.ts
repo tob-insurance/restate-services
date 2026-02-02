@@ -1,19 +1,19 @@
-/**
- * Generate reminder letter files
- */
-
 import { readSoaParquet } from "../../../data-pipeline/lib";
 import { uploadFile } from "../../../infrastructure/azure";
 import {
   completeJobPhase,
   getAccountEmails,
-  getDcNoteIdsByCustomer,
   getLatestLetter,
   insertJobPhase,
   insertReminderLetter,
 } from "../../../infrastructure/database/queries";
-import { generateExcel, generateLetterNumber } from "../../utils/generators";
-import { generateCollectionPdf } from "../../utils/generators/pdf/generate-collection-pdf";
+import { generateSoaPdfHandler } from "../../handlers";
+import { excelSoaName, reminderPdfName } from "../../utils/formatter/naming";
+import {
+  generateExcel,
+  generateLetterNumber,
+  getSignature,
+} from "../../utils/generators";
 import {
   type IAccount,
   type IGenerateReminderResult,
@@ -24,14 +24,14 @@ import {
 import { sendReminderEmail } from "../email/send-reminder";
 import { reconcilePayment } from "../payment/reconcile-payment";
 
-type GenerateLetterParams = {
+type GenerateReminderLetterParams = {
   customer: IAccount;
   reminder: ISoaReminder;
   item: ISoaItem;
 };
 
-export const generateLetter = async (
-  params: GenerateLetterParams
+export const generateReminderLetter = async (
+  params: GenerateReminderLetterParams
 ): Promise<IGenerateReminderResult | null> => {
   const { customer, reminder, item } = params;
   const dateNow = new Date();
@@ -116,32 +116,58 @@ export const generateLetter = async (
 
   // Step 8: Generate Files (Phase: GeneratingFiles)
   await insertJobPhase(jobId, SoaPhase.GeneratingFiles);
-  const dateToString = dateNow.toISOString().split("T")[0];
+  const _dateToString = dateNow.toISOString().split("T")[0];
 
   const excelFile = generateExcel({
     soaData: soaList,
     customerId: customer.code,
   });
 
-  const pdfFile = await generateCollectionPdf(
-    customer.code,
-    customer.fullName,
-    dateToString,
-    customer.virtualAccount || "-"
-  );
+  const isReminder = reminderCount !== Number(item.processingType);
+
+  const pdfFileName = reminderPdfName(reminderCount);
+
+  const pdfFileBase64 = await generateSoaPdfHandler({
+    templateName: isReminder
+      ? "TemplateReminderLetterSOA"
+      : "TemplateOutstandingStatementOfAccount",
+    data: {
+      asAtDate: item.toDate,
+      customerName: customer.fullName,
+      virtualAccount: customer.virtualAccount,
+      signature: await getSignature(),
+    },
+    filename: pdfFileName,
+  });
+
+  const pdfFile = {
+    ...pdfFileBase64,
+    bytes: Buffer.from(pdfFileBase64.bytes as string, "base64"),
+  };
+
   await completeJobPhase(jobId, SoaPhase.GeneratingFiles);
 
   // Step 9: Upload to Azure (Phase: UploadingToAzure)
   await insertJobPhase(jobId, SoaPhase.UploadingToAzure);
-  const prefix = `RL${reminderCount}_`;
+
+  const excelFileName = excelSoaName(customer.code, dateNow);
   await uploadFile(
-    { ...excelFile, fileName: `${prefix}${excelFile.fileName}` },
+    {
+      ...excelFile,
+      fileName: excelFileName,
+      contentType:
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    },
     customer.code,
     "excel"
   );
 
   await uploadFile(
-    { ...pdfFile, fileName: `${prefix}${pdfFile.fileName}` },
+    {
+      ...pdfFile,
+      fileName: pdfFileName,
+      contentType: "application/pdf",
+    },
     customer.code,
     "pdf"
   );

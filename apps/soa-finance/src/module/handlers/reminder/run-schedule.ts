@@ -1,8 +1,3 @@
-/**
- * Run the reminder schedule (RL1, RL2, RL3)
- * Waits for interval then sends reminder if outstanding reminders exist
- */
-
 import type { WorkflowContext } from "@restatedev/restate-sdk";
 
 import {
@@ -81,6 +76,7 @@ export async function runReminderSchedule({
           customer: customerData,
           branches: branchesForReminder,
           item: reminderProcessingItem,
+          ctx,
         })
     );
 

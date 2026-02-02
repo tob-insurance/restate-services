@@ -2,6 +2,7 @@
  * Process SOA for a single branch
  */
 
+import type { WorkflowContext } from "@restatedev/restate-sdk";
 import type {
   IAccount,
   ISoaItem,
@@ -9,7 +10,8 @@ import type {
 } from "../../utils/types";
 import { generateSoa } from "./generate";
 
-export const processSingleBranch = async (
+export const processBranch = async (
+  ctx: WorkflowContext | undefined,
   branchCode: string,
   customer: IAccount,
   item: ISoaItem
@@ -23,9 +25,11 @@ export const processSingleBranch = async (
   console.log(`Processing branch ${branchCode} for customer ${customer.code}`);
 
   const result = await generateSoa({
+    ctx,
     branchCode,
     customer,
     classOfBusiness: item.classOfBusiness,
+    processingType: item.processingType,
     dateNow,
     toDate: item.toDate,
     jobId: item.jobId || "",

@@ -1,6 +1,4 @@
-/**
- * Generate SOA files (Excel + PDF) and upload to Azure
- */
+import type { WorkflowContext } from "@restatedev/restate-sdk";
 
 import { readSoaParquet } from "../../../data-pipeline/lib";
 import { uploadFile } from "../../../infrastructure/azure";
@@ -9,8 +7,9 @@ import {
   getDcNoteIdsByCustomer,
   insertJobPhase,
 } from "../../../infrastructure/database/queries";
+
+import { excelSoaName } from "../../utils/formatter/naming";
 import { generateExcel } from "../../utils/generators";
-import { generateCollectionPdf } from "../../utils/generators/pdf/generate-collection-pdf";
 import {
   type IAccount,
   type IStatementOfAccountModel,
@@ -18,6 +17,7 @@ import {
 } from "../../utils/types";
 
 type GenerateSoaOptions = {
+  ctx?: WorkflowContext;
   branchCode: string;
   customer: IAccount;
   classOfBusiness: string;
@@ -25,6 +25,7 @@ type GenerateSoaOptions = {
   toDate: number;
   jobId: string;
   testMode?: boolean;
+  processingType: number;
   skipAgingFilter?: boolean;
   skipDcNoteCheck?: boolean;
 };
@@ -33,6 +34,7 @@ export const generateSoa = async (
   options: GenerateSoaOptions
 ): Promise<IStatementOfAccountModel[] | null> => {
   const {
+    ctx,
     branchCode,
     customer,
     classOfBusiness,
@@ -46,24 +48,42 @@ export const generateSoa = async (
     `GenerateSOA started for ${customer.code}, Branch: ${branchCode}, COB: ${classOfBusiness}`
   );
 
+  // Helper to run with or without context
+  const runPhase = async <T>(
+    name: string,
+    fn: () => Promise<T>
+  ): Promise<T> => {
+    if (ctx) {
+      return await ctx.run(name, fn);
+    }
+    return await fn();
+  };
+
   // ========== Phase: Get SOA Data ==========
   await insertJobPhase(jobId, SoaPhase.GetSoa);
-  console.log(`Getting SOA data for ${customer.code}`);
 
-  const toDateObj = new Date(toDate * 1000);
-  let soaList = await readSoaParquet(customer.code);
+  let soaList = await runPhase("read-parquet", async () => {
+    console.log(`Getting SOA data for ${customer.code}`);
+    return await readSoaParquet(customer.code);
+  });
 
-  // Filter by aging >= 60 days (skip if skipAgingFilter is true)
-  if (skipAgingFilter) {
-    console.log(
-      `Skip aging filter enabled - keeping all ${soaList.length} records`
+  // Filter Aging (Outstanding > 60 Days by default)
+  // biome-ignore lint/suspicious/useAwait: Async required by runPhase signature
+  soaList = await runPhase("filter-aging", async () => {
+    if (skipAgingFilter) {
+      console.log(
+        `[AgingFilter] DISABLED for ${customer.code} - keeping all ${soaList.length} records`
+      );
+      return soaList;
+    }
+    const filtered = soaList.filter(
+      (soa) => Number.parseInt(soa.aging, 10) >= 60
     );
-  } else {
-    soaList = soaList.filter((soa) => Number.parseInt(soa.aging, 10) >= 60);
     console.log(
-      `Filtered to ${soaList.length} SOA records with aging >= 60 days`
+      `[AgingFilter] ENABLED for ${customer.code}: Filtered ${soaList.length} down to ${filtered.length} SOA records (aging >= 60 days)`
     );
-  }
+    return filtered;
+  });
 
   await completeJobPhase(jobId, SoaPhase.GetSoa);
 
@@ -72,90 +92,82 @@ export const generateSoa = async (
     return null;
   }
 
-  // Extract DC notes
-  const dcNotes = soaList
-    .flatMap((soa) => soa.debitAndCreditNoteNo?.split(",") || [])
-    .filter((note, idx, arr) => arr.indexOf(note) === idx);
+  // Extract unique DC notes (O(N) with Set)
+  const newSoaList = await runPhase("filter-dc-notes", async () => {
+    const dcNotesSet = new Set(
+      soaList.flatMap((soa) => soa.debitAndCreditNoteNo?.split(",") || [])
+    );
+    const dcNotes = Array.from(dcNotesSet);
+    console.log(`Extracted ${dcNotes.length} unique DC notes`);
 
-  console.log(`Extracted ${dcNotes.length} unique DC notes`);
-
-  // Get existing DC notes from previous reminders
-  const existingDcNotes = await getDcNoteIdsByCustomer(customer.code);
-  console.log(`Found ${existingDcNotes.length} DC notes in previous reminders`);
-
-  // Filter out already processed DC notes (skip if skipDcNoteCheck is true)
-  let newDcNotes: string[];
-  if (skipDcNoteCheck) {
-    newDcNotes = dcNotes;
+    const existingDcNotes = await getDcNoteIdsByCustomer(customer.code);
     console.log(
-      `Skip DC note check enabled - processing all ${newDcNotes.length} DC notes`
-    );
-  } else {
-    newDcNotes = dcNotes.filter(
-      (note) =>
-        !existingDcNotes.some(
-          (existing) => existing.toLowerCase() === note.toLowerCase()
-        )
+      `Found ${existingDcNotes.length} DC notes in previous reminders`
     );
 
-    if (newDcNotes.length === 0) {
-      console.log(`Skipping ${customer.code}: All DC notes already processed`);
-      return null;
+    let processedDcNotes: string[];
+    if (skipDcNoteCheck) {
+      processedDcNotes = dcNotes;
+      console.log(
+        `Skip DC note check enabled - processing all ${processedDcNotes.length} DC notes`
+      );
+    } else {
+      // Optimization: Use a Set of lowercased existing IDs for O(1) lookup
+      const existingSet = new Set(
+        existingDcNotes.map((id) => id.toLowerCase())
+      );
+
+      processedDcNotes = dcNotes.filter(
+        (note) => !existingSet.has(note.toLowerCase())
+      );
+
+      if (processedDcNotes.length === 0) {
+        console.log(
+          `Skipping ${customer.code}: All DC notes already processed`
+        );
+        return [];
+      }
+      console.log(
+        `Processing ${processedDcNotes.length} new DC notes (filtered)`
+      );
     }
-    console.log(`Processing ${newDcNotes.length} new DC notes (filtered)`);
-  }
 
-  // Filter soaList to only include new DC notes
-  soaList = soaList.filter((soa) =>
-    newDcNotes.includes(soa.debitAndCreditNoteNo)
-  );
+    const processedSet = new Set(processedDcNotes);
+    return soaList.filter((soa) => processedSet.has(soa.debitAndCreditNoteNo));
+  });
 
-  if (soaList.length === 0) {
+  if (newSoaList.length === 0) {
     console.log(
       `Skipping ${customer.code}: No matching SOA records after filter`
     );
     return null;
   }
 
-  // Phase complete - data ready for file generation
+  soaList = newSoaList;
   console.log(`SOA data ready for ${customer.code}: ${soaList.length} records`);
 
-  // ========== Phase: Generate Files ==========
-  await insertJobPhase(jobId, SoaPhase.GeneratingFiles);
-  console.log(`Generating Excel and PDF files for ${customer.code}`);
+  // ========== Phase: Generate & Upload Files ==========
+  const toDateObj = new Date(toDate * 1000);
+  const _dateStr = toDateObj.toISOString().split("T")[0];
 
-  const dateStr = toDateObj.toISOString().split("T")[0];
+  // Excel: Generate and Upload in one durable step to avoid binary serialization issues
+  await runPhase("generate-and-upload-excel", async () => {
+    await insertJobPhase(jobId, SoaPhase.GeneratingFiles);
 
-  // Generate Excel file
-  const excelFile = await generateExcel({
-    soaData: soaList,
-    customerId: customer.code,
+    console.log(`Generating Excel for ${customer.code}`);
+    const excelFile = generateExcel({
+      soaData: soaList,
+      customerId: customer.code,
+    });
+    excelFile.fileName = excelSoaName(customer.code, options.dateNow);
+
+    console.log(`Uploading Excel for ${customer.code}`);
+    await uploadFile(excelFile, customer.code, "excel");
+
+    await completeJobPhase(jobId, SoaPhase.GeneratingFiles);
   });
-  console.log(`Generated Excel: ${excelFile.fileName}`);
 
-  // Generate PDF file
-  const pdfFile = await generateCollectionPdf(
-    customer.code,
-    customer.fullName,
-    dateStr,
-    customer.virtualAccount || "-"
-  );
-  console.log(`Generated PDF: ${pdfFile.fileName}`);
-
-  await completeJobPhase(jobId, SoaPhase.GeneratingFiles);
-
-  // ========== Phase: Upload to Azure ==========
-  await insertJobPhase(jobId, SoaPhase.UploadingToAzure);
-  console.log(`Uploading files to Azure for ${customer.code}`);
-
-  const excelUploadResult = await uploadFile(excelFile, customer.code, "excel");
-  console.log(`Excel uploaded: ${excelUploadResult.blobName}`);
-
-  const pdfUploadResult = await uploadFile(pdfFile, customer.code, "pdf");
-  console.log(`PDF uploaded: ${pdfUploadResult.blobName}`);
-
-  await completeJobPhase(jobId, SoaPhase.UploadingToAzure);
-  console.log(`Files uploaded successfully for ${customer.code}`);
+  console.log(`Files generated and uploaded successfully for ${customer.code}`);
 
   return soaList;
 };

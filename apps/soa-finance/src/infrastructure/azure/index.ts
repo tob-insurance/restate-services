@@ -1,3 +1,4 @@
+import { Readable } from "node:stream";
 import { getContainerClient } from "./blob-client";
 
 type StorageFileData = {
@@ -11,6 +12,11 @@ type UploadResult = {
   blobName: string;
   success: boolean;
 };
+
+const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024; // 50MB
+const BLOCK_SIZE = 4 * 1024 * 1024; // 4MB
+const MAX_CONCURRENCY = 4;
+const UPLOAD_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
 function generateBlobPath(
   customerCode: string,
@@ -33,12 +39,30 @@ export async function uploadFile(
   const blobName = generateBlobPath(customerCode, type, fileData.fileName);
   const blockBlobClient = container.getBlockBlobClient(blobName);
 
+  const fileSize = fileData.bytes.length;
+  const isLargeFile = fileSize > LARGE_FILE_THRESHOLD;
+
   try {
-    await blockBlobClient.uploadData(fileData.bytes, {
-      blobHTTPHeaders: {
-        blobContentType: fileData.contentType,
-      },
-    });
+    if (isLargeFile) {
+      console.log(
+        `Large file detected (${(fileSize / (1024 * 1024)).toFixed(2)}MB), using chunked upload...`
+      );
+      const stream = Readable.from(fileData.bytes);
+
+      await blockBlobClient.uploadStream(stream, BLOCK_SIZE, MAX_CONCURRENCY, {
+        blobHTTPHeaders: { blobContentType: fileData.contentType },
+        abortSignal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+        onProgress: (progress) => {
+          const percent = ((progress.loadedBytes / fileSize) * 100).toFixed(1);
+          console.log(`Upload progress: ${percent}%`);
+        },
+      });
+    } else {
+      await blockBlobClient.uploadData(fileData.bytes, {
+        blobHTTPHeaders: { blobContentType: fileData.contentType },
+        abortSignal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+      });
+    }
 
     console.log(`File uploaded ${blobName} successfully`);
     return { url: blockBlobClient.url, blobName, success: true };

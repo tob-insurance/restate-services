@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 
 import { formatUUID } from "../../../module/utils/formatter";
-import { executeQuery } from "../database";
+import { executeMany, executeQuery } from "../database";
 
 type DcNoteRow = { DC_NOTE_ID: string };
 
@@ -76,6 +76,23 @@ export const insertReminderDetail = async (
     { dcNoteId, reminderId, isPaid },
     { autoCommit: true }
   );
+};
+
+export const insertReminderDetailsBulk = async (
+  details: { dcNoteId: string; reminderId: string; isPaid?: string }[]
+): Promise<void> => {
+  const sql = `
+    INSERT INTO SOA_REMINDER_DETAIL (DC_NOTE_ID, REMINDER_ID, IS_PAID)
+    VALUES (:dcNoteId, hextoraw(:reminderId), :isPaid)
+  `;
+
+  const binds = details.map((d) => ({
+    dcNoteId: d.dcNoteId,
+    reminderId: d.reminderId,
+    isPaid: d.isPaid || "N",
+  }));
+
+  await executeMany(sql, binds);
 };
 
 export const updatePaymentStatus = async (

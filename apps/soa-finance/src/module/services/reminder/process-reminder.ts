@@ -1,6 +1,4 @@
-/**
- * Process reminder letters for all branches
- */
+import type { WorkflowContext } from "@restatedev/restate-sdk";
 
 import { getReminderByCustomerAndPeriod } from "../../../infrastructure/database/queries";
 import {
@@ -11,12 +9,13 @@ import {
   type ISoaReminder,
   SoaType,
 } from "../../utils/types";
-import { generateLetter } from "./generate-letter";
+import { generateReminderLetter } from "./generate-reminder-letter";
 
 type ProcessReminderParams = {
   customer: IAccount;
   branches: IBranch[];
   item: ISoaItem;
+  ctx: WorkflowContext;
 };
 
 export const processReminderLetter = async (
@@ -30,7 +29,6 @@ export const processReminderLetter = async (
     }`
   );
 
-  // Get existing reminders from database
   const reminders = (await getReminderByCustomerAndPeriod(
     customer.code,
     item.timePeriod
@@ -44,9 +42,8 @@ export const processReminderLetter = async (
   const allDcNotesPaid: string[] = [];
   let remindersSent = 0;
 
-  // Loop through each reminder
   for (const reminder of reminders) {
-    const result = await generateLetter({
+    const result = await generateReminderLetter({
       customer,
       reminder,
       item,

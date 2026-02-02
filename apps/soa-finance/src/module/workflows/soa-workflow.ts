@@ -1,7 +1,3 @@
-/**
- * Main workflow entry point
- */
-
 import type { WorkflowContext } from "@restatedev/restate-sdk";
 import { workflow } from "@restatedev/restate-sdk";
 
@@ -9,12 +5,14 @@ import {
   getReminderByCustomerAndPeriod,
   updateJobStatus,
 } from "../../infrastructure/database/queries";
+
 import {
   completeWorkflow,
   handleErrorWithRetry,
-  orchestrateNewSoa,
+  newSoa,
   processReminder,
 } from "../handlers";
+
 import {
   ensureJobExists,
   getCustomerData,
@@ -25,22 +23,32 @@ import type { ISoaItem } from "../utils/types";
 
 export const soaWorkflow = workflow({
   name: "SoaWorkflow",
+  options: {
+    retryPolicy: {
+      initialInterval: { seconds: 1 },
+      maxInterval: { seconds: 30 },
+      maxAttempts: 3,
+    },
+  },
   handlers: {
     run: async (ctx: WorkflowContext, params: ISoaItem) => {
       ctx.console.log("Starting SOA workflow");
 
-      const { customerId, batchId, timePeriod, maxRetries, processingType } =
-        params;
+      const {
+        customerId,
+        batchId,
+        timePeriod,
+        maxRetries,
+        processingType,
+        chunkNumber,
+      } = params;
 
       ctx.console.log(`Starting SOA for customer: ${customerId}`);
 
-      // Get or create job
       const { jobId, retryAttempt } = await ctx.run(
         "get-or-create-job",
-        async () => await ensureJobExists(batchId, customerId)
+        async () => await ensureJobExists(batchId, customerId, chunkNumber)
       );
-
-      // Create processing item with jobId included
       const processingItem: ISoaItem = {
         ...params,
         jobId,
@@ -51,12 +59,10 @@ export const soaWorkflow = workflow({
 
       while (!success && currentRetryAttempt <= maxRetries) {
         try {
-          // Update status to processing
-          await ctx.run("update-processing", async () => {
+          await ctx.run("processing-soa-start", async () => {
             await updateJobStatus(jobId, "Processing");
           });
 
-          // Get customer info
           const customerData = await ctx.run(
             "get-customer",
             async () => await getCustomerData(jobId, customerId)
@@ -66,7 +72,6 @@ export const soaWorkflow = workflow({
             throw new Error(`Customer ${customerId} not found`);
           }
 
-          // Check SOA history to decide: new SOA or Reminder Letter
           const existingReminders = await ctx.run(
             "check-soa-history",
             async () =>
@@ -84,13 +89,14 @@ export const soaWorkflow = workflow({
           if (shouldDoReminder) {
             await processReminder(ctx, customerData, processingItem);
           } else {
-            await orchestrateNewSoa(ctx, customerData, processingItem, jobId);
+            await newSoa({ ctx, customerData, params: processingItem, jobId });
           }
+
+          // await newSoa(ctx, customerData, processingItem, jobId);
 
           success = true;
           ctx.console.log(`Completed: ${customerId}`);
 
-          // Complete workflow (handles both SOA and Reminder paths)
           await completeWorkflow({ ctx, jobId, batchId });
         } catch (error: unknown) {
           const errorResult = await handleErrorWithRetry({

@@ -1,33 +1,60 @@
-/**
- * Create reminder record in database
- */
-
+import type { WorkflowContext } from "@restatedev/restate-sdk";
 import {
   insertReminder,
-  insertReminderDetail,
+  insertReminderDetailsBulk,
 } from "../../../infrastructure/database/queries";
 import type { IAccount, IStatementOfAccountModel } from "../../utils/types";
 
+export type CreateReminderParams = {
+  customer: IAccount;
+  timePeriod: string;
+  branchCode: string;
+  soaList: IStatementOfAccountModel[];
+  ctx?: WorkflowContext;
+};
+
 export const createReminder = async (
-  customer: IAccount,
-  timePeriod: string,
-  branchCode: string,
-  soaList: IStatementOfAccountModel[]
+  params: CreateReminderParams
 ): Promise<string> => {
+  const { customer, timePeriod, branchCode, soaList, ctx } = params;
   console.log(
     `Creating SOA reminder for ${customer.code}, branch: ${branchCode}`
   );
 
-  // Insert reminder and get ID
-  const reminderId = await insertReminder(
-    customer.code,
-    timePeriod,
-    branchCode
-  );
+  // 1. Insert reminder and get ID (Always deterministic since reminderId is generated inside)
+  const reminderId = await (async () => {
+    if (ctx) {
+      return await ctx.run(
+        "insert-reminder-header",
+        async () => await insertReminder(customer.code, timePeriod, branchCode)
+      );
+    }
+    return await insertReminder(customer.code, timePeriod, branchCode);
+  })();
 
-  // Insert details for each SOA item
-  for (const soa of soaList) {
-    await insertReminderDetail(soa.debitAndCreditNoteNo, reminderId, "N");
+  // 2. Insert details in chunks using bulk insert (Batch of 5000 is safe and fast)
+  const chunkSize = 5000;
+  for (let i = 0; i < soaList.length; i += chunkSize) {
+    const chunk = soaList.slice(i, i + chunkSize);
+    const chunkNo = Math.floor(i / chunkSize) + 1;
+
+    console.log(
+      `Inserting reminder details chunk ${chunkNo} (${chunk.length} items)`
+    );
+
+    const details = chunk.map((soa) => ({
+      dcNoteId: soa.debitAndCreditNoteNo,
+      reminderId,
+    }));
+
+    if (ctx) {
+      await ctx.run(
+        `insert-reminder-details-chunk-${chunkNo}`,
+        async () => await insertReminderDetailsBulk(details)
+      );
+    } else {
+      await insertReminderDetailsBulk(details);
+    }
   }
 
   console.log(

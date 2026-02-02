@@ -8,8 +8,9 @@ export const getAllAccounts = async () => {
       CM_FULLNAME AS "fullName",
       ACTING_CODE AS "actingCode"
     FROM MASTER_CM 
-    WHERE IS_CUSTOMER = 'N' 
-    AND ROWNUM <= 5`;
+    WHERE IS_CUSTOMER = 'N'`;
+  // WHERE IS_CUSTOMER = 'N'
+  // AND ROWNUM <= 5`;
 
   const result = await executeQuery(query);
   const rows = (result.rows as IAccount[]) || [];

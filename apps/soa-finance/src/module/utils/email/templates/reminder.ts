@@ -1,7 +1,3 @@
-/**
- * Reminder Email Template Generators (RL1, RL2, RL3)
- */
-
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { formatDateIndonesian } from "../../formatter";

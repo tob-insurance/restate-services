@@ -1,12 +1,11 @@
-/**
- * Process SOA for multi-branch customers
- * Iterates through all branches and creates reminders for each
- */
-
 import type { WorkflowContext } from "@restatedev/restate-sdk";
-
+import { uploadFile } from "../../../infrastructure/azure";
 import { getAllBranches } from "../../../infrastructure/database/queries";
-import { createReminder, processSingleBranch } from "../../services";
+import { generatePdf } from "../../../infrastructure/gotenberg/gotenberg-client";
+import { createReminder, processBranch } from "../../services";
+import { letterSoaPdfName } from "../../utils/formatter/naming";
+import { getSignature } from "../../utils/generators";
+import { renderLiquidToHtml } from "../../utils/generators/pdf/render-template";
 
 import type {
   IAccount,
@@ -33,23 +32,58 @@ export async function processMultiBranchSoa({
   ctx.console.log(`Processing ${branches.length} branches`);
 
   for (const branchItem of branches) {
-    const branchResult = await ctx.run(
-      `Branch-${branchItem.officeCode}`,
-      async () =>
-        await processSingleBranch(branchItem.officeCode, customerData, params)
+    const branchResult = await processBranch(
+      ctx,
+      branchItem.officeCode,
+      customerData,
+      params
     );
 
     if (branchResult.soaData && branchResult.soaData.length > 0) {
       await ctx.run(
-        `create-reminder-${branchItem.officeCode}`,
-        async () =>
-          await createReminder(
-            customerData,
-            params.timePeriod,
-            branchItem.officeCode,
-            branchResult.soaData as IStatementOfAccountModel[]
-          )
+        `generate-and-upload-pdf-${branchItem.officeCode}`,
+        async () => {
+          const isReminder = params.processingType > 1;
+          const pdfHtml = await renderLiquidToHtml(
+            isReminder
+              ? "TemplateReminderLetterSOA"
+              : "TemplateOutstandingStatementOfAccount",
+            {
+              asAtDate: params.toDate,
+              customerName: customerData.fullName,
+              virtualAccount: customerData.virtualAccount,
+              signature: await getSignature(),
+            }
+          );
+
+          const pdfBuffer = await generatePdf(pdfHtml, {
+            marginTop: 0.5,
+            marginBottom: 0.5,
+            marginLeft: 0.5,
+            marginRight: 0.5,
+          });
+
+          const pdfFileName = letterSoaPdfName(customerData.code);
+
+          await uploadFile(
+            {
+              fileName: pdfFileName,
+              bytes: pdfBuffer,
+              contentType: "application/pdf",
+            },
+            customerData.code,
+            "pdf"
+          );
+        }
       );
+
+      await createReminder({
+        customer: customerData,
+        timePeriod: params.timePeriod,
+        branchCode: branchItem.officeCode,
+        soaList: branchResult.soaData as IStatementOfAccountModel[],
+        ctx,
+      });
     }
   }
 }

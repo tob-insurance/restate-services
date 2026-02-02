@@ -1,80 +1,93 @@
 # SOA Finance Service
 
-This service is developed using **Restate** to handle a data processing pipeline (Oracle > Data Stream > Parquet) leveraging the concept of **Durable Execution**.
+This service is a **Restate** application designed to handle the Statement of Account (SOA) and Reminder Letter generation pipeline. It uses **Durable Execution** to ensure reliability across complex distributed processes involving Oracle databases, data streaming, Parquet file processing, and external services like Azure Blob Storage and SendGrid.
 
 ## Project Structure
 
-The project follows a custom directory structure designed to separate technical concerns, business logic, and data storage:
+The project follows a domain-driven structure to separate concerns:
 
-- `src/infrastructure/`: Technical implementation and external connections.
-  - `database.ts`: Manages database connections (Oracle/PostgreSQL).
-  - `parquet.ts`: Handles Parquet file processing and writing.
-  - `stream.ts`: Configures the data streaming pipeline.
-- `src/module/`: Contains the core business logic, divided into:
-  - `handlers/`: Atomic functions for specific tasks (Activities).
-  - `services/`: Implementation of detailed business rules.
-  - `workflows/`: Process orchestration and flow management (Durable Execution).
-  - `utils/`: Helpers specific to business domain logic.
-- `src/datas/`: Storage directory for output data (e.g., generated Parquet files).
-- `src/app.ts`: Main entry point and service registration with Restate.
+- **`src/data-pipeline/`**:
+  - Handles high-performance data processing using **Apache Arrow** and **Parquet**.
+  - Responsible for reading and processing large datasets efficiently.
+
+- **`src/infrastructure/`**: External adapters and technical implementations.
+  - `azure/`: Azure Blob Storage integration for uploading generated reports.
+  - `database/`: Database queries and connection management (Oracle).
+  - `email/`: Email sending service (SendGrid) and template management.
+  - `gotenberg/`: Client for generating PDFs from HTML using Gotenberg.
+  - `browser/`: Utilities for browser-based tasks (if applicable).
+
+- **`src/module/`**: Core business logic.
+  - **`workflows/`**: Orchestration logic defining the durable execution flows.
+    - `BatchWorkflow`: Manages the high-level batch processing of all customers.
+    - `SoaWorkflow`: Handles the end-to-end process for a single customer (Data extraction -> Generation -> Email).
+  - **`services/`**: focused business logic and rules (e.g., `createReminder`, `generateSoa`).
+  - **`handlers/`**: Atomic activities called by workflows (e.g., `generateSoaPdfHandler`).
+  - **`utils/`**: Shared utilities for formatting, template rendering, and types.
+
+## Prerequisites
+
+- **[Bun](https://bun.sh/)**: Runtime and package manager.
+- **[Docker](https://www.docker.com/)**: Required to run the Restate runtime and Gotenberg.
+- **Environment Variables**: Create a `.env` file with the following keys:
+  - `RESTATE_URL`: URL of the Restate server (default: `http://localhost:8080`).
+  - `DATABASE_URL`: Oracle database connection string.
+  - `AZURE_STORAGE_CONNECTION_STRING`: Azure Blob Storage connection.
+  - `SENDGRID_API_KEY`: API key for sending emails.
+  - `GOTENBERG_URL`: URL of the Gotenberg service (default: `http://localhost:3000`).
 
 ## Getting Started
 
-### 1. Prerequisites
-
-- [Bun](https://bun.sh/) (Runtime & Package Manager)
-- [Docker](https://www.docker.com/) (To run the Restate Server)
-
-### 2. Install Dependencies
-
-Run the installation command from the root of the monorepo:
+### 1. Install Dependencies
 
 ```bash
 bun install
 ```
 
-### 3. Run Restate Server (Docker)
+### 2. Start Infrastructure
 
-Start the Restate server for local development:
+Run the required services (Restate, Gotenberg) using Docker Compose:
 
 ```bash
-docker run --name restate_dev --rm \
-  -p 8080:8080 -p 9070:9070 -p 9071:9071 \
-  --add-host=host.docker.internal:host-gateway \
-  docker.restate.dev/restatedev/restate:latest
+docker-compose up -d
 ```
 
-### 4. Run the soa-finance Service
+- **Restate Admin**: http://localhost:9070
+- **Gotenberg**: http://localhost:3000
 
-Run the service in development mode with hot-reload:
+### 3. Run the Service
+
+Start the application in development mode with hot-reloading:
 
 ```bash
-cd apps/soa-finance
 bun run dev
 ```
 
-### 5. Register the Service with Restate
+### 4. Register with Restate
 
-In a new terminal, register the running service:
+Once the service is running, register it with the Restate runtime:
 
 ```bash
 restate deployments register http://localhost:9080
 ```
 
-## Core Concepts
+## Workflows
 
-### Data Pipeline
+### Batch Workflow
 
-1. **Oracle**: Extracts data from the source database.
-2. **Stream**: Streams data in real-time through the pipeline.
-3. **Parquet**: Stores the final results in an optimized columnar format.
+The entry point for processing SOAs. It:
 
-### Workflows vs Handlers
+1. Determines the processing date and period.
+2. Fetches all active customers.
+3. Creates a batch record.
+4. Triggers `SoaWorkflow` for each customer in chunks to manage load.
 
-- **Workflow**: Manages the sequence of processes. If the process is interrupted (e.g., server failure), Restate automatically resumes from the last successful step.
-- **Handlers**: Atomic tasks such as `fetchFromOracle` or `writeToParquet`. Every instruction within a handler is executed idempotently by Restate.
+### SOA Workflow
 
-## Monitoring
+Processes an individual customer:
 
-Access the Restate Dashboard to monitor active workflows and service health:
-[http://localhost:9070](http://localhost:9070)
+1. **GetSoa**: Fetches SOA data from Parquet/Database.
+2. **Filter**: Applies aging and payment reconciliation filters.
+3. **Generate**: Creates Excel and PDF reports (using Gotenberg).
+4. **Upload**: Uploads files to Azure Blob Storage.
+5. **Send**: Sends the SOA/Reminder email via SendGrid.

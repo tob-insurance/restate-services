@@ -91,3 +91,9 @@ Processes an individual customer:
 3. **Generate**: Creates Excel and PDF reports (using Gotenberg).
 4. **Upload**: Uploads files to Azure Blob Storage.
 5. **Send**: Sends the SOA/Reminder email via SendGrid.
+
+---
+
+## Workflow SOA
+
+![Flowchart](src/assets/workflow.png)

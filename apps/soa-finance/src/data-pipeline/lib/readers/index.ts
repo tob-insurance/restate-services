@@ -6,7 +6,8 @@ import { readParquet } from "parquet-wasm";
 import type { IStatementOfAccountModel } from "../../../module/utils/types";
 
 export function readSoaParquet(
-  accountCode: string
+  accountCode: string,
+  branchCode: string
 ): IStatementOfAccountModel[] {
   const filePath = join(
     process.cwd(),
@@ -25,6 +26,15 @@ export function readSoaParquet(
     const rows = tableToArray(table) as unknown as IStatementOfAccountModel[];
 
     console.log(`[Parquet] Read ${rows.length} raw rows from file`);
+
+    if (branchCode && branchCode !== "ALL") {
+      const filteredBranch = rows.filter((row) => row.branch === branchCode);
+      console.log(
+        `[Parquet] Filtered by branch ${branchCode}: ${filteredBranch.length} rows`
+      );
+
+      return filteredBranch;
+    }
 
     return rows;
   } catch (error: unknown) {

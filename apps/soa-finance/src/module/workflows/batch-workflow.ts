@@ -13,152 +13,204 @@ import {
   formatUUID,
 } from "../utils/formatter";
 import type { IAccount, SoaType, soaSchema } from "../utils/types";
-
 import { type SoaWorkflow, soaWorkflow } from "./soa-workflow";
+
+const POST_COMPLETION_DELAY = 30_000;
+const WORKER_START_DELAY = 30_000;
+const MAX_WORKERS = 10;
+const PROGRESS_LOG_INTERVAL = 10;
+
+type ActiveWorkerSlot = {
+  accountId: string;
+  promise: RestatePromise<string>;
+};
+
+interface IBatchWorkflowResult {
+  batchId: string;
+  message: string;
+  totalAccounts: number;
+  status: "Completed";
+}
+
+/**
+ * BatchWorkflow - Workflow utama untuk memproses Statement of Account (SOA) secara batch.
+ *
+ * Tujuan:
+ * - Mengambil semua akun customer dari database
+ * - Membuat record batch baru untuk tracking status proses
+ * - Memproses setiap customer secara paralel dengan batasan maksimum worker (10 concurrent)
+ * - Mengelola antrian customer menggunakan worker pool
+ * - Mengembalikan status batch setelah semua customer selesai diproses
+ *
+ * Hubungan ke fungsi lain:
+ * - Memanggil `getAllAccounts` dari queries untuk mengambil data customer
+ * - Memanggil `insertBatch` untuk membuat record batch baru di database
+ * - Memanggil `updateBatchStatus` untuk update status batch (Processing → Completed)
+ * - Mendelegasi proses per-customer ke `soaWorkflow` sebagai child workflow
+ *
+ * Alur proses:
+ * 1. Inisialisasi parameter tanggal (timePeriod, toDate, processingDate) > karena nilainya akan digunakan untuk beberapa service
+ * 2. Ambil semua akun customer dari database
+ * 3. Buat record batch dengan status "Queued"
+ * 4. Update status batch menjadi "Processing"
+ * 5. Proses customer menggunakan worker pool (max 10 concurrent)
+ * 6. Update status batch menjadi "Completed"
+ * 7. Return hasil batch
+ */
 
 export const batchWorkflow = workflow({
   name: "BatchWorkflow",
   handlers: {
-    run: async (ctx: WorkflowContext, type: soaSchema) => {
-      ctx.console.log("Starting batch workflow");
+    run: async (
+      ctx: WorkflowContext,
+      soaRequest: soaSchema
+    ): Promise<IBatchWorkflowResult> => {
+      // STEP 1: Inisialisasi Parameter Tanggal
+      const processingDates = await ctx.run("initialize-dates", () => {
+        const currentDate = new Date();
+        return {
+          timePeriod: formatTimePeriod(currentDate),
+          toDate: formatDateToUnixTimestamp(currentDate),
+          processingDate: currentDate.toISOString(),
+        };
+      });
 
-      const { timePeriod, toDate, processingDate } = await ctx.run(
-        "get-processing-date",
-        () => {
-          const dateNow = new Date();
-          return {
-            timePeriod: formatTimePeriod(dateNow),
-            toDate: formatDateToUnixTimestamp(dateNow),
-            processingDate: dateNow.toISOString(),
-          };
+      const soaProcessingType = soaRequest.type as SoaType;
+      const soaOptions = {
+        classOfBusiness: "ALL",
+        branch: "ALL",
+        maxRetries: 3,
+        testMode: soaRequest.testMode ?? false,
+        skipAgingFilter: soaRequest.skipAgingFilter ?? false,
+        skipDcNoteCheck: soaRequest.skipDcNoteCheck ?? false,
+      };
+
+      // STEP 2: Ambil Data Akun Customer
+      const accountsToProcess = await ctx.run(
+        "get-all-accounts",
+        async (): Promise<IAccount[]> => {
+          const accounts = await getAllAccounts();
+          if (!accounts || accounts.length === 0) {
+            throw new Error("Tidak ada akun customer yang ditemukan");
+          }
+          return accounts;
         }
       );
 
-      const processingType = type.type as SoaType;
-      const classOfBusiness = "ALL";
-      const branch = "ALL";
-      const maxRetries = 3;
+      const totalAccounts = accountsToProcess.length;
 
-      const customers = await ctx.run(
-        "get-customers",
-        async () => await getAllAccounts()
-      );
-
-      // const customer = customers.find((c) => c.code === "00000318");
-
-      if (!customers || customers.length === 0) {
-        throw new Error("No customers found");
-      }
-
-      // if (!customer) {
-      //   throw new Error("No customers found");
-      // }
-
-      const customerRows: IAccount[] = customers;
-      // const customerRows: IAccount[] = [customer];
-      const totalCustomers = customerRows.length;
-
+      // STEP 3: Buat Record Batch
       const batchId = await ctx.run("create-batch", async () => {
-        const id = formatUUID(uuidv4());
-        await insertBatch(id, totalCustomers, "Queued");
-
-        return id;
+        const newBatchId = formatUUID(uuidv4());
+        await insertBatch(newBatchId, totalAccounts, "Queued");
+        return newBatchId;
       });
 
-      ctx.console.log(`Batch created: ${batchId}, Total: ${totalCustomers}`);
+      ctx.console.log(`mulai: ${batchId} dengan total ${totalAccounts} akun`);
 
-      // Processing SOA for each customer in sequential chunks of 50
-      await ctx.run("soa-processing", async () => {
+      // STEP 4: Update Status ke Processing
+      await ctx.run("processing-status-update", async () => {
         await updateBatchStatus(batchId, "Processing");
       });
 
-      // Worker Pool Pattern: Maintain 10 concurrent workers at all times
-      const maxConcurrency = 10;
-      let customerIndex = 0;
-      let completedCount = 0;
+      // STEP 5: Proses dengan Worker Pool
+      const workerPool: Map<string, ActiveWorkerSlot> = new Map();
+      let nextAccountIndex = 0;
+      let processedAccountCount = 0;
 
-      // Track active workers with their customer IDs
-      type WorkerSlot = {
-        customerId: string;
-        promise: RestatePromise<unknown>;
-      };
+      /**
+       * Memulai proses SOA untuk satu akun customer.
+       *
+       * Tujuan:
+       * - Membuat workflow client untuk customer berdasarkan accountId
+       * - Memanggil soaWorkflow.run() dengan parameter lengkap
+       * - Mendaftarkan promise ke worker pool untuk tracking
+       *
+       * Hubungan ke fungsi lain:
+       * - Dipanggil oleh main loop setiap kali ada slot worker kosong
+       * - Menggunakan `soaWorkflow` sebagai child workflow untuk proses detail
+       * - Promise yang dibuat akan di-race untuk mendeteksi completion
+       */
+      const startAccountProcessing = (account: IAccount): void => {
+        const accountId = account.code;
 
-      const activeWorkers: Map<string, WorkerSlot> = new Map();
-
-      // Helper function to start processing a customer
-      const startCustomerProcessing = (customer: IAccount) => {
-        const customerId = customer.code;
-
-        const promise = ctx
-          .workflowClient<SoaWorkflow>(soaWorkflow, customerId)
+        const workerPromise = ctx
+          .workflowClient<SoaWorkflow>(soaWorkflow, accountId)
           .run({
-            customerId,
-            timePeriod,
-            processingDate,
+            customerId: accountId,
+            timePeriod: processingDates.timePeriod,
+            processingDate: processingDates.processingDate,
             batchId,
-            classOfBusiness,
-            branch,
-            toDate,
-            maxRetries,
-            processingType,
-            testMode: type.testMode ?? false,
-            skipAgingFilter: type.skipAgingFilter ?? false,
-            skipDcNoteCheck: type.skipDcNoteCheck ?? false,
-          });
+            classOfBusiness: soaOptions.classOfBusiness,
+            branch: soaOptions.branch,
+            toDate: processingDates.toDate,
+            maxRetries: soaOptions.maxRetries,
+            processingType: soaProcessingType,
+            testMode: soaOptions.testMode,
+            skipAgingFilter: soaOptions.skipAgingFilter,
+            skipDcNoteCheck: soaOptions.skipDcNoteCheck,
+          })
+          .map(() => accountId);
 
-        activeWorkers.set(customerId, { customerId, promise });
-        ctx.console.log(
-          `Started: ${customerId} (Active: ${activeWorkers.size}, Remaining: ${totalCustomers - customerIndex})`
-        );
+        workerPool.set(accountId, {
+          accountId,
+          promise: workerPromise,
+        });
       };
 
+      // Isi worker pool sampai penuh atau semua akun sudah dimulai
       while (
-        activeWorkers.size < maxConcurrency &&
-        customerIndex < customerRows.length
+        workerPool.size < MAX_WORKERS &&
+        nextAccountIndex < totalAccounts
       ) {
-        startCustomerProcessing(customerRows[customerIndex]);
-        customerIndex++;
-        await ctx.sleep(30_000); // Small delay between starting workers
+        startAccountProcessing(accountsToProcess[nextAccountIndex]);
+        nextAccountIndex++;
+        await ctx.sleep(WORKER_START_DELAY);
       }
 
-      // Process until all customers are completed
-      while (activeWorkers.size > 0) {
-        // Wait for ANY one to complete using RestatePromise.race
-        // Each promise returns its customerId so we know which one finished
-        const finishedCustomerId = (await RestatePromise.race(
-          Array.from(activeWorkers.values()).map((w) =>
-            w.promise.map(() => w.customerId)
-          )
-        )) as string;
-
-        // Process the finished customer
-        activeWorkers.delete(finishedCustomerId);
-        completedCount++;
-        ctx.console.log(
-          `[Queue] Completed: ${finishedCustomerId} (${completedCount}/${totalCustomers})`
+      // Proses sampai semua akun selesai
+      while (workerPool.size > 0) {
+        // Tunggu salah satu worker selesai
+        const completedAccountId = await RestatePromise.race(
+          Array.from(workerPool.values()).map((slot) => slot.promise)
         );
 
-        // Delay 1 minute after completing each customer
-        ctx.console.log("[Queue] Waiting 1 minute before next customer...");
-        await ctx.sleep(30_000);
+        // Hapus dari pool dan update counter
+        workerPool.delete(completedAccountId);
+        processedAccountCount++;
 
-        // If there are more customers, start the next one
-        if (customerIndex < customerRows.length) {
-          startCustomerProcessing(customerRows[customerIndex]);
-          customerIndex++;
-          await ctx.sleep(30_000);
+        // Log progress setiap N akun
+        if (processedAccountCount % PROGRESS_LOG_INTERVAL === 0) {
+          ctx.console.log(
+            `[Batch] Progress: ${processedAccountCount}/${totalAccounts}`
+          );
+        }
+
+        await ctx.sleep(POST_COMPLETION_DELAY);
+
+        // Mulai proses akun berikutnya jika masih ada
+        if (nextAccountIndex < totalAccounts) {
+          startAccountProcessing(accountsToProcess[nextAccountIndex]);
+          nextAccountIndex++;
+          await ctx.sleep(WORKER_START_DELAY);
         }
       }
 
-      ctx.console.log(`[Queue] All ${completedCount} customers processed`);
+      // STEP 6: Update Status ke Completed
+      await ctx.run("completed-status-update", async () => {
+        await updateBatchStatus(batchId, "Completed");
+      });
 
-      ctx.console.log("Finished batch workflow");
+      ctx.console.log(
+        `${batchId} selesai, proses: ${processedAccountCount} akun`
+      );
 
+      // STEP 7: Return Hasil Batch
       return {
         batchId,
-        message: "SOA processing started successfully",
-        totalCustomers,
-        Status: "Queued",
+        message: "Proses SOA batch berhasil diselesaikan",
+        totalAccounts,
+        status: "Completed",
       };
     },
   },

@@ -21,6 +21,42 @@ import {
 
 import type { ISoaItem } from "../utils/types";
 
+interface ISoaWorkflowResult {
+  customerId: string;
+  status: "completed" | "failed";
+  jobId: string;
+}
+
+/**
+ * SoaWorkflow - Workflow untuk memproses Statement of Account (SOA) per customer.
+ *
+ * Tujuan:
+ * - Memproses SOA untuk satu customer tertentu
+ * - Menentukan apakah customer perlu diproses sebagai SOA baru atau reminder letter
+ * - Mengelola retry logic jika terjadi error
+ * - Melaporkan hasil proses ke batch workflow
+ *
+ * Hubungan ke fungsi lain:
+ * - Dipanggil oleh `batchWorkflow` sebagai child workflow untuk setiap customer
+ * - Memanggil `ensureJobExists` untuk membuat/mendapatkan job record di database
+ * - Memanggil `getCustomerData` untuk mengambil data lengkap customer
+ * - Memanggil `getReminderByCustomerAndPeriod` untuk cek histori SOA
+ * - Memanggil `shouldProcessReminder` untuk menentukan tipe proses (SOA baru vs Reminder)
+ * - Memanggil `newSoa` atau `processReminder` berdasarkan keputusan di atas
+ * - Memanggil `completeWorkflow` untuk finalisasi dan update status batch
+ * - Memanggil `handleErrorWithRetry` untuk error handling dengan retry mechanism
+ *
+ * Alur proses:
+ * 1. Buat/ambil job record untuk customer ini
+ * 2. Loop retry sampai sukses atau max retry tercapai:
+ *    a. Update status job ke "Processing"
+ *    b. Ambil data customer dari database
+ *    c. Cek histori reminder untuk periode ini
+ *    d. Tentukan apakah proses sebagai reminder atau SOA baru
+ *    e. Jalankan proses yang sesuai
+ *    f. Tandai workflow selesai
+ * 3. Return hasil dengan status completed/failed
+ */
 export const soaWorkflow = workflow({
   name: "SoaWorkflow",
   options: {
@@ -31,11 +67,12 @@ export const soaWorkflow = workflow({
     },
   },
   handlers: {
-    run: async (ctx: WorkflowContext, params: ISoaItem) => {
-      ctx.console.log("Starting SOA workflow");
-
+    run: async (
+      ctx: WorkflowContext,
+      soaParams: ISoaItem
+    ): Promise<ISoaWorkflowResult> => {
       const { customerId, batchId, timePeriod, maxRetries, processingType } =
-        params;
+        soaParams;
 
       ctx.console.log(`Starting SOA for customer: ${customerId}`);
 
@@ -43,55 +80,72 @@ export const soaWorkflow = workflow({
         "get-or-create-job",
         async () => await ensureJobExists(batchId, customerId)
       );
+
       const processingItem: ISoaItem = {
-        ...params,
+        ...soaParams,
         jobId,
       };
 
+      let isProcessingSuccess = false;
       const currentRetryAttempt = retryAttempt;
-      let success = false;
 
-      while (!success && currentRetryAttempt <= maxRetries) {
+      // STEP 2: Loop retry sampai sukses atau max retry
+      while (!isProcessingSuccess && currentRetryAttempt <= maxRetries) {
         try {
-          await ctx.run("processing-soa-start", async () => {
+          // STEP 2a: Update status job ke Processing
+          await ctx.run("update-job-processing", async () => {
             await updateJobStatus(jobId, "Processing");
           });
 
+          // STEP 2b: Ambil data customer
           const customerData = await ctx.run(
-            "get-customer",
+            "get-customer-data",
             async () => await getCustomerData(jobId, customerId)
           );
 
           if (!customerData) {
-            throw new Error(`Customer ${customerId} not found`);
+            throw new Error(`Customer ${customerId} tidak ditemukan`);
           }
 
-          // const existingReminders = await ctx.run(
-          //   "check-soa-history",
-          //   async () =>
-          //     await getReminderByCustomerAndPeriod(
-          //       customerData.code,
-          //       timePeriod,
-          //     ),
-          // );
+          // STEP 2c: Cek histori reminder untuk periode ini
+          const existingReminders = await ctx.run(
+            "check-soa-history",
+            async () =>
+              await getReminderByCustomerAndPeriod(
+                customerData.code,
+                timePeriod
+              )
+          );
 
-          // const shouldDoReminder = shouldProcessReminder(
-          //   existingReminders.length > 0,
-          //   processingType
-          // );
+          // STEP 2d: Tentukan tipe proses
+          const hasExistingReminder = existingReminders.length > 0;
+          const shouldCreateReminder = shouldProcessReminder(
+            hasExistingReminder,
+            processingType
+          );
 
-          // if (shouldDoReminder) {
-          //   await processReminder(ctx, customerData, processingItem);
-          // } else {
-          //   await newSoa({ ctx, customerData, params: processingItem, jobId });
-          // }
+          // STEP 2e: Jalankan proses yang sesuai
+          if (shouldCreateReminder) {
+            await processReminder(ctx, customerData, processingItem);
+          } else {
+            await newSoa({
+              ctx,
+              customerData,
+              params: processingItem,
+              jobId,
+            });
+          }
 
-          await newSoa({ ctx, customerData, params: processingItem, jobId });
+          isProcessingSuccess = true;
 
-          success = true;
-          ctx.console.log(`Completed: ${customerId}`);
+          // STEP 2f: Finalisasi workflow
+          await completeWorkflow({
+            ctx,
+            jobId,
+            batchId,
+          });
 
-          await completeWorkflow({ ctx, jobId, batchId });
+          ctx.console.log(`selesai: ${customerId}`);
         } catch (error: unknown) {
           const errorResult = await handleErrorWithRetry({
             ctx,
@@ -104,12 +158,17 @@ export const soaWorkflow = workflow({
           });
 
           if (!errorResult.shouldContinue) {
-            return errorResult.result;
+            return errorResult.result as unknown as ISoaWorkflowResult;
           }
         }
       }
 
-      return { customerId, status: "completed", jobId };
+      // STEP 3: Return hasil
+      return {
+        customerId,
+        status: "completed",
+        jobId,
+      };
     },
   },
 });

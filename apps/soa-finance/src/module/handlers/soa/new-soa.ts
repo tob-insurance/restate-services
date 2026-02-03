@@ -36,5 +36,5 @@ export async function newSoa(parameters: newSoaParams): Promise<void> {
       })
   );
 
-  // await runReminderSchedule({ ctx, customerData, params });
+  await runReminderSchedule({ ctx, customerData, params });
 }

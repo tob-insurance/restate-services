@@ -1,9 +1,11 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
 import { uploadFile } from "../../../infrastructure/azure";
-import { generatePdf } from "../../../infrastructure/gotenberg/gotenberg-client";
+import { generatePdfWithHeaderFooter } from "../../../infrastructure/gotenberg/gotenberg-client";
 import { createReminder, processBranch } from "../../services";
+import { formatDateIndonesian } from "../../utils/formatter";
 import { letterSoaPdfName } from "../../utils/formatter/naming";
 import { getSignature } from "../../utils/generators";
+import { generateHeaderFooter } from "../../utils/generators/pdf/header-footer";
 import { renderLiquidToHtml } from "../../utils/generators/pdf/render-template";
 import type {
   IAccount,
@@ -37,19 +39,25 @@ export async function processSingleBranchSoa({
           ? "TemplateReminderLetterSOA"
           : "TemplateOutstandingStatementOfAccount",
         {
-          asAtDate: params.toDate,
+          asAtDate: formatDateIndonesian(new Date(params.toDate * 1000)),
           customerName: customerData.fullName,
           virtualAccount: customerData.virtualAccount,
           signature: await getSignature(),
         }
       );
 
-      const pdfBuffer = await generatePdf(pdfFile, {
-        marginTop: 0.5,
-        marginBottom: 0.5,
-        marginLeft: 0.5,
-        marginRight: 0.5,
-      });
+      // Generate header and footer HTML
+      const { headerHtml, footerHtml } = await generateHeaderFooter();
+
+      const pdfBuffer = await generatePdfWithHeaderFooter(
+        pdfFile,
+        headerHtml,
+        footerHtml,
+        {
+          marginLeft: 0.5,
+          marginRight: 0.5,
+        }
+      );
 
       const pdfFileName = letterSoaPdfName(customerData.code);
 

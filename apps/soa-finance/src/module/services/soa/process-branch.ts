@@ -38,7 +38,6 @@ export const processBranch = async (
     skipDcNoteCheck: item.skipDcNoteCheck ?? false,
   });
 
-  // Return SOA data for reminder creation in separate checkpoint
   if (result && result.length > 0) {
     console.log(
       `SOA generated for ${customer.code} branch ${branchCode}: ${result.length} records`

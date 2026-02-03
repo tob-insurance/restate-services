@@ -3,6 +3,7 @@
  */
 
 import { sendEmail } from "../../../infrastructure/email";
+import { CC_EMAILS } from "../../utils/constants";
 import {
   generateReminderEmailHtml,
   getReminderEmailSubject,
@@ -17,6 +18,9 @@ type SendReminderEmailParams = {
   reminderType: string;
   letterNo: string;
   previousLetterNo?: string;
+  previousLetterDate?: Date;
+  branch?: string;
+  totalPremium?: number;
   excelFile: { fileName: string; bytes: Buffer; contentType: string };
   pdfFile: { fileName: string; bytes: Buffer; contentType: string };
   testMode: boolean;
@@ -31,6 +35,9 @@ export const sendReminderEmail = async (
     reminderType,
     letterNo,
     previousLetterNo,
+    previousLetterDate,
+    branch,
+    totalPremium,
     testMode,
     excelFile,
     pdfFile,
@@ -42,6 +49,9 @@ export const sendReminderEmail = async (
     virtualAccount: customer.virtualAccount || "-",
     letterNo,
     previousLetterNo,
+    previousLetterDate,
+    branch,
+    totalPremium,
   };
 
   const htmlContent = await generateReminderEmailHtml(reminderType, emailData);
@@ -60,6 +70,12 @@ export const sendReminderEmail = async (
       contentBytes: pdfFile.bytes.toString("base64"),
     },
   ];
-  await sendEmail({ to: recipients, subject, body: htmlContent, attachments });
+  await sendEmail({
+    to: recipients,
+    cc: params.testMode ? [recipient] : [...CC_EMAILS],
+    subject,
+    body: htmlContent,
+    attachments,
+  });
   return true;
 };

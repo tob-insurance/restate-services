@@ -77,7 +77,7 @@ export const generateReminderLetter = async (
   // Step 4: Get SOA data (Phase: GetSoa)
   await insertJobPhase(jobId, SoaPhase.GetSoa);
 
-  const soaList = readSoaParquet(customer.code);
+  const soaList = readSoaParquet(customer.code, branchCode);
 
   await completeJobPhase(jobId, SoaPhase.GetSoa);
   if (soaList.length === 0) {
@@ -97,6 +97,27 @@ export const generateReminderLetter = async (
   const dcNotesPaid = await reconcilePayment(
     reminder.id,
     currentParquetDcNotes
+  );
+
+  // Step 5.1: Check if all DC Notes are paid - skip email if so
+  const unpaidDcNotes = currentParquetDcNotes.filter(
+    (dc) => !dcNotesPaid.some((paid) => paid.toLowerCase() === dc.toLowerCase())
+  );
+
+  if (unpaidDcNotes.length === 0) {
+    console.log(
+      `Skipping reminder for ${customer.code}: All ${dcNotesPaid.length} DC notes have been paid`
+    );
+    return {
+      sent: false,
+      dcNotesPaid,
+      letterNo: null,
+      reason: "ALL_PAID",
+    };
+  }
+
+  console.log(
+    `DC note status for ${customer.code}: ${dcNotesPaid.length} paid, ${unpaidDcNotes.length} unpaid`
   );
 
   // Step 6: Generate Letter Number
@@ -176,12 +197,28 @@ export const generateReminderLetter = async (
 
   // Step 10: Send Email (Phase: SendingEmail)
   await insertJobPhase(jobId, SoaPhase.SendingEmail);
+
+  // Calculate total, branch, etc for Email
+  const branchName = soaList.length > 0 ? soaList[0].branch : "";
+  const unpaidItems = soaList.filter((item) =>
+    unpaidDcNotes.some(
+      (id) => id.toLowerCase() === item.debitAndCreditNoteNo.toLowerCase()
+    )
+  );
+  const totalPremium = unpaidItems.reduce(
+    (sum, item) => sum + (item.netPremiumIdr || 0),
+    0
+  );
+
   const emailResult = await sendReminderEmail({
     customer,
     toEmail,
     reminderType: reminderCount.toString(),
     letterNo,
     previousLetterNo: latestLetter?.letterNo,
+    previousLetterDate: latestLetter?.sentDate, // Ensure this field exists on latestLetter type
+    branch: branchName,
+    totalPremium,
     excelFile,
     pdfFile,
     testMode: item.testMode,
@@ -189,5 +226,5 @@ export const generateReminderLetter = async (
 
   await completeJobPhase(jobId, SoaPhase.SendingEmail);
 
-  return { sent: emailResult, dcNotesPaid, letterNo };
+  return { sent: emailResult, dcNotesPaid, letterNo, reason: "SENT" };
 };

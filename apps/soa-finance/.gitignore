@@ -2,6 +2,8 @@
 datas/
 *.parquet
 
+__test__/
+
 # Logs/Reports
 lint.txt
 lint.json

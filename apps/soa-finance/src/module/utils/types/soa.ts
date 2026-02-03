@@ -26,7 +26,6 @@ export type ISoaItem = {
   processingDate: string;
   batchId: string;
   jobId?: string;
-  chunkNumber: number;
   classOfBusiness: string;
   branch: string;
   toDate: number;
@@ -53,7 +52,8 @@ export type IProcessReminder = {
 export type IGenerateReminderResult = {
   sent: boolean;
   dcNotesPaid: string[];
-  letterNo?: string;
+  letterNo?: string | null;
+  reason?: "ALL_PAID" | "SENT" | "ERROR";
 };
 
 export type IStatementOfAccountModel = {
@@ -72,10 +72,10 @@ export type IStatementOfAccountModel = {
   distributionName: string;
   distributionNameSecond: string;
   qualitateQuaName: string;
-  endEffDate: Date;
-  endExpDate: Date;
-  postDate: Date;
-  dueDate: Date;
+  endEffDate: string;
+  endExpDate: string;
+  postDate: string;
+  dueDate: string;
   aging: string;
   currency: string;
   exchangeRate: number;

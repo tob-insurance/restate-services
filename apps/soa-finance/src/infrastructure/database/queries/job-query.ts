@@ -7,20 +7,15 @@ import { executeQuery } from "../database";
 export const insertJob = async (
   jobId: string,
   batchId: string,
-  customerId: string,
-  chunkNumber: number
+  customerId: string
 ) => {
   const sql = `
     INSERT INTO SOA_PROCESSING_JOBS
-    (JOB_ID, BATCH_ID, CUSTOMER_ID, STATUS, RETRY_ATTEMPT, STARTED_AT, CHUNK_NUMBER)
-    VALUES (hextoraw(:jobId), hextoraw(:batchId), :customerId, 'Queued', 0, SYSDATE, :chunkNumber)
+    (JOB_ID, BATCH_ID, CUSTOMER_ID, STATUS, RETRY_ATTEMPT, STARTED_AT)
+    VALUES (hextoraw(:jobId), hextoraw(:batchId), :customerId, 'Queued', 0, SYSDATE)
   `;
 
-  await executeQuery(
-    sql,
-    { jobId, batchId, customerId, chunkNumber },
-    { autoCommit: true }
-  );
+  await executeQuery(sql, { jobId, batchId, customerId }, { autoCommit: true });
 
   return jobId;
 };
@@ -33,7 +28,6 @@ export const getJobByBatchAndCustomer = async (
     SELECT RAWTOHEX(JOB_ID) AS "jobId",
            RAWTOHEX(BATCH_ID) AS "batchId",
            CUSTOMER_ID AS "customerId",
-           CHUNK_NUMBER AS "chunkNumber",
            STATUS AS "status",
            RETRY_ATTEMPT AS "retryAttempt",
            ERROR_MESSAGE AS "errorMessage",

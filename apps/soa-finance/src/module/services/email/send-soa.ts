@@ -1,7 +1,12 @@
-import { completeJobPhase } from "../../../infrastructure/database/queries";
+import {
+  completeJobPhase,
+  insertJobPhase,
+} from "../../../infrastructure/database/queries";
 import { sendEmail } from "../../../infrastructure/email";
 
+import { CC_EMAILS } from "../../utils/constants";
 import { generateSoaEmailHtml } from "../../utils/email";
+import { formatDateDDMMYYYY } from "../../utils/formatter";
 import {
   type IAccount,
   type IEmailMessage,
@@ -24,22 +29,18 @@ export const sendSoaEmail = async (
   const { customer, toEmail, excelFile, pdfFile, testMode, jobId } = options;
   const asAtDate = new Date();
 
-  // Generate email HTML
   const emailHtml = await generateSoaEmailHtml({
     customerName: customer.fullName,
     virtualAccount: customer.virtualAccount || "-",
     asAtDate,
   });
 
-  // In testMode, always use provided email; otherwise use customer email or fallback
   const recipientEmail = testMode ? toEmail : customer.email || toEmail;
 
-  // Prepare email message
   const message: IEmailMessage = {
     to: [recipientEmail],
-    subject: `SOA OUTSTANDING ${
-      customer.fullName
-    } as ${asAtDate.toLocaleDateString("id-ID")}`,
+    cc: testMode ? [recipientEmail] : [...CC_EMAILS],
+    subject: `SOA OUTSTANDING ${customer.fullName} as ${formatDateDDMMYYYY(asAtDate)}`,
     body: emailHtml,
     attachments: [
       {
@@ -56,11 +57,10 @@ export const sendSoaEmail = async (
   };
 
   console.log(`Sending SOA email for ${customer.code} to: ${recipientEmail}`);
-  const sent = await sendEmail(message);
 
-  if (sent) {
-    await completeJobPhase(jobId, SoaPhase.SendingEmail);
-  }
+  await insertJobPhase(jobId, SoaPhase.SendingEmail);
+  const sent = await sendEmail(message);
+  await completeJobPhase(jobId, SoaPhase.SendingEmail);
 
   return sent;
 };

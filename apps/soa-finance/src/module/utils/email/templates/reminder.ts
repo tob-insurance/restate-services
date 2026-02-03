@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { formatDateIndonesian } from "../../formatter";
+import { getSignature } from "../../generators";
 import { renderTemplate } from "../../template";
 import type { IReminderEmailData } from "../../types/reminder";
 
@@ -10,58 +11,60 @@ function loadTemplate(name: string): string {
   return readFileSync(join(TEMPLATES_DIR, `${name}.html`), "utf-8");
 }
 
-export async function generateRL1EmailHtml(
-  data: IReminderEmailData
-): Promise<string> {
-  const template = loadTemplate("rl1Email");
-  return await renderTemplate(template, {
-    customerName: data.customerName,
-    letterNo: data.letterNo,
-    virtualAccount: data.virtualAccount,
-    formattedDate: formatDateIndonesian(data.asAtDate),
-  });
-}
+const currencyFormatter = new Intl.NumberFormat("id-ID", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
 
-export async function generateRL2EmailHtml(
-  data: IReminderEmailData
-): Promise<string> {
-  const template = loadTemplate("rl2Email");
-  return await renderTemplate(template, {
-    customerName: data.customerName,
-    letterNo: data.letterNo,
-    previousLetterNo: data.previousLetterNo,
-    virtualAccount: data.virtualAccount,
-    formattedDate: formatDateIndonesian(data.asAtDate),
-  });
-}
+const enDateFormatter = new Intl.DateTimeFormat("en-US", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
 
-export async function generateRL3EmailHtml(
-  data: IReminderEmailData
-): Promise<string> {
-  const template = loadTemplate("rl3Email");
-  return await renderTemplate(template, {
-    customerName: data.customerName,
-    letterNo: data.letterNo,
-    previousLetterNo: data.previousLetterNo,
-    virtualAccount: data.virtualAccount,
-    formattedDate: formatDateIndonesian(data.asAtDate),
-  });
+function formatEnDate(date: Date): string {
+  return enDateFormatter.format(date);
 }
 
 export async function generateReminderEmailHtml(
   type: string,
   data: IReminderEmailData
 ): Promise<string> {
-  switch (type) {
-    case "1":
-      return await generateRL1EmailHtml(data);
-    case "2":
-      return await generateRL2EmailHtml(data);
-    case "3":
-      return await generateRL3EmailHtml(data);
-    default:
-      return await generateRL1EmailHtml(data);
+  const template = loadTemplate("TemplateReminderLetterSOA");
+  const now = new Date();
+
+  let dayDeadline = "19";
+  if (type === "2") {
+    dayDeadline = "25";
+  } else if (type === "3") {
+    dayDeadline = "29";
   }
+
+  const deadlineDateId = `${dayDeadline} ${formatDateIndonesian(now).split(" ").slice(1).join(" ")}`;
+  const deadlineDateEn = `${dayDeadline} ${formatEnDate(now).split(" ").slice(1).join(" ")}`;
+
+  return await renderTemplate(template, {
+    reminderType: type,
+    customerName: data.customerName,
+    letterNo: data.letterNo,
+    previousLetterNo: data.previousLetterNo,
+    virtualAccount: data.virtualAccount,
+    formattedDate: formatDateIndonesian(data.asAtDate),
+    formattedDateEn: formatEnDate(data.asAtDate),
+    formattedSentDate: data.previousLetterDate
+      ? formatDateIndonesian(data.previousLetterDate)
+      : "-",
+    formattedSentDateEn: data.previousLetterDate
+      ? formatEnDate(data.previousLetterDate)
+      : "-",
+    branch: data.branch || "",
+    formattedTotalPremium: data.totalPremium
+      ? currencyFormatter.format(data.totalPremium)
+      : "0.00",
+    deadlineDateId,
+    deadlineDateEn,
+    signature: getSignature(),
+  });
 }
 
 export function getReminderEmailSubject(

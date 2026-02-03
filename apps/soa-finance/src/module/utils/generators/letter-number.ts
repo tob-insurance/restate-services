@@ -1,8 +1,3 @@
-/**
- * Letter Number Generator
- * Format: XXX/FIN/SOA/RL{type}/{month_roman}/{year}
- */
-
 import { getNextLetterSequence } from "../../../infrastructure/database/queries";
 import { ROMAN_MONTHS } from "../constants";
 

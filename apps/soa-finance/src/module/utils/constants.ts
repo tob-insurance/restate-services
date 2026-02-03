@@ -15,6 +15,9 @@ export const INDONESIAN_MONTHS = [
   "Desember",
 ] as const;
 
+// CC recipients for SOA and Reminder emails
+export const CC_EMAILS = ["finance@tob-ins.com"] as const;
+
 export const ROMAN_MONTHS = [
   "I",
   "II",

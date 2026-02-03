@@ -1,5 +1,5 @@
-// Formatter Functions
 export {
+  formatDateDDMMYYYY,
   formatDateIndonesian,
   formatDateToUnixTimestamp,
   formatDuration,

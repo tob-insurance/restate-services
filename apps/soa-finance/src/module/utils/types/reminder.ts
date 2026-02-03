@@ -5,4 +5,6 @@ export type IReminderEmailData = {
   letterNo: string;
   previousLetterNo?: string;
   previousLetterDate?: Date;
+  branch?: string;
+  totalPremium?: number;
 };

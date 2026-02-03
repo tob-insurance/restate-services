@@ -28,6 +28,13 @@ export function formatDateIndonesian(date: Date): string {
   return `${date.getDate()} ${INDONESIAN_MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }
 
+export function formatDateDDMMYYYY(date: Date): string {
+  const day = date.getDate().toString().padStart(2, "0");
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
 export function formatTimePeriod(date: Date): string {
   return date.toISOString().slice(0, 7);
 }
@@ -45,13 +52,28 @@ export function formatDuration(durationMs: number): string {
   return `${hh}:${mm}:${ss}`;
 }
 
-export function parseDate(value: unknown): Date {
+export function parseDate(value: unknown): string {
   if (!value) {
-    return new Date(0);
-  }
-  if (value instanceof Date) {
-    return value;
+    return "-";
   }
 
-  return new Date(value as string | number);
+  let date: Date;
+
+  if (value instanceof Date) {
+    date = value;
+  } else if (typeof value === "string" || typeof value === "number") {
+    date = new Date(value);
+  } else {
+    return "-";
+  }
+
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+
+  return `${month}/${day}/${year}`;
 }

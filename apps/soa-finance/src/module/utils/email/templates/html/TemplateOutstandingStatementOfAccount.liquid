@@ -1,21 +1,19 @@
 ﻿
 <div lang="en-ID" link="#0563C1" vlink="#954F72" style="word-wrap:break-word;">
     <p>
-        Jakarta, {{ AsAtDateId }}
+        Jakarta, {{ asAtDate }}
     </p>
     <p>
-        Dear {{ Name }},
+        Dear {{ customerName }},
     </p>
     <p>
         Sebelumnya kami mengucapkan terima kasih atas kepercayaan dan kerjasama yang telah terjalin selama ini dengan PT. ASURANSI TOTAL BERSAMA.
         <br />
-        Berdasarkan catatan kami per tanggal {{ AsAtDateId }}, terlampir adalah rincian tagihan premi.
+        Berdasarkan catatan kami per tanggal {{ asAtDate }}, terlampir adalah rincian tagihan premi.
     </p>
     <p>
         Besar harapan kami kepada Bpk/Ibu dapat melakukan pembayaran atas premi,
-        <b>
-            <span style="background-color: yellow !important;">terutama tagihan yang melewati tanggal jatuh tempo</span>
-        </b>
+        <span style="color: #ff0000; font-weight: bold;">terutama tagihan yang melewati tanggal jatuh tempo</span>
     </p>
     <p>
         Premi dapat dibayarkan ke BCA VIRTUAL ACCOUNT sebagai berikut:
@@ -24,12 +22,12 @@
         <tr>
             <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">No. Virtual Account</td>
             <td style="vertical-align: top;">:</td>
-            <td style="vertical-align: top;">{{ VirtualNumber }}</td>
+            <td style="vertical-align: top;">{{ virtualAccount }}</td>
         </tr>
         <tr>
             <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">Atas Nama</td>
             <td style="vertical-align: top;">:</td>
-            <td style="vertical-align: top;">{{ Name }}</td>
+            <td style="vertical-align: top;">{{ customerName }}</td>
         </tr>
     </table>
     <br />

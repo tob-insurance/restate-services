@@ -1,26 +1,22 @@
-import fs from "node:fs/promises";
-import path from "node:path";
-import { Liquid } from "liquidjs";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { renderTemplate } from "../../template";
+import { getSignature } from "./assets";
 
-const engine = new Liquid({
-  root: path.resolve(__dirname, "../../email/templates/html"),
-  extname: ".liquid",
-});
+const TEMPLATES_DIR = join(__dirname, "../../email/templates/html");
 
 export async function renderLiquidToHtml(
   templateName: string,
-  data: object
+  data: Record<string, unknown>
 ): Promise<string> {
-  try {
-    const filePath = path.join(
-      __dirname,
-      "../../email/templates/html",
-      `${templateName}.liquid`
-    );
+  const templatePath = join(TEMPLATES_DIR, `${templateName}.liquid`);
+  const templateContent = readFileSync(templatePath, "utf-8");
 
-    const templateContent = await fs.readFile(filePath, "utf-8");
-    return await engine.parseAndRender(templateContent, data);
-  } catch (error) {
-    throw new Error(`Failed to render template ${templateName}: ${error}`);
-  }
+  // Add signature to data
+  const enrichedData = {
+    ...data,
+    ImgSign: getSignature(),
+  };
+
+  return await renderTemplate(templateContent, enrichedData);
 }

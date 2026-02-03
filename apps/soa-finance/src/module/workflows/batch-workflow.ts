@@ -13,6 +13,7 @@ import {
   formatUUID,
 } from "../utils/formatter";
 import type { IAccount, SoaType, soaSchema } from "../utils/types";
+
 import { type SoaWorkflow, soaWorkflow } from "./soa-workflow";
 
 export const batchWorkflow = workflow({
@@ -71,46 +72,85 @@ export const batchWorkflow = workflow({
         await updateBatchStatus(batchId, "Processing");
       });
 
-      const chunkSize = 10;
-      for (let i = 0; i < customerRows.length; i += chunkSize) {
-        const start = i + 1;
-        const end = Math.min(i + chunkSize, customerRows.length);
-        const chunkNumber = Math.floor(i / chunkSize) + 1;
+      // Worker Pool Pattern: Maintain 10 concurrent workers at all times
+      const maxConcurrency = 10;
+      let customerIndex = 0;
+      let completedCount = 0;
 
+      // Track active workers with their customer IDs
+      type WorkerSlot = {
+        customerId: string;
+        promise: RestatePromise<unknown>;
+      };
+
+      const activeWorkers: Map<string, WorkerSlot> = new Map();
+
+      // Helper function to start processing a customer
+      const startCustomerProcessing = (customer: IAccount) => {
+        const customerId = customer.code;
+
+        const promise = ctx
+          .workflowClient<SoaWorkflow>(soaWorkflow, customerId)
+          .run({
+            customerId,
+            timePeriod,
+            processingDate,
+            batchId,
+            classOfBusiness,
+            branch,
+            toDate,
+            maxRetries,
+            processingType,
+            testMode: type.testMode ?? false,
+            skipAgingFilter: type.skipAgingFilter ?? false,
+            skipDcNoteCheck: type.skipDcNoteCheck ?? false,
+          });
+
+        activeWorkers.set(customerId, { customerId, promise });
         ctx.console.log(
-          `Processing chunk ${chunkNumber}: ${start}-${end}, size: ${chunkSize}`
+          `Started: ${customerId} (Active: ${activeWorkers.size}, Remaining: ${totalCustomers - customerIndex})`
+        );
+      };
+
+      while (
+        activeWorkers.size < maxConcurrency &&
+        customerIndex < customerRows.length
+      ) {
+        startCustomerProcessing(customerRows[customerIndex]);
+        customerIndex++;
+        await ctx.sleep(30_000); // Small delay between starting workers
+      }
+
+      // Process until all customers are completed
+      while (activeWorkers.size > 0) {
+        // Wait for ANY one to complete using RestatePromise.race
+        // Each promise returns its customerId so we know which one finished
+        const finishedCustomerId = (await RestatePromise.race(
+          Array.from(activeWorkers.values()).map((w) =>
+            w.promise.map(() => w.customerId)
+          )
+        )) as string;
+
+        // Process the finished customer
+        activeWorkers.delete(finishedCustomerId);
+        completedCount++;
+        ctx.console.log(
+          `[Queue] Completed: ${finishedCustomerId} (${completedCount}/${totalCustomers})`
         );
 
-        const chunk = customerRows.slice(i, i + chunkSize);
-        const promises: RestatePromise<unknown>[] = [];
+        // Delay 1 minute after completing each customer
+        ctx.console.log("[Queue] Waiting 1 minute before next customer...");
+        await ctx.sleep(30_000);
 
-        for (const customer of chunk) {
-          const customerId = customer.code;
-          promises.push(
-            ctx.workflowClient<SoaWorkflow>(soaWorkflow, customerId).run({
-              customerId,
-              timePeriod,
-              processingDate,
-              batchId,
-              chunkNumber,
-              classOfBusiness,
-              branch,
-              toDate,
-              maxRetries,
-              processingType,
-              testMode: type.testMode ?? false,
-              skipAgingFilter: type.skipAgingFilter ?? false,
-              skipDcNoteCheck: type.skipDcNoteCheck ?? false,
-            })
-          );
-
-          await ctx.sleep(500);
+        // If there are more customers, start the next one
+        if (customerIndex < customerRows.length) {
+          startCustomerProcessing(customerRows[customerIndex]);
+          customerIndex++;
+          await ctx.sleep(30_000);
         }
-
-        await RestatePromise.allSettled(promises);
-
-        await ctx.sleep(1000);
       }
+
+      ctx.console.log(`[Queue] All ${completedCount} customers processed`);
 
       ctx.console.log("Finished batch workflow");
 

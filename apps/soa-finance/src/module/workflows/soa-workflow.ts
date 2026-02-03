@@ -34,20 +34,14 @@ export const soaWorkflow = workflow({
     run: async (ctx: WorkflowContext, params: ISoaItem) => {
       ctx.console.log("Starting SOA workflow");
 
-      const {
-        customerId,
-        batchId,
-        timePeriod,
-        maxRetries,
-        processingType,
-        chunkNumber,
-      } = params;
+      const { customerId, batchId, timePeriod, maxRetries, processingType } =
+        params;
 
       ctx.console.log(`Starting SOA for customer: ${customerId}`);
 
       const { jobId, retryAttempt } = await ctx.run(
         "get-or-create-job",
-        async () => await ensureJobExists(batchId, customerId, chunkNumber)
+        async () => await ensureJobExists(batchId, customerId)
       );
       const processingItem: ISoaItem = {
         ...params,
@@ -72,27 +66,27 @@ export const soaWorkflow = workflow({
             throw new Error(`Customer ${customerId} not found`);
           }
 
-          const existingReminders = await ctx.run(
-            "check-soa-history",
-            async () =>
-              await getReminderByCustomerAndPeriod(
-                customerData.code,
-                timePeriod
-              )
-          );
+          // const existingReminders = await ctx.run(
+          //   "check-soa-history",
+          //   async () =>
+          //     await getReminderByCustomerAndPeriod(
+          //       customerData.code,
+          //       timePeriod,
+          //     ),
+          // );
 
-          const shouldDoReminder = shouldProcessReminder(
-            existingReminders.length > 0,
-            processingType
-          );
+          // const shouldDoReminder = shouldProcessReminder(
+          //   existingReminders.length > 0,
+          //   processingType
+          // );
 
-          if (shouldDoReminder) {
-            await processReminder(ctx, customerData, processingItem);
-          } else {
-            await newSoa({ ctx, customerData, params: processingItem, jobId });
-          }
+          // if (shouldDoReminder) {
+          //   await processReminder(ctx, customerData, processingItem);
+          // } else {
+          //   await newSoa({ ctx, customerData, params: processingItem, jobId });
+          // }
 
-          // await newSoa(ctx, customerData, processingItem, jobId);
+          await newSoa({ ctx, customerData, params: processingItem, jobId });
 
           success = true;
           ctx.console.log(`Completed: ${customerId}`);

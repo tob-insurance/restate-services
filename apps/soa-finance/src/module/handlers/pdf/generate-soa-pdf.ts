@@ -1,6 +1,11 @@
 import { generatePdfWithHeaderFooter } from "../../../infrastructure/gotenberg/gotenberg-client";
-import { renderLiquidToHtml } from "../../utils/generators";
-import { generateHeaderFooter } from "../../utils/generators/pdf/header-footer";
+import { createFooter } from "../../utils/email/templates/html/footer";
+import { createHeader } from "../../utils/email/templates/html/header";
+import {
+  getFooter,
+  getHeader,
+  renderLiquidToHtml,
+} from "../../utils/generators";
 
 export async function generateSoaPdfHandler(params: {
   templateName: string;
@@ -11,19 +16,14 @@ export async function generateSoaPdfHandler(params: {
   const html = await renderLiquidToHtml(params.templateName, params.data);
 
   // 2. Generate header and footer HTML
-  const { headerHtml, footerHtml } = await generateHeaderFooter();
+  const headerHtml = createHeader(getHeader());
+  const footerHtml = createFooter(getFooter());
 
   // 3. Send to Gotenberg with header/footer
   const pdfBuffer = await generatePdfWithHeaderFooter(
     html,
     headerHtml,
-    footerHtml,
-    {
-      marginTop: 1.5,
-      marginBottom: 1,
-      marginLeft: 0.5,
-      marginRight: 0.5,
-    }
+    footerHtml
   );
 
   return {

@@ -33,9 +33,23 @@ function createWorksheet(sheet: IExcelSheetData): WorksheetType {
 
   applyNumberFormats(worksheet, sheet.columns, worksheetData.length);
 
-  worksheet["!cols"] = sheet.columns.map((col) => ({
-    wch: col.width ?? 15,
-  }));
+  // Implement Autofit
+  worksheet["!cols"] = sheet.columns.map((col, colIdx) => {
+    // If width is explicitly provided, use it
+    if (col.width) {
+      return { wch: col.width };
+    }
+
+    // Otherwise, calculate the maximum length in this column
+    const maxLen = worksheetData.reduce((prev, row) => {
+      const cellValue = row[colIdx];
+      const cellLen = cellValue ? cellValue.toString().length : 0;
+      return Math.max(prev, cellLen);
+    }, 0);
+
+    // Set width to max length found + small padding
+    return { wch: maxLen + 2 };
+  });
 
   return worksheet;
 }

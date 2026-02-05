@@ -8,6 +8,12 @@ export type ISoaPipelineResult = {
   duration: string;
 };
 
+export type IDataPipelineResult = {
+  success: boolean;
+  duration: string;
+  filesUploaded: number;
+};
+
 export type IPartitionedFile = {
   distributionCode?: string;
   rowCount: number;

@@ -76,7 +76,7 @@ export type IStatementOfAccountModel = {
   endExpDate: string;
   postDate: string;
   dueDate: string;
-  aging: string;
+  aging: number;
   currency: string;
   exchangeRate: number;
   endReason: string;

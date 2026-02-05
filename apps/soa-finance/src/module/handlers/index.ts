@@ -1,9 +1,6 @@
 export { generateSoaPdfHandler } from "./pdf/generate-soa-pdf";
 export { processReminder } from "./reminder/process-letter";
-export {
-  type ReminderScheduleParams,
-  runReminderSchedule,
-} from "./reminder/run-schedule";
+export { runReminderSchedule } from "./reminder/run-schedule";
 export { newSoa } from "./soa/new-soa";
 export {
   type ProcessSoaParams,

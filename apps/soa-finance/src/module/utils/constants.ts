@@ -76,7 +76,7 @@ export const excelColumns: IExcelColumn[] = [
   { header: "Effective Date", key: "endEffDate", width: 12 },
   { header: "Expired Date", key: "endExpDate", width: 12 },
   { header: "Post Date", key: "postDate", width: 12 },
-  { header: "Aging", key: "aging", width: 10, format: "number" },
+  { header: "Aging", key: "aging", width: 10 },
   { header: "Currency", key: "currency", width: 10 },
   { header: "Exchange Rate", key: "exchangeRate", width: 12, format: "number" },
   { header: "Endorsement Reason", key: "endReason", width: 20 },

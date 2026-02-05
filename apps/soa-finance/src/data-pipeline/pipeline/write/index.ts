@@ -1,13 +1,10 @@
-import { join } from "node:path";
-
-import type {
-  IPartitionedFile,
-  IStatementOfAccountModel,
-} from "../../../module/utils/types";
-import { writeSoaParquet } from "../../lib";
+import { uploadParquetToS3 } from "../../../infrastructure/storage/s3/s3-uploader";
+import type { IStatementOfAccountModel } from "../../../module/utils/types";
+import { writeSoaParquetToBuffer } from "../../lib/writers";
 
 export async function writeToParquet(
-  source: AsyncIterable<IStatementOfAccountModel>
+  source: AsyncIterable<IStatementOfAccountModel>,
+  testMode?: boolean
 ) {
   const datasAccount = new Map<string, IStatementOfAccountModel[]>();
 
@@ -21,21 +18,19 @@ export async function writeToParquet(
     datasAccount.get(accountCode)?.push(row);
   }
 
-  const files: IPartitionedFile[] = [];
-
   for (const [distributionCode, rows] of datasAccount) {
     const fileName = `soa_${distributionCode}.parquet`;
-    const localPath = join(process.cwd(), "src/data-pipeline/datas");
-    const filePath = join(localPath, fileName);
 
-    writeSoaParquet(rows, filePath);
+    const buffer = writeSoaParquetToBuffer(rows);
 
-    files.push({
-      distributionCode,
-      rowCount: rows.length,
-      filePath,
-    });
+    const result = await uploadParquetToS3(fileName, buffer, testMode);
 
-    console.log(`Wrote ${rows.length} rows for account ${distributionCode}`);
+    if (!result.success) {
+      throw new Error(`Failed to upload ${fileName}`);
+    }
+
+    console.log(
+      `Uploaded ${rows.length} rows for ${distributionCode} to ${result.key}`
+    );
   }
 }

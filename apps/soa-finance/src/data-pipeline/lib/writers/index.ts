@@ -1,4 +1,3 @@
-import { writeFileSync } from "node:fs";
 import { tableFromArrays, tableToIPC } from "apache-arrow";
 import {
   Compression,
@@ -8,10 +7,9 @@ import {
 } from "parquet-wasm";
 import type { IStatementOfAccountModel } from "../../../module/utils/types";
 
-export function writeSoaParquet(
-  data: IStatementOfAccountModel[],
-  outputPath: string
-): void {
+export function writeSoaParquetToBuffer(
+  data: IStatementOfAccountModel[]
+): Buffer {
   // Convert to column-oriented format for Arrow
   const columns: Record<string, unknown[]> = {};
 
@@ -46,5 +44,5 @@ export function writeSoaParquet(
 
   // Write Parquet using parquet-wasm
   const buffer = writeParquet(wasmTable, writerProps);
-  writeFileSync(outputPath, Buffer.from(buffer));
+  return Buffer.from(buffer);
 }

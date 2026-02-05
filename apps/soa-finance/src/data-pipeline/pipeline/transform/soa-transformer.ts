@@ -43,7 +43,7 @@ export function transformSoaRow(
     endExpDate: parseDate(row[column.END_EXP_DATE]),
     postDate: parseDate(row[column.POST_DATE]),
     dueDate: parseDate(row[column.DUE_DATE]),
-    aging: Math.floor(aging).toString(),
+    aging,
     currency: parseString(row[column.CURR]),
     exchangeRate,
     endReason: parseString(row[column.END_REASON]),

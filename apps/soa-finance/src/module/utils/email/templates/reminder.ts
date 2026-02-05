@@ -28,16 +28,19 @@ function formatEnDate(date: Date): string {
 
 export async function generateReminderEmailHtml(
   type: string,
-  data: IReminderEmailData
+  data: IReminderEmailData,
+  templateName = "TemplateReminderLetterSOA"
 ): Promise<string> {
-  const template = loadTemplate("TemplateReminderLetterSOA");
+  const template = loadTemplate(templateName);
   const now = new Date();
 
-  let dayDeadline = "19";
-  if (type === "2") {
-    dayDeadline = "25";
+  let dayDeadline = "18";
+  if (type === "1") {
+    dayDeadline = "18";
+  } else if (type === "2") {
+    dayDeadline = "24";
   } else if (type === "3") {
-    dayDeadline = "29";
+    dayDeadline = "28";
   }
 
   const deadlineDateId = `${dayDeadline} ${formatDateIndonesian(now).split(" ").slice(1).join(" ")}`;
@@ -63,7 +66,7 @@ export async function generateReminderEmailHtml(
       : "0.00",
     deadlineDateId,
     deadlineDateEn,
-    signature: getSignature(),
+    ImgSign: getSignature(),
   });
 }
 
@@ -73,11 +76,11 @@ export function getReminderEmailSubject(
 ): string {
   switch (type) {
     case "1":
-      return `[REMINDER I] Tagihan Premi - ${customerName}`;
+      return `1st Reminder Letter - ${customerName}`;
     case "2":
-      return `[REMINDER II - URGENT] Tagihan Premi - ${customerName}`;
+      return `2nd Reminder Letter - ${customerName}`;
     case "3":
-      return `[PERINGATAN TERAKHIR] Tagihan Premi - ${customerName}`;
+      return `Warning Letter - ${customerName}`;
     default:
       return `Tagihan Premi - ${customerName}`;
   }

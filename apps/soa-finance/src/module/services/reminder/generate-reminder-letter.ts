@@ -8,7 +8,14 @@ import {
   insertReminderLetter,
 } from "../../../infrastructure/database/queries";
 import { generateSoaPdfHandler } from "../../handlers";
+import {
+  formatDateEnglish,
+  formatDateIndonesian,
+  formatMonthEnglish,
+  formatMonthIndonesian,
+} from "../../utils/formatter/date";
 import { excelSoaName, reminderPdfName } from "../../utils/formatter/naming";
+import { formatThousands } from "../../utils/formatter/number";
 import {
   generateExcel,
   generateLetterNumber,
@@ -70,27 +77,23 @@ export const generateReminderLetter = async (
 
   // Step 3: Get email recipients
   const _emails = await getAccountEmails(customer.code, branchCode);
-  const toEmail = "gerardus.david@tob-ins.com"; // for development
+  const toEmail = "gerardus.david@tob-ins.com";
 
   const jobId = item.jobId ?? "";
 
   // Step 4: Get SOA data (Phase: GetSoa)
   await insertJobPhase(jobId, SoaPhase.GetSoa);
 
-  const soaList = readSoaParquet(customer.code, branchCode);
+  const soaList = await readSoaParquet(
+    customer.code,
+    branchCode,
+    item.testMode
+  );
 
   await completeJobPhase(jobId, SoaPhase.GetSoa);
   if (soaList.length === 0) {
     return null;
   }
-
-  // Step 5: Compare DC Notes (Paid vs Unpaid)
-  // const existingDcNotes = await getDcNoteIdsByCustomer(customer.code);
-  // const soaDcNotes = soaList.map((s) => s.debitAndCreditNoteNo);
-
-  // const dcNotesPaid = existingDcNotes.filter(
-  //   (dc) => !soaDcNotes.some((soa) => soa.toLowerCase() === dc.toLowerCase()),
-  // );
 
   // Step 5: Compare DC Notes (Paid vs Unpaid)
   const currentParquetDcNotes = soaList.map((s) => s.debitAndCreditNoteNo);
@@ -120,6 +123,15 @@ export const generateReminderLetter = async (
     `DC note status for ${customer.code}: ${dcNotesPaid.length} paid, ${unpaidDcNotes.length} unpaid`
   );
 
+  // Step 5.2: Filter soaList to include only unpaid items
+  // This filter is applied BEFORE generating files,
+  // so Excel and PDF only contain outstanding (unpaid) items.
+  const unpaidItems = soaList.filter((soaItem) =>
+    unpaidDcNotes.some(
+      (dc) => dc.toLowerCase() === soaItem.debitAndCreditNoteNo.toLowerCase()
+    )
+  );
+
   // Step 6: Generate Letter Number
   const letterNo = await generateLetterNumber(
     reminderCount.toString(),
@@ -137,27 +149,63 @@ export const generateReminderLetter = async (
 
   // Step 8: Generate Files (Phase: GeneratingFiles)
   await insertJobPhase(jobId, SoaPhase.GeneratingFiles);
-  const _dateToString = dateNow.toISOString().split("T")[0];
 
+  // Generate Excel with ONLY unpaid items (matches C# logic)
   const excelFile = generateExcel({
-    soaData: soaList,
+    soaData: unpaidItems,
     customerId: customer.code,
   });
 
   const isReminder = reminderCount !== Number(item.processingType);
-
   const pdfFileName = reminderPdfName(reminderCount);
+  const toDate = new Date(item.toDate * 1000);
+
+  // Prepare PDF template data based on whether it's a reminder or initial SOA
+  let pdfTemplateData: Record<string, unknown>;
+
+  if (isReminder) {
+    // For Reminder Letters (RL1, RL2, WL): include all reminder-specific fields
+    const branchName = unpaidItems.length > 0 ? unpaidItems[0].branch : "";
+    const totalPremium = unpaidItems.reduce(
+      (sum, soaItem) => sum + (soaItem.netPremiumIdr || 0),
+      0
+    );
+
+    pdfTemplateData = {
+      AsAtDateId: formatDateIndonesian(toDate),
+      AsAtDateEn: formatDateEnglish(toDate),
+      LetterNo: letterNo,
+      Name: customer.fullName,
+      Branch: branchName,
+      ReminderCount: reminderCount.toString(),
+      TotalPremium: formatThousands(totalPremium),
+      OutstandingMonthId: formatMonthIndonesian(toDate),
+      OutstandingMonthEn: formatMonthEnglish(toDate),
+      LetterNoReff: latestLetter?.letterNo ?? null,
+      SentDateId: latestLetter?.sentDate
+        ? formatDateIndonesian(latestLetter.sentDate)
+        : null,
+      SentDateEn: latestLetter?.sentDate
+        ? formatDateEnglish(latestLetter.sentDate)
+        : null,
+      VirtualNumber: customer.virtualAccount,
+      ImgSign: await getSignature(),
+    };
+  } else {
+    // For initial SOA: use simpler data structure
+    pdfTemplateData = {
+      asAtDate: formatDateIndonesian(toDate),
+      customerName: customer.fullName,
+      virtualAccount: customer.virtualAccount,
+      signature: await getSignature(),
+    };
+  }
 
   const pdfFileBase64 = await generateSoaPdfHandler({
     templateName: isReminder
       ? "TemplateReminderLetterSOA"
       : "TemplateOutstandingStatementOfAccount",
-    data: {
-      asAtDate: item.toDate,
-      customerName: customer.fullName,
-      virtualAccount: customer.virtualAccount,
-      signature: await getSignature(),
-    },
+    data: pdfTemplateData,
     filename: pdfFileName,
   });
 
@@ -198,15 +246,10 @@ export const generateReminderLetter = async (
   // Step 10: Send Email (Phase: SendingEmail)
   await insertJobPhase(jobId, SoaPhase.SendingEmail);
 
-  // Calculate total, branch, etc for Email
-  const branchName = soaList.length > 0 ? soaList[0].branch : "";
-  const unpaidItems = soaList.filter((item) =>
-    unpaidDcNotes.some(
-      (id) => id.toLowerCase() === item.debitAndCreditNoteNo.toLowerCase()
-    )
-  );
+  // Calculate total, branch, etc for Email (using unpaidItems defined in Step 5.2)
+  const branchName = unpaidItems.length > 0 ? unpaidItems[0].branch : "";
   const totalPremium = unpaidItems.reduce(
-    (sum, item) => sum + (item.netPremiumIdr || 0),
+    (sum, soaItem) => sum + (soaItem.netPremiumIdr || 0),
     0
   );
 
@@ -216,12 +259,13 @@ export const generateReminderLetter = async (
     reminderType: reminderCount.toString(),
     letterNo,
     previousLetterNo: latestLetter?.letterNo,
-    previousLetterDate: latestLetter?.sentDate, // Ensure this field exists on latestLetter type
+    previousLetterDate: latestLetter?.sentDate,
     branch: branchName,
     totalPremium,
     excelFile,
     pdfFile,
     testMode: item.testMode,
+    isReminder, // Pass the isReminder flag for template selection
   });
 
   await completeJobPhase(jobId, SoaPhase.SendingEmail);

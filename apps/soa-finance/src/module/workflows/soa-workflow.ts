@@ -126,7 +126,11 @@ export const soaWorkflow = workflow({
 
           // STEP 2e: Jalankan proses yang sesuai
           if (shouldCreateReminder) {
-            await processReminder(ctx, customerData, processingItem);
+            await processReminder({
+              ctx,
+              customerData,
+              params: processingItem,
+            });
           } else {
             await newSoa({
               ctx,

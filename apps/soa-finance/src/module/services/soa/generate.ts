@@ -64,7 +64,7 @@ export const generateSoa = async (
 
   let soaList = await runPhase("read-parquet", async () => {
     console.log(`Getting SOA data for ${customer.code}`);
-    return await readSoaParquet(customer.code, branchCode);
+    return await readSoaParquet(customer.code, branchCode, options.testMode);
   });
 
   // Filter Aging (Outstanding > 60 Days by default)
@@ -76,9 +76,7 @@ export const generateSoa = async (
       );
       return soaList;
     }
-    const filtered = soaList.filter(
-      (soa) => Number.parseInt(soa.aging, 10) >= 60
-    );
+    const filtered = soaList.filter((soa) => soa.aging >= 60);
     console.log(
       `[AgingFilter] ENABLED for ${customer.code}: Filtered ${soaList.length} down to ${filtered.length} SOA records (aging >= 60 days)`
     );

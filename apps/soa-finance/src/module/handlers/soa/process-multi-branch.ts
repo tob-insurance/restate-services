@@ -1,13 +1,24 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
 import { uploadFile } from "../../../infrastructure/azure";
 import { getAllBranches } from "../../../infrastructure/database/queries";
+import { getLatestLetter } from "../../../infrastructure/database/queries/letter-query";
 import { generatePdfWithHeaderFooter } from "../../../infrastructure/gotenberg/gotenberg-client";
 import { createReminder, processBranch } from "../../services";
-import { formatDateIndonesian } from "../../utils/formatter";
+import { createFooter } from "../../utils/email/templates/html/footer";
+import { createHeader } from "../../utils/email/templates/html/header";
+import {
+  formatDateEnglish,
+  formatDateIndonesian,
+  formatMonthEnglish,
+  formatMonthIndonesian,
+} from "../../utils/formatter/date";
 import { letterSoaPdfName } from "../../utils/formatter/naming";
+import { formatThousands } from "../../utils/formatter/number";
 import { getSignature } from "../../utils/generators";
-import { generateHeaderFooter } from "../../utils/generators/pdf/header-footer";
+import { generateLetterNumber } from "../../utils/generators/letter-number";
+import { getFooter, getHeader } from "../../utils/generators/pdf/assets";
 import { renderLiquidToHtml } from "../../utils/generators/pdf/render-template";
+
 import type {
   IAccount,
   ISoaItem,
@@ -45,29 +56,70 @@ export async function processMultiBranchSoa({
         `generate-and-upload-pdf-${branchItem.officeCode}`,
         async () => {
           const isReminder = params.processingType > 1;
-          const pdfHtml = await renderLiquidToHtml(
-            isReminder
-              ? "TemplateReminderLetterSOA"
-              : "TemplateOutstandingStatementOfAccount",
-            {
-              asAtDate: formatDateIndonesian(new Date(params.toDate * 1000)),
+          const toDate = new Date(params.toDate * 1000);
+
+          let templateData: Record<string, unknown> = {};
+
+          if (isReminder) {
+            const reminderCount = (params.processingType - 1).toString();
+            const totalPremiumVal = (branchResult.soaData || []).reduce(
+              (acc: number, item: IStatementOfAccountModel) =>
+                acc + (item.netPremiumIdr || 0),
+              0
+            );
+
+            let letterNoReff = null;
+            let sentDateId = null;
+            let sentDateEn = null;
+
+            if (params.processingType > 2) {
+              const latestLetter = await getLatestLetter(params.jobId);
+              if (latestLetter) {
+                letterNoReff = latestLetter.letterNo;
+                sentDateId = formatDateIndonesian(latestLetter.sentDate);
+                sentDateEn = formatDateEnglish(latestLetter.sentDate);
+              }
+            }
+
+            templateData = {
+              AsAtDateId: formatDateIndonesian(toDate),
+              AsAtDateEn: formatDateEnglish(toDate),
+              LetterNo: await generateLetterNumber(reminderCount, toDate),
+              Name: customerData.fullName,
+              Branch: branchItem.name,
+              ReminderCount: reminderCount,
+              TotalPremium: formatThousands(totalPremiumVal),
+              OutstandingMonthId: formatMonthIndonesian(toDate),
+              OutstandingMonthEn: formatMonthEnglish(toDate),
+              LetterNoReff: letterNoReff,
+              SentDateId: sentDateId,
+              SentDateEn: sentDateEn,
+              VirtualNumber: customerData.virtualAccount,
+              ImgSign: await getSignature(),
+            };
+          } else {
+            templateData = {
+              asAtDate: formatDateIndonesian(toDate),
               customerName: customerData.fullName,
               virtualAccount: customerData.virtualAccount,
               signature: await getSignature(),
-            }
+            };
+          }
+
+          const bodyHtml = await renderLiquidToHtml(
+            isReminder
+              ? "TemplateReminderLetterSOA"
+              : "TemplateOutstandingStatementOfAccount",
+            templateData
           );
 
-          // Generate header and footer HTML
-          const { headerHtml, footerHtml } = await generateHeaderFooter();
+          const headerHtml = createHeader(getHeader());
+          const footerHtml = createFooter(getFooter());
 
           const pdfBuffer = await generatePdfWithHeaderFooter(
-            pdfHtml,
+            bodyHtml,
             headerHtml,
-            footerHtml,
-            {
-              marginLeft: 0.5,
-              marginRight: 0.5,
-            }
+            footerHtml
           );
 
           const pdfFileName = letterSoaPdfName(customerData.code);

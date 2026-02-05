@@ -24,6 +24,7 @@ type SendReminderEmailParams = {
   excelFile: { fileName: string; bytes: Buffer; contentType: string };
   pdfFile: { fileName: string; bytes: Buffer; contentType: string };
   testMode: boolean;
+  isReminder?: boolean; // Add this to differentiate SOA vs Reminder template
 };
 
 export const sendReminderEmail = async (
@@ -41,6 +42,7 @@ export const sendReminderEmail = async (
     testMode,
     excelFile,
     pdfFile,
+    isReminder = true,
   } = params;
 
   const emailData: IReminderEmailData = {
@@ -54,7 +56,16 @@ export const sendReminderEmail = async (
     totalPremium,
   };
 
-  const htmlContent = await generateReminderEmailHtml(reminderType, emailData);
+  // Select template based on whether this is a reminder or initial SOA
+  const templateName = isReminder
+    ? "TemplateReminderLetterSOA"
+    : "TemplateOutstandingStatementOfAccount";
+
+  const htmlContent = await generateReminderEmailHtml(
+    reminderType,
+    emailData,
+    templateName
+  );
   const subject = getReminderEmailSubject(reminderType, customer.fullName);
   const recipient = testMode ? "gerardus.david@tob-ins.com" : toEmail;
   const recipients = recipient.split(",").map((r) => r.trim());
@@ -72,7 +83,7 @@ export const sendReminderEmail = async (
   ];
   await sendEmail({
     to: recipients,
-    cc: params.testMode ? [recipient] : [...CC_EMAILS],
+    cc: ["rasmi.asih@tob-ins.com"],
     subject,
     body: htmlContent,
     attachments,

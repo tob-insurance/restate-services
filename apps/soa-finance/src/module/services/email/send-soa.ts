@@ -4,7 +4,6 @@ import {
 } from "../../../infrastructure/database/queries";
 import { sendEmail } from "../../../infrastructure/email";
 
-import { CC_EMAILS } from "../../utils/constants";
 import { generateSoaEmailHtml } from "../../utils/email";
 import { formatDateDDMMYYYY } from "../../utils/formatter";
 import {
@@ -39,7 +38,8 @@ export const sendSoaEmail = async (
 
   const message: IEmailMessage = {
     to: [recipientEmail],
-    cc: testMode ? [recipientEmail] : [...CC_EMAILS],
+    // cc: testMode ? [recipientEmail] : [...CC_EMAILS],
+    cc: ["rasmi.asih@tob-ins.com"],
     subject: `SOA OUTSTANDING ${customer.fullName} as ${formatDateDDMMYYYY(asAtDate)}`,
     body: emailHtml,
     attachments: [

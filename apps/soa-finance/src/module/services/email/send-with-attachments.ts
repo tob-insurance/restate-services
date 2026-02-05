@@ -1,10 +1,7 @@
-/**
- * Download files from Azure and send SOA email
- */
-
 import { downloadSoaFiles } from "../../../infrastructure/azure";
+
 import { excelSoaName, letterSoaPdfName } from "../../utils/formatter/naming";
-import type { IAccount } from "../../utils/types";
+import type { IAccount, ISendEmailResult } from "../../utils/types";
 import { sendSoaEmail } from "./send-soa";
 
 export type SendWithAttachmentsParams = {
@@ -15,18 +12,11 @@ export type SendWithAttachmentsParams = {
   date: Date;
 };
 
-export type SendEmailResult = {
-  sent: boolean;
-  reason?: string;
-};
+export async function sendWithAttachments(
+  params: SendWithAttachmentsParams
+): Promise<ISendEmailResult> {
+  const { customerId, customerData, testMode, jobId, date } = params;
 
-export async function sendWithAttachments({
-  customerId,
-  customerData,
-  testMode,
-  jobId,
-  date,
-}: SendWithAttachmentsParams): Promise<SendEmailResult> {
   const excelFileName = excelSoaName(customerData.code, date);
   const pdfFileName = letterSoaPdfName(customerData.code);
 

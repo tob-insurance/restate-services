@@ -17,6 +17,21 @@ const INDONESIAN_MONTHS = [
   "Desember",
 ];
 
+const ENGLISH_MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
 export function formatIndonesianDate(date: Date): string {
   const day = date.getDate().toString().padStart(2, "0");
   const month = INDONESIAN_MONTHS[date.getMonth()];
@@ -33,6 +48,18 @@ export function formatDateDDMMYYYY(date: Date): string {
   const month = (date.getMonth() + 1).toString().padStart(2, "0");
   const year = date.getFullYear();
   return `${day}/${month}/${year}`;
+}
+
+export function formatDateEnglish(date: Date): string {
+  return `${date.getDate()} ${ENGLISH_MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+export function formatMonthEnglish(date: Date): string {
+  return `${ENGLISH_MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+export function formatMonthIndonesian(date: Date): string {
+  return `${INDONESIAN_MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }
 
 export function formatTimePeriod(date: Date): string {

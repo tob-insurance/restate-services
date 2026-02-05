@@ -9,5 +9,5 @@ export const excelSoaName = (
   date: Date = new Date()
 ): string => {
   const ticks = date.getTime() * 10_000 + 621_355_968_000_000_000;
-  return `Outstanding-SOA-${customerCode}-${ticks}.xlsx`;
+  return `Outstanding-SOA--${customerCode}-${ticks}.xlsx`;
 };

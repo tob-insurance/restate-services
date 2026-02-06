@@ -1,0 +1,286 @@
+<div lang="en-ID" link="#0563C1" vlink="#954F72" style="padding-top: 40px; word-wrap: break-word; text-align: justify;">
+    <div id="Bahasa_Indonesia">
+		<table  width="100%" cellpadding="0" cellspacing="0" border="0">
+			<tr>
+				<td style="text-align: left; width: 50%;">
+					Jakarta, {{ AsAtDateId }}
+				</td>
+				<td style="text-align: right; width: 50%;">
+					No: {{ LetterNo }}
+				</td>
+			</tr>
+		</table>
+        <p>
+            {{ Name }},
+            <br/>
+            {{ Branch }}
+        </p>
+        <p>
+            {% case ReminderCount %}
+                {% when "1" %}
+                    <strong>Hal : Surat Penagihan Premi</strong>
+                {% when "2" %}
+                    <strong>Hal : Surat Penagihan Premi Ke 2</strong>
+                {% when "3" %}
+                    <strong>Hal : Surat Penagihan Premi Ke 3</strong>
+            {% endcase %}
+        </p>
+        <p>
+            Dengan hormat, 
+        </p>
+
+        <p>
+            Sebelumnya kami mengucapkan terima kasih atas kepercayaan dan kerjasama yang telah terjalin selama ini antara {{ Name }} dengan PT. ASURANSI TOTAL BERSAMA. 
+        </p>
+        {% case ReminderCount %}
+            {% when "1" %}
+                <p>
+                    Berdasarkan catatan kami per tanggal {{ AsAtDateId }}, kami ingin menginformasikan bahwa saldo premi sudah terhutang selama lebih dari 60 hari, sebagai berikut:
+                </p>
+
+                <p style="text-align: center; margin: 0;">
+                    <strong>Total Tagihan Premi : IDR {{ TotalPremium }} (detail terlampir) </strong>
+                </p>
+
+                <p>
+                    Mengingat pertanggungan polis telah berjalan lebih dari 60 hari, maka kami mengharapkan pembayaran dapat dilakukan sebelum tanggal
+                    <strong>
+                        19 {{ OutstandingMonthId }}
+                    </strong>
+                </p>
+            {% when "2" %}
+                <p>
+					Melanjutkan surat tagihan premi ke-1 reff no {{ LetterNoReff }} tanggal {{ SentDateId }} perihal saldo terhutang lebih dari 60 hari,
+					kami informasikan kembali bahwa per tanggal {{ AsAtDateId }} {{ Name }} masih terdapat saldo premi terhutang, sebagai berikut:
+				</p>
+
+                <p style="text-align: center; margin: 0;">
+                    <strong>Total Tagihan Premi : IDR {{ TotalPremium }} (detail terlampir) </strong>
+                </p>
+
+                <p>
+                    Mengingat pertanggungan polis telah berjalan lebih dari 60 hari, maka kami mengharapkan perhatian dan kerjasama Bp/Ibu agar pembayaran dapat dilakukan sebelum tanggal
+                    <strong>25 {{ OutstandingMonthId }}</strong>
+                </p>
+            {% when "3" %}
+                <p>
+					Melanjutkan surat tagihan premi ke-2 reff no {{ LetterNoReff }} tanggal {{ SentDateId }} perihal saldo terhutang lebih dari 60 hari,
+					kami informasikan kembali bahwa per tanggal {{ AsAtDateId }} {{ Name }} masih terdapat saldo premi terhutang, sebagai berikut:
+				</p>
+
+                <p style="text-align: center; margin: 0;">
+                    <strong>Total Tagihan Premi : IDR {{ TotalPremium }} (detail terlampir) </strong>
+                </p>
+
+                <p>
+                    Mengingat pertanggungan polis telah berjalan lebih dari 60 hari, maka kami mengharapkan perhatian dan kerjasama Bp/Ibu agar pembayaran dapat dilakukan sebelum tanggal
+                    <strong>29 {{ OutstandingMonthId }}</strong>
+                </p>
+                <p>
+                    Apabila sampai dengan tanggal tersebut belum kami terima pembayarannya, maka dengan berat hati kami akan membatalkan pertanggungan atas polis tersebut secara prorate
+                    dan premi prorate tetap akan kami tagihkan kembali.
+                    <strong>Jika terjadi risiko atas pertanggungan polis ini, maka kami tidak berkewajiban untuk menanggung risiko tersebut.</strong>
+                </p>
+        {% endcase %}
+        <p>
+            Premi dapat dibayarkan ke :
+        </p>
+        <table style="width:auto; border-collapse: collapse;">
+            <tr>
+                <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">1. No Rekening</td>
+                <td style="vertical-align: top;">:</td>
+                <td style="vertical-align: top;">879-209-1333</td>
+            </tr>
+            <tr>
+                <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">&nbsp;&nbsp;&nbsp; Nama Rekening</td>
+                <td style="vertical-align: top;">:</td>
+                <td style="vertical-align: top;">PT. ASURANSI TOTAL BERSAMA</td>
+            </tr>
+            <tr>
+                <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">&nbsp;&nbsp;&nbsp; Bank</td>
+                <td style="vertical-align: top;">:</td>
+                <td style="vertical-align: top;">BCA Cab. WTC Mangga Dua</td>
+            </tr>
+            <tr>
+                <td>
+                    <br />
+                </td>
+            </tr>
+            
+            <tr>
+                <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">2. No Rekening</td>
+                <td style="vertical-align: top;">:</td>
+                <td style="vertical-align: top;">120-00-3288888-0 (MANDIRI IDR)</td>
+            </tr>
+            <tr>
+                <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">&nbsp;&nbsp;&nbsp; Nama Rekening</td>
+                <td style="vertical-align: top;">:</td>
+                <td style="vertical-align: top;">PT. ASURANSI TOTAL BERSAMA</td>
+            </tr>
+            <tr>
+                <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">&nbsp;&nbsp;&nbsp; Bank</td>
+                <td style="vertical-align: top;">:</td>
+                <td style="vertical-align: top;">Mandiri Cab Sunter Permai</td>
+            </tr>
+        </table>
+        <p>
+            Apabila terdapat pertanyaan, mohon untuk menghubungi kami melalui telepon (021) 3971-7273 atau melalui email ke finance@tob-ins.com. 
+        </p>
+
+        <p>
+            Jika tagihan tersebut telah dibayarkan sebelum surat ini diterima, mohon untuk menginformasikannya kepada kami dan abaikan surat tagihan ini.
+        </p>
+
+        <p>
+            Demikian kami sampaikan, atas perhatian dan kerjasamanya kami ucapkan terima kasih. 
+        </p>
+
+        <p>
+            Hormat kami,
+        </p>
+		<img src="{{ImgSign}}" style="width:100px;height:auto" />
+        <p>
+            Finance Dept.
+        </p>
+    </div>
+    <div id="Bahasa_Inggris" style="padding-top: 50px; page-break-before: always;">
+		<table  width="100%" cellpadding="0" cellspacing="0" border="0">
+			<tr>
+				<td style="text-align: left; width: 50%;">
+					Jakarta, {{ AsAtDateEn }}
+				</td>
+				<td style="text-align: right; width: 50%;">
+					No: {{ LetterNo }}
+				</td>
+			</tr>
+		</table>
+		<p>
+			{{ Name }},
+			<br/>
+			{{ Branch }}
+		</p>
+        <p>
+            {% case ReminderCount %}
+                {% when "1" %}
+                    <strong>RE : 1st Reminder Letter </strong>
+                {% when "2" %}
+                    <strong>RE : 2nd Reminder Letter </strong>
+                {% when "3" %}
+                    <strong>RE : 3rd Reminder Letter </strong>
+            {% endcase %}
+        </p>
+        <p>
+            Dear Sir & Madam,
+        </p>
+
+        <p>
+            Firstly, we would like to thank you for your trust & cooperation of {{ Name }} to PT. ASURANSI TOTAL BERSAMA. 
+        </p>
+        {% case ReminderCount %}
+            {% when "1" %}
+                <p>
+                    Based on our records, we would like to inform you that the premium outstanding balance overdue 60 days as of {{ AsAtDateEn }}, are as follows:
+                </p>
+
+                <p style="text-align: center; margin: 0;">
+                    <strong>Total Premium : IDR {{ TotalPremium }} (details attached) </strong>
+                </p>
+
+                <p>
+                    We highly appreciate your attention & cooperation to inform the client to resolve the above outstandings immediately before
+                    <strong>19 {{ OutstandingMonthEn }}</strong>
+                </p>
+            {% when "2" %}
+                <p>
+                    Referring to our first reminder letter No. {{ LetterNoReff }} dated {{ SentDateEn }} regarding the premium outstanding overdue 60 days as of
+                    {{ AsAtDateEn }}, we would like to remind you that we have not yet received the remittance for the outstanding balance, as follows:
+                </p>
+
+                <p style="text-align: center; margin: 0;">
+                    <strong>Total Premium : IDR {{ TotalPremium }} (details attached) </strong>
+                </p>
+
+                <p>
+                    We highly appreciate your attention & cooperation to inform the client to resolve the above outstandings immediately before
+                    <strong>25 {{ OutstandingMonthEn }}</strong>
+                </p>
+            {% when "3" %}
+                <p>
+                    Referring to our second reminder letter No. {{ LetterNoReff }} dated {{ SentDate }} regarding the premium outstanding overdue 60 days as of
+                    {{ AsAtDateEn }}, we would like to remind you that we have not yet received the remittance for the outstanding balance, as follows:
+                </p>
+
+                <p style="text-align: center; margin: 0;">
+                    <strong>Total Premium : IDR {{ TotalPremium }} (details attached) </strong>
+                </p>
+
+                <p>
+                    We highly appreciate your attention & cooperation to inform the client to resolve the above outstandings immediately before
+                    <strong>29 {{ OutstandingMonthEn }}</strong>
+                </p>
+                <p>
+                    Please be advised that if we do not receive the payment by the deadline, we regret to inform you that the claim process for 
+                    {{ Name }} will be put on hold without further notice.
+                </p>
+        {% endcase %}
+        <p>
+            Premium can be paid to :
+        </p>
+        <table style="width:auto; border-collapse: collapse;">
+            <tr>
+                <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">1. Account No</td>
+                <td style="vertical-align: top;">:</td>
+                <td style="vertical-align: top;">879-209-1333</td>
+            </tr>
+            <tr>
+                <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">&nbsp;&nbsp;&nbsp; Account Name</td>
+                <td style="vertical-align: top;">:</td>
+                <td style="vertical-align: top;">PT. ASURANSI TOTAL BERSAMA</td>
+            </tr>
+            <tr>
+                <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">&nbsp;&nbsp;&nbsp; Bank</td>
+                <td style="vertical-align: top;">:</td>
+                <td style="vertical-align: top;">BCA Cab. WTC Mangga Dua</td>
+            </tr>
+            <tr>
+                <td>
+                    <br />
+                </td>
+            </tr>
+            <tr>
+                <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">2. Account No</td>
+                <td style="vertical-align: top;">:</td>
+                <td style="vertical-align: top;">120-00-3288888-0 (MANDIRI IDR)</td>
+            </tr>
+            <tr>
+                <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">&nbsp;&nbsp;&nbsp; Account Name</td>
+                <td style="vertical-align: top;">:</td>
+                <td style="vertical-align: top;">PT. ASURANSI TOTAL BERSAMA</td>
+            </tr>
+            <tr>
+                <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">&nbsp;&nbsp;&nbsp; Bank</td>
+                <td style="vertical-align: top;">:</td>
+                <td style="vertical-align: top;">Mandiri Cab Sunter Permai</td>
+            </tr>
+        </table>
+        <p>
+            Should you have any questions, please do not hesitate to contact us by phone at (021) 3971-7273 or via email at finance@tob-ins.com.
+        </p>
+
+        <p>
+            If the outstanding amount has already been paid prior to receiving this letter, please notify us and kindly disregard this.
+        </p>
+
+        <p>
+            Thank you for your attention.
+        </p>
+
+        <p>
+            Warmest regards,
+        </p>
+		<img src="{{ImgSign}}" style="width:100px;height:auto" />
+        <p>
+            Finance Dept.
+        </p>
+    </div>
+</div>

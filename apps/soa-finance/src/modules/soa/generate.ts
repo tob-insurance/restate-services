@@ -1,6 +1,6 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
 
-import { readSoaParquet } from "../../data-pipeline/lib";
+import { readSoaParquet } from "../../pipeline/lib";
 import { uploadFile } from "../../infrastructure/azure";
 import {
   getDcNoteIdsByCustomer,
@@ -8,8 +8,8 @@ import {
   insertJobPhase,
 } from "../../database";
 
-import { excelSoaName } from "../../module/utils/formatter/naming";
-import { generateExcel } from "../../module/utils/generators";
+import { excelSoaName } from "../../utils/formatter";
+import { generateExcel } from "../../utils/generators";
 import {
   type IStatementOfAccountModel,
   type IAccount,

@@ -13,12 +13,12 @@ import {
 } from "../../modules";
 
 import type { ISoaItem } from "../../types";
-import { processReminder } from "../handlers";
 import {
+  processReminder,
   completeWorkflow,
   handleErrorWithRetry,
   newSoa,
-} from "../../module/handlers";
+} from "../handlers";
 
 interface ISoaWorkflowResult {
   customerId: string;

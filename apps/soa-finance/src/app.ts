@@ -1,6 +1,5 @@
 import { serve } from "@restatedev/restate-sdk";
-import { batchWorkflow } from "./module/workflows/batch-workflow";
-import { soaWorkflow } from "./module/workflows/soa-workflow";
+import { batchWorkflow, soaWorkflow } from "./engine";
 
 serve({
   services: [soaWorkflow, batchWorkflow],

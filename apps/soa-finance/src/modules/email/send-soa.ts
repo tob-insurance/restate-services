@@ -1,7 +1,7 @@
 import { completeJobPhase, insertJobPhase } from "../../database";
 import { sendEmail } from "../../infrastructure/email";
 
-import { generateSoaEmailHtml } from "../../module/utils/email";
+import { generateSoaEmailHtml } from "../../utils/email";
 import { formatDateDDMMYYYY } from "../../utils";
 import {
   type IAccount,

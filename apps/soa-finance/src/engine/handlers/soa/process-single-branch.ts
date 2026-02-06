@@ -3,23 +3,22 @@ import { uploadFile } from "../../../infrastructure/azure";
 import { getLatestLetter } from "../../../database";
 import { generatePdfWithHeaderFooter } from "../../../infrastructure/gotenberg/gotenberg-client";
 import { createReminder, processBranch } from "../../../modules";
-import { createFooter } from "../../../module/utils/email/templates/html/footer";
-import { createHeader } from "../../../module/utils/email/templates/html/header";
+import { createFooter, createHeader } from "../../../utils/email";
 import {
   formatDateEnglish,
   formatDateIndonesian,
   formatMonthEnglish,
   formatMonthIndonesian,
-} from "../../../module/utils/formatter/date";
-import { letterSoaPdfName } from "../../../module/utils/formatter/naming";
-import { formatThousands } from "../../../module/utils/formatter/number";
-import { getSignature } from "../../../module/utils/generators";
-import { generateLetterNumber } from "../../../module/utils/generators/letter-number";
+  letterSoaPdfName,
+  formatThousands,
+} from "../../../utils/formatter";
 import {
+  getSignature,
+  generateLetterNumber,
   getFooter,
   getHeader,
-} from "../../../module/utils/generators/pdf/assets";
-import { renderLiquidToHtml } from "../../../module/utils/generators/pdf/render-template";
+  renderLiquidToHtml,
+} from "../../../utils/generators";
 
 import type {
   IAccount,

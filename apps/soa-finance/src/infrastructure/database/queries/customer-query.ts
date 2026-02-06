@@ -1,4 +1,4 @@
-import type { IAccount } from "../../../module/utils/types";
+import type { IAccount } from "../../../types";
 import { executeQuery } from "../database";
 
 export const getAllAccounts = async () => {
@@ -19,7 +19,7 @@ export const getAllAccounts = async () => {
 };
 
 export const getAccountById = async (
-  customerId: string
+  customerId: string,
 ): Promise<IAccount | null> => {
   const query = `
     SELECT 
@@ -42,7 +42,7 @@ type EmailRow = { EMAIL: string };
 
 export const getAccountEmails = async (
   cmCode: string,
-  officeCode?: string | null
+  officeCode?: string | null,
 ): Promise<string[]> => {
   let query = `
     SELECT DISTINCT EMAIL 

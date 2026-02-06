@@ -8,7 +8,7 @@ import {
 import type { IStatementOfAccountModel } from "../../types";
 
 export function writeSoaParquetToBuffer(
-  data: IStatementOfAccountModel[],
+  data: IStatementOfAccountModel[]
 ): Buffer {
   // Convert to column-oriented format for Arrow
   const columns: Record<string, unknown[]> = {};
@@ -25,7 +25,7 @@ export function writeSoaParquetToBuffer(
         const value = row[key as keyof IStatementOfAccountModel];
         // Convert aging to number
         columns[key].push(
-          key === "aging" ? Number.parseInt(value as string, 10) : value,
+          key === "aging" ? Number.parseInt(value as string, 10) : value
         );
       }
     }

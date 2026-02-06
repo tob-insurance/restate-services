@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const TEMPLATES_DIR = join(__dirname, "../../../assets/email/templates");
+
 import { formatDateIndonesian } from "../../formatter";
 import { renderTemplate } from "../../template";
 
@@ -26,7 +27,7 @@ function loadTemplate(name: string): string {
 }
 
 export async function generateSoaEmailHtml(
-  data: SoaEmailData,
+  data: SoaEmailData
 ): Promise<string> {
   const template = loadTemplate("TemplateOutstandingStatementOfAccount");
   return await renderTemplate(template, {

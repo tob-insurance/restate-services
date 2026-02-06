@@ -22,7 +22,7 @@ export async function generateSoaPdfHandler(params: {
   const pdfBuffer = await generatePdfWithHeaderFooter(
     html,
     headerHtml,
-    footerHtml,
+    footerHtml
   );
 
   return {

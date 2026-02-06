@@ -38,7 +38,7 @@ export const initOracleClient = () => {
 export async function executeQuery(
   sql: string,
   binds: BindParameters = {},
-  options: ExecuteOptions = {},
+  options: ExecuteOptions = {}
 ) {
   await initOracleClient();
 
@@ -57,7 +57,7 @@ export async function executeQuery(
 export async function executeMany(
   sql: string,
   binds: BindParameters[],
-  options: ExecuteOptions = {},
+  options: ExecuteOptions = {}
 ) {
   await initOracleClient();
 
@@ -75,7 +75,7 @@ export async function executeMany(
 
 export async function executeProcedure(
   procedureName: string,
-  binds: BindParameters = {},
+  binds: BindParameters = {}
 ) {
   await initOracleClient();
   const connection = await oracledb.getConnection("default");
@@ -94,7 +94,7 @@ export async function executeProcedure(
 
     const result = await connection.execute(
       `BEGIN ${procedureName}(:p_office, :p_class, :p_dc_account_code, :p_dc_account_name, :p_as_at_date, :p_userid, :p_cursor, :p_status, :p_error_message); END;`,
-      bindParams,
+      bindParams
     );
 
     const outBinds = result.outBinds as ProcedureOutBinds;
@@ -118,7 +118,7 @@ export async function executeProcedure(
     if (rows.length > 0) {
       console.log(
         "StoredProcedure First row sample:",
-        JSON.stringify(rows[0], null, 2),
+        JSON.stringify(rows[0], null, 2)
       );
     }
 

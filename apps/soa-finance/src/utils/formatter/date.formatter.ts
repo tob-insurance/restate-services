@@ -104,3 +104,41 @@ export function parseDate(value: unknown): string {
 
   return `${month}/${day}/${year}`;
 }
+
+export function calculateWaitUntilDay(
+  targetDay: number,
+  targetHour = 7,
+  targetMinute = 0,
+  fromDate: Date = new Date()
+): number {
+  const now = fromDate;
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+
+  // 1. Tentukan target date pada bulan berjalan
+  let targetDate = new Date(
+    currentYear,
+    currentMonth,
+    targetDay,
+    targetHour,
+    targetMinute,
+    0,
+    0
+  );
+
+  // 2. Jika waktu sekarang sudah melewati target di bulan ini, jadwalkan untuk bulan depan
+  if (now.getTime() >= targetDate.getTime()) {
+    targetDate = new Date(
+      currentYear,
+      currentMonth + 1,
+      targetDay,
+      targetHour,
+      targetMinute,
+      0,
+      0
+    );
+  }
+
+  const waitTime = targetDate.getTime() - now.getTime();
+  return Math.max(0, waitTime);
+}

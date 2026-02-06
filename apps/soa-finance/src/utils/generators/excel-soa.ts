@@ -8,7 +8,7 @@ type GenerateSoaExcelParams = {
 };
 
 function groupAndAggregateSoa(
-  soaData: IStatementOfAccountModel[],
+  soaData: IStatementOfAccountModel[]
 ): IStatementOfAccountModel[] {
   if (soaData.length === 0) {
     return [];
@@ -72,7 +72,7 @@ function groupAndAggregateSoa(
  * Sorts SOA data by PolicyNo, PolicyEndNo, and Installment.
  */
 function sortSoaData(
-  soaData: IStatementOfAccountModel[],
+  soaData: IStatementOfAccountModel[]
 ): IStatementOfAccountModel[] {
   return [...soaData].sort((a, b) => {
     // Sort by PolicyNo

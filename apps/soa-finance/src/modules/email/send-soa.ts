@@ -1,14 +1,13 @@
 import { completeJobPhase, insertJobPhase } from "../../database";
 import { sendEmail } from "../../infrastructure/email";
-
-import { generateSoaEmailHtml } from "../../utils/email";
-import { formatDateDDMMYYYY } from "../../utils";
 import {
   type IAccount,
   type IEmailMessage,
   type IFileData,
   SoaPhase,
 } from "../../types";
+import { formatDateDDMMYYYY } from "../../utils";
+import { generateSoaEmailHtml } from "../../utils/email";
 
 type SendSoaEmailOptions = {
   customer: IAccount;
@@ -20,7 +19,7 @@ type SendSoaEmailOptions = {
 };
 
 export const sendSoaEmail = async (
-  options: SendSoaEmailOptions,
+  options: SendSoaEmailOptions
 ): Promise<boolean> => {
   const { customer, toEmail, excelFile, pdfFile, testMode, jobId } = options;
   const asAtDate = new Date();

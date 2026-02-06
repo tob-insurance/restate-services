@@ -8,7 +8,7 @@ export type JobInfo = {
 
 export async function ensureJobExists(
   batchId: string,
-  customerId: string,
+  customerId: string
 ): Promise<JobInfo> {
   const existingJob = await getJobByBatchAndCustomer(batchId, customerId);
 

@@ -7,7 +7,7 @@ type WorksheetType = ReturnType<typeof utils.aoa_to_sheet>;
 function applyNumberFormats(
   worksheet: WorksheetType,
   columns: IExcelColumn[],
-  rowCount: number,
+  rowCount: number
 ): void {
   for (let rowIdx = 1; rowIdx < rowCount; rowIdx += 1) {
     for (let colIdx = 0; colIdx < columns.length; colIdx += 1) {
@@ -25,7 +25,7 @@ function applyNumberFormats(
 function createWorksheet(sheet: IExcelSheetData): WorksheetType {
   const headers = sheet.columns.map((col) => col.header);
   const dataRows = sheet.rows.map((row) =>
-    sheet.columns.map((col) => row[col.key] ?? ""),
+    sheet.columns.map((col) => row[col.key] ?? "")
   );
 
   const worksheetData = [headers, ...dataRows];

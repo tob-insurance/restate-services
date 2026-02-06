@@ -11,13 +11,13 @@ type ProcessReminderParams = {
 };
 
 export async function processReminder(
-  parameters: ProcessReminderParams,
+  parameters: ProcessReminderParams
 ): Promise<void> {
   const { ctx, customerData, params } = parameters;
 
   const branchesForReminder = await ctx.run(
     "get-branches-for-reminder",
-    async () => await getAllBranches(),
+    async () => await getAllBranches()
   );
 
   await processReminderLetter({

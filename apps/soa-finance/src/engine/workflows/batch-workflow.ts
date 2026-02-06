@@ -3,13 +3,12 @@ import { RestatePromise, workflow } from "@restatedev/restate-sdk";
 import { v4 as uuidv4 } from "uuid";
 
 import { getAllAccounts, insertBatch, updateBatchStatus } from "../../database";
+import type { IAccount, SoaType, soaSchema } from "../../types";
 import {
   formatDateToUnixTimestamp,
   formatTimePeriod,
   formatUUID,
 } from "../../utils";
-
-import type { IAccount, SoaType, soaSchema } from "../../types";
 import { type SoaWorkflow, soaWorkflow } from "./soa-workflow";
 
 const POST_COMPLETION_DELAY = 60_000;
@@ -60,7 +59,7 @@ export const batchWorkflow = workflow({
   handlers: {
     run: async (
       ctx: WorkflowContext,
-      soaRequest: soaSchema,
+      soaRequest: soaSchema
     ): Promise<IBatchWorkflowResult> => {
       // STEP 1: Inisialisasi Parameter Tanggal
       const processingDates = await ctx.run("initialize-dates", () => {
@@ -91,7 +90,7 @@ export const batchWorkflow = workflow({
             throw new Error("Tidak ada akun customer yang ditemukan");
           }
           return accounts;
-        },
+        }
       );
 
       const totalAccounts = accountsToProcess.length;
@@ -169,7 +168,7 @@ export const batchWorkflow = workflow({
       while (workerPool.size > 0) {
         // Tunggu salah satu worker selesai
         const completedAccountId = await RestatePromise.race(
-          Array.from(workerPool.values()).map((slot) => slot.promise),
+          Array.from(workerPool.values()).map((slot) => slot.promise)
         );
 
         // Hapus dari pool dan update counter
@@ -179,7 +178,7 @@ export const batchWorkflow = workflow({
         // Log progress setiap N akun
         if (processedAccountCount % PROGRESS_LOG_INTERVAL === 0) {
           ctx.console.log(
-            `[Batch] Progress: ${processedAccountCount}/${totalAccounts}`,
+            `[Batch] Progress: ${processedAccountCount}/${totalAccounts}`
           );
         }
 
@@ -199,7 +198,7 @@ export const batchWorkflow = workflow({
       });
 
       ctx.console.log(
-        `${batchId} selesai, proses: ${processedAccountCount} akun`,
+        `${batchId} selesai, proses: ${processedAccountCount} akun`
       );
 
       // STEP 7: Return Hasil Batch

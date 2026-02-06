@@ -35,7 +35,7 @@ export async function newSoa(parameters: newSoaParams): Promise<void> {
         testMode: params.testMode,
         jobId,
         date: dateNow,
-      }),
+      })
   );
 
   await runReminderSchedule({ ctx, customerData, params });

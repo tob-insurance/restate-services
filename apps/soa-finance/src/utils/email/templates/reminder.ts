@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { IReminderEmailData } from "../../../types";
 import { formatDateIndonesian } from "../../formatter";
 import { getSignature } from "../../generators";
 import { renderTemplate } from "../../template";
-import type { IReminderEmailData } from "../../../types";
 
 const TEMPLATES_DIR = join(__dirname, "../../../assets/email/templates");
 
@@ -29,7 +29,7 @@ function formatEnDate(date: Date): string {
 export async function generateReminderEmailHtml(
   type: string,
   data: IReminderEmailData,
-  templateName = "TemplateReminderLetterSOA",
+  templateName = "TemplateReminderLetterSOA"
 ): Promise<string> {
   const template = loadTemplate(templateName);
   const now = new Date();
@@ -72,7 +72,7 @@ export async function generateReminderEmailHtml(
 
 export function getReminderEmailSubject(
   type: string,
-  customerName: string,
+  customerName: string
 ): string {
   switch (type) {
     case "1":

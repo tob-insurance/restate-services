@@ -1,30 +1,29 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
-import { uploadFile } from "../../../infrastructure/azure";
 import { getAllBranches, getLatestLetter } from "../../../database";
+import { uploadFile } from "../../../infrastructure/azure";
 import { generatePdfWithHeaderFooter } from "../../../infrastructure/gotenberg/gotenberg-client";
 import { createReminder, processBranch } from "../../../modules";
+import type {
+  IAccount,
+  ISoaItem,
+  IStatementOfAccountModel,
+} from "../../../types";
 import { createFooter, createHeader } from "../../../utils/email";
 import {
   formatDateEnglish,
   formatDateIndonesian,
   formatMonthEnglish,
   formatMonthIndonesian,
-  letterSoaPdfName,
   formatThousands,
+  letterSoaPdfName,
 } from "../../../utils/formatter";
 import {
-  getSignature,
   generateLetterNumber,
   getFooter,
   getHeader,
+  getSignature,
   renderLiquidToHtml,
 } from "../../../utils/generators";
-
-import type {
-  IAccount,
-  ISoaItem,
-  IStatementOfAccountModel,
-} from "../../../types";
 
 export type ProcessSoaParams = {
   ctx: WorkflowContext;
@@ -39,7 +38,7 @@ export async function processMultiBranchSoa({
 }: ProcessSoaParams): Promise<void> {
   const branches = await ctx.run(
     "get-branches",
-    async () => await getAllBranches(),
+    async () => await getAllBranches()
   );
 
   ctx.console.log(`Processing ${branches.length} branches`);
@@ -49,7 +48,7 @@ export async function processMultiBranchSoa({
       ctx,
       branchItem.officeCode,
       customerData,
-      params,
+      params
     );
 
     if (branchResult.soaData && branchResult.soaData.length > 0) {
@@ -66,7 +65,7 @@ export async function processMultiBranchSoa({
             const totalPremiumVal = (branchResult.soaData || []).reduce(
               (acc: number, item: IStatementOfAccountModel) =>
                 acc + (item.netPremiumIdr || 0),
-              0,
+              0
             );
 
             let letterNoReff = null;
@@ -111,7 +110,7 @@ export async function processMultiBranchSoa({
             isReminder
               ? "TemplateReminderLetterSOA"
               : "TemplateOutstandingStatementOfAccount",
-            templateData,
+            templateData
           );
 
           const headerHtml = createHeader(getHeader());
@@ -120,7 +119,7 @@ export async function processMultiBranchSoa({
           const pdfBuffer = await generatePdfWithHeaderFooter(
             bodyHtml,
             headerHtml,
-            footerHtml,
+            footerHtml
           );
 
           const pdfFileName = letterSoaPdfName(customerData.code);
@@ -132,9 +131,9 @@ export async function processMultiBranchSoa({
               contentType: "application/pdf",
             },
             customerData.code,
-            "pdf",
+            "pdf"
           );
-        },
+        }
       );
 
       await createReminder({

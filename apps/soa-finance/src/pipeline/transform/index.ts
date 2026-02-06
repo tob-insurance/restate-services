@@ -2,7 +2,7 @@ import type { IStatementOfAccountModel } from "../../types";
 import { transformSoaRow } from "./soa-transformer";
 
 export async function* transformSoaStream(
-  source: AsyncIterable<unknown[]>,
+  source: AsyncIterable<unknown[]>
 ): AsyncGenerator<IStatementOfAccountModel, void, unknown> {
   for await (const row of source) {
     const model = transformSoaRow(row);

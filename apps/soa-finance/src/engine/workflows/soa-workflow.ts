@@ -14,10 +14,10 @@ import {
 
 import type { ISoaItem } from "../../types";
 import {
-  processReminder,
   completeWorkflow,
   handleErrorWithRetry,
   newSoa,
+  processReminder,
 } from "../handlers";
 
 interface ISoaWorkflowResult {
@@ -68,7 +68,7 @@ export const soaWorkflow = workflow({
   handlers: {
     run: async (
       ctx: WorkflowContext,
-      soaParams: ISoaItem,
+      soaParams: ISoaItem
     ): Promise<ISoaWorkflowResult> => {
       const { customerId, batchId, timePeriod, maxRetries, processingType } =
         soaParams;
@@ -77,7 +77,7 @@ export const soaWorkflow = workflow({
 
       const { jobId, retryAttempt } = await ctx.run(
         "get-or-create-job",
-        async () => await ensureJobExists(batchId, customerId),
+        async () => await ensureJobExists(batchId, customerId)
       );
 
       const processingItem: ISoaItem = {
@@ -99,7 +99,7 @@ export const soaWorkflow = workflow({
           // STEP 2b: Ambil data customer
           const customerData = await ctx.run(
             "get-customer-data",
-            async () => await getCustomerData(jobId, customerId),
+            async () => await getCustomerData(jobId, customerId)
           );
 
           if (!customerData) {
@@ -112,15 +112,15 @@ export const soaWorkflow = workflow({
             async () =>
               await getReminderByCustomerAndPeriod(
                 customerData.code,
-                timePeriod,
-              ),
+                timePeriod
+              )
           );
 
           // STEP 2d: Tentukan tipe proses
           const hasExistingReminder = existingReminders.length > 0;
           const shouldCreateReminder = shouldProcessReminder(
             hasExistingReminder,
-            processingType,
+            processingType
           );
 
           // STEP 2e: Jalankan proses yang sesuai

@@ -1,30 +1,29 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
-import { uploadFile } from "../../../infrastructure/azure";
 import { getLatestLetter } from "../../../database";
+import { uploadFile } from "../../../infrastructure/azure";
 import { generatePdfWithHeaderFooter } from "../../../infrastructure/gotenberg/gotenberg-client";
 import { createReminder, processBranch } from "../../../modules";
+import type {
+  IAccount,
+  ISoaItem,
+  IStatementOfAccountModel,
+} from "../../../types";
 import { createFooter, createHeader } from "../../../utils/email";
 import {
   formatDateEnglish,
   formatDateIndonesian,
   formatMonthEnglish,
   formatMonthIndonesian,
-  letterSoaPdfName,
   formatThousands,
+  letterSoaPdfName,
 } from "../../../utils/formatter";
 import {
-  getSignature,
   generateLetterNumber,
   getFooter,
   getHeader,
+  getSignature,
   renderLiquidToHtml,
 } from "../../../utils/generators";
-
-import type {
-  IAccount,
-  ISoaItem,
-  IStatementOfAccountModel,
-} from "../../../types";
 
 export type ProcessSoaParams = {
   ctx: WorkflowContext;
@@ -41,7 +40,7 @@ export async function processSingleBranchSoa({
     ctx,
     params.branch,
     customerData,
-    params,
+    params
   );
 
   if (singleResult.soaData && singleResult.soaData.length > 0) {
@@ -56,7 +55,7 @@ export async function processSingleBranchSoa({
         const totalPremiumVal = (singleResult.soaData || []).reduce(
           (acc: number, item: IStatementOfAccountModel) =>
             acc + (item.netPremiumIdr || 0),
-          0,
+          0
         );
 
         let letterNoReff = null;
@@ -101,7 +100,7 @@ export async function processSingleBranchSoa({
         isReminder
           ? "TemplateReminderLetterSOA"
           : "TemplateOutstandingStatementOfAccount",
-        bodyValue,
+        bodyValue
       );
 
       const headerHtml = createHeader(getHeader());
@@ -110,7 +109,7 @@ export async function processSingleBranchSoa({
       const pdfBuffer = await generatePdfWithHeaderFooter(
         bodyHtml,
         headerHtml,
-        footerHtml,
+        footerHtml
       );
 
       const pdfFileName = letterSoaPdfName(customerData.code);
@@ -122,7 +121,7 @@ export async function processSingleBranchSoa({
           contentType: "application/pdf",
         },
         customerData.code,
-        "pdf",
+        "pdf"
       );
     });
 

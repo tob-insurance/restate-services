@@ -1,10 +1,10 @@
 import { uploadParquetToS3 } from "../../infrastructure/storage/s3/s3-uploader";
-import { writeSoaParquetToBuffer } from "../lib";
 import type { IStatementOfAccountModel } from "../../types";
+import { writeSoaParquetToBuffer } from "../lib";
 
 export async function writeToParquet(
   source: AsyncIterable<IStatementOfAccountModel>,
-  testMode?: boolean,
+  testMode?: boolean
 ) {
   const datasAccount = new Map<string, IStatementOfAccountModel[]>();
 
@@ -30,7 +30,7 @@ export async function writeToParquet(
     }
 
     console.log(
-      `Uploaded ${rows.length} rows for ${distributionCode} to ${result.key}`,
+      `Uploaded ${rows.length} rows for ${distributionCode} to ${result.key}`
     );
   }
 }

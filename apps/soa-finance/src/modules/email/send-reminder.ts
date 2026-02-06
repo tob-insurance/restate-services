@@ -1,7 +1,9 @@
 import { sendEmail } from "../../infrastructure/email";
-
-import type { IReminderEmailData } from "../../types";
-import type { IAccount, IEmailAttachment } from "../../types";
+import type {
+  IAccount,
+  IEmailAttachment,
+  IReminderEmailData,
+} from "../../types";
 import {
   generateReminderEmailHtml,
   getReminderEmailSubject,
@@ -23,7 +25,7 @@ type SendReminderEmailParams = {
 };
 
 export const sendReminderEmail = async (
-  params: SendReminderEmailParams,
+  params: SendReminderEmailParams
 ): Promise<boolean> => {
   const {
     customer,
@@ -59,7 +61,7 @@ export const sendReminderEmail = async (
   const htmlContent = await generateReminderEmailHtml(
     reminderType,
     emailData,
-    templateName,
+    templateName
   );
   const subject = getReminderEmailSubject(reminderType, customer.fullName);
   const recipient = testMode ? "gerardus.david@tob-ins.com" : toEmail;

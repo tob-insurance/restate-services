@@ -18,11 +18,11 @@ export type ReminderLetterParams = {
 };
 
 export const insertReminderLetter = (
-  params: ReminderLetterParams,
+  params: ReminderLetterParams
 ): Promise<string> => insertReminderLetterInternal(params);
 
 async function insertReminderLetterInternal(
-  params: ReminderLetterParams,
+  params: ReminderLetterParams
 ): Promise<string> {
   const { reminderId, type, letterNo, referenceId, sentDate } = params;
   const id = formatUUID(uuidv4());
@@ -51,7 +51,7 @@ async function insertReminderLetterInternal(
 }
 
 export const getLatestLetter = async (
-  reminderId: string | undefined,
+  reminderId: string | undefined
 ): Promise<LatestLetterResult | null> => {
   if (!reminderId) {
     return null;
@@ -75,7 +75,7 @@ export const getLatestLetter = async (
 export const getNextLetterSequence = async (
   type: string,
   year: number,
-  month: number,
+  month: number
 ): Promise<number> => {
   const query = `
     SELECT COUNT(*) + 1 AS NEXT_NO

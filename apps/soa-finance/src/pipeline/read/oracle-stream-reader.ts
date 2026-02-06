@@ -9,7 +9,7 @@ type OracleBinds = {
 };
 
 export async function* streamFromOracle(
-  options: IOracleStreamOptions,
+  options: IOracleStreamOptions
 ): AsyncGenerator<unknown[], void, unknown> {
   await initOracleClient();
   const connection = await oracledb.getConnection();
@@ -33,7 +33,7 @@ export async function* streamFromOracle(
           dir: oracledb.BIND_OUT,
           maxSize: 200,
         },
-      },
+      }
     );
 
     const outBinds = result.outBinds as OracleBinds;

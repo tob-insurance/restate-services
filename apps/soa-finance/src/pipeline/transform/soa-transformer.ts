@@ -2,7 +2,7 @@ import { column, type IStatementOfAccountModel } from "../../types";
 import { parseDate, parseNumber, parseString } from "../../utils";
 
 export function transformSoaRow(
-  row: unknown[],
+  row: unknown[]
 ): IStatementOfAccountModel | null {
   if (!row || row.length < 37) {
     return null;

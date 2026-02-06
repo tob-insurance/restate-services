@@ -1,20 +1,18 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
-
-import { readSoaParquet } from "../../pipeline/lib";
-import { uploadFile } from "../../infrastructure/azure";
 import {
-  getDcNoteIdsByCustomer,
   completeJobPhase,
+  getDcNoteIdsByCustomer,
   insertJobPhase,
 } from "../../database";
-
-import { excelSoaName } from "../../utils/formatter";
-import { generateExcel } from "../../utils/generators";
+import { uploadFile } from "../../infrastructure/azure";
+import { readSoaParquet } from "../../pipeline/lib";
 import {
-  type IStatementOfAccountModel,
   type IAccount,
+  type IStatementOfAccountModel,
   SoaPhase,
 } from "../../types";
+import { excelSoaName } from "../../utils/formatter";
+import { generateExcel } from "../../utils/generators";
 
 type GenerateSoaOptions = {
   ctx?: WorkflowContext;
@@ -31,7 +29,7 @@ type GenerateSoaOptions = {
 };
 
 export const generateSoa = async (
-  options: GenerateSoaOptions,
+  options: GenerateSoaOptions
 ): Promise<IStatementOfAccountModel[] | null> => {
   const {
     ctx,
@@ -45,13 +43,13 @@ export const generateSoa = async (
   } = options;
 
   console.log(
-    `GenerateSOA started for ${customer.code}, Branch: ${branchCode}, COB: ${classOfBusiness}`,
+    `GenerateSOA started for ${customer.code}, Branch: ${branchCode}, COB: ${classOfBusiness}`
   );
 
   // Helper to run with or without context
   const runPhase = async <T>(
     name: string,
-    fn: () => Promise<T>,
+    fn: () => Promise<T>
   ): Promise<T> => {
     if (ctx) {
       return await ctx.run(name, fn);
@@ -72,13 +70,13 @@ export const generateSoa = async (
   soaList = await runPhase("filter-aging", async () => {
     if (skipAgingFilter) {
       console.log(
-        `[AgingFilter] DISABLED for ${customer.code} - keeping all ${soaList.length} records`,
+        `[AgingFilter] DISABLED for ${customer.code} - keeping all ${soaList.length} records`
       );
       return soaList;
     }
     const filtered = soaList.filter((soa) => soa.aging >= 60);
     console.log(
-      `[AgingFilter] ENABLED for ${customer.code}: Filtered ${soaList.length} down to ${filtered.length} SOA records (aging >= 60 days)`,
+      `[AgingFilter] ENABLED for ${customer.code}: Filtered ${soaList.length} down to ${filtered.length} SOA records (aging >= 60 days)`
     );
     return filtered;
   });
@@ -93,40 +91,40 @@ export const generateSoa = async (
   // Extract unique DC notes (O(N) with Set)
   const newSoaList = await runPhase("filter-dc-notes", async () => {
     const dcNotesSet = new Set(
-      soaList.flatMap((soa) => soa.debitAndCreditNoteNo?.split(",") || []),
+      soaList.flatMap((soa) => soa.debitAndCreditNoteNo?.split(",") || [])
     );
     const dcNotes = Array.from(dcNotesSet);
     console.log(`Extracted ${dcNotes.length} unique DC notes`);
 
     const existingDcNotes = await getDcNoteIdsByCustomer(customer.code);
     console.log(
-      `Found ${existingDcNotes.length} DC notes in previous reminders`,
+      `Found ${existingDcNotes.length} DC notes in previous reminders`
     );
 
     let processedDcNotes: string[];
     if (skipDcNoteCheck) {
       processedDcNotes = dcNotes;
       console.log(
-        `Skip DC note check enabled - processing all ${processedDcNotes.length} DC notes`,
+        `Skip DC note check enabled - processing all ${processedDcNotes.length} DC notes`
       );
     } else {
       // Optimization: Use a Set of lowercased existing IDs for O(1) lookup
       const existingSet = new Set(
-        existingDcNotes.map((id) => id.toLowerCase()),
+        existingDcNotes.map((id) => id.toLowerCase())
       );
 
       processedDcNotes = dcNotes.filter(
-        (note) => !existingSet.has(note.toLowerCase()),
+        (note) => !existingSet.has(note.toLowerCase())
       );
 
       if (processedDcNotes.length === 0) {
         console.log(
-          `Skipping ${customer.code}: All DC notes already processed`,
+          `Skipping ${customer.code}: All DC notes already processed`
         );
         return [];
       }
       console.log(
-        `Processing ${processedDcNotes.length} new DC notes (filtered)`,
+        `Processing ${processedDcNotes.length} new DC notes (filtered)`
       );
     }
 
@@ -136,7 +134,7 @@ export const generateSoa = async (
 
   if (newSoaList.length === 0) {
     console.log(
-      `Skipping ${customer.code}: No matching SOA records after filter`,
+      `Skipping ${customer.code}: No matching SOA records after filter`
     );
     return null;
   }

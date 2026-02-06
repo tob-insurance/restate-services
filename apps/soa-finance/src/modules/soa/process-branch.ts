@@ -7,7 +7,7 @@ export const processBranch = async (
   ctx: WorkflowContext | undefined,
   branchCode: string,
   customer: IAccount,
-  item: ISoaItem,
+  item: ISoaItem
 ): Promise<{
   processed: boolean;
   recordCount: number;
@@ -33,7 +33,7 @@ export const processBranch = async (
 
   if (result && result.length > 0) {
     console.log(
-      `SOA generated for ${customer.code} branch ${branchCode}: ${result.length} records`,
+      `SOA generated for ${customer.code} branch ${branchCode}: ${result.length} records`
     );
 
     return {

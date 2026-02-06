@@ -18,7 +18,7 @@ export type ErrorWithRetryResult = {
 };
 
 export async function handleErrorWithRetry(
-  options: ErrorWithRetryOptions,
+  options: ErrorWithRetryOptions
 ): Promise<ErrorWithRetryResult> {
   const {
     ctx,
@@ -38,7 +38,7 @@ export async function handleErrorWithRetry(
         jobId,
         "Retrying",
         errorMessage,
-        currentRetryAttempt,
+        currentRetryAttempt
       );
     });
 
@@ -51,7 +51,7 @@ export async function handleErrorWithRetry(
     await updateJobStatus(
       jobId,
       "Failed",
-      `Failed after ${maxRetries} attempts: ${errorMessage}`,
+      `Failed after ${maxRetries} attempts: ${errorMessage}`
     );
     await incrementFailedCount(batchId);
   });

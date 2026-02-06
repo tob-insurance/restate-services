@@ -7,7 +7,7 @@ const TEMPLATES_DIR = join(__dirname, "../../assets/email/templates");
 
 export async function renderLiquidToHtml(
   templateName: string,
-  data: Record<string, unknown>,
+  data: Record<string, unknown>
 ): Promise<string> {
   const templatePath = join(TEMPLATES_DIR, `${templateName}.liquid`);
   const templateContent = readFileSync(templatePath, "utf-8");

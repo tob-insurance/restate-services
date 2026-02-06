@@ -1,2 +1,2 @@
-export { writeSoaParquetToBuffer } from "./writers";
 export { readSoaParquet } from "./readers";
+export { writeSoaParquetToBuffer } from "./writers";

@@ -20,7 +20,7 @@ import type { IStatementOfAccountModel } from "../../types";
 export async function readSoaParquet(
   accountCode: string,
   branchCode: string,
-  testMode = false,
+  testMode = false
 ): Promise<IStatementOfAccountModel[]> {
   const s3Client = getStorageServiceClient();
   const bucketName = storageServiceConfig.bucketName;
@@ -56,14 +56,14 @@ export async function readSoaParquet(
     const rows = tableToArray(table) as unknown as IStatementOfAccountModel[];
 
     console.log(
-      `[S3 Parquet] Read ${rows.length} raw rows from S3 (${environment})`,
+      `[S3 Parquet] Read ${rows.length} raw rows from S3 (${environment})`
     );
 
     // Filter by branch jika diperlukan
     if (branchCode && branchCode !== "ALL") {
       const filteredBranch = rows.filter((row) => row.branch === branchCode);
       console.log(
-        `[S3 Parquet] Filtered by branch ${branchCode}: ${filteredBranch.length} rows`,
+        `[S3 Parquet] Filtered by branch ${branchCode}: ${filteredBranch.length} rows`
       );
       return filteredBranch;
     }
@@ -87,7 +87,7 @@ export async function readSoaParquet(
  * Convert AWS SDK stream ke Buffer
  */
 async function streamToBuffer(
-  stream: NodeJS.ReadableStream | ReadableStream | Blob,
+  stream: NodeJS.ReadableStream | ReadableStream | Blob
 ): Promise<Buffer> {
   // Jika stream adalah Blob (browser/node 18+)
   if (stream instanceof Blob) {
@@ -113,10 +113,10 @@ async function streamToBuffer(
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     (stream as NodeJS.ReadableStream).on("data", (chunk) =>
-      chunks.push(Buffer.from(chunk)),
+      chunks.push(Buffer.from(chunk))
     );
     (stream as NodeJS.ReadableStream).on("end", () =>
-      resolve(Buffer.concat(chunks)),
+      resolve(Buffer.concat(chunks))
     );
     (stream as NodeJS.ReadableStream).on("error", reject);
   });
@@ -126,7 +126,7 @@ async function streamToBuffer(
  * Convert parquet table ke array of objects
  */
 function tableToArray(
-  table: ReturnType<typeof readParquet>,
+  table: ReturnType<typeof readParquet>
 ): Record<string, unknown>[] {
   const ipcStream = table.intoIPCStream();
   const arrowTable = tableFromIPC(ipcStream);

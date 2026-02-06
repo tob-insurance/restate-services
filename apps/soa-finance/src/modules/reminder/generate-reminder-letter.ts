@@ -1,5 +1,3 @@
-import { readSoaParquet } from "../../pipeline/lib";
-import { uploadFile } from "../../infrastructure/azure";
 import {
   completeJobPhase,
   getAccountEmails,
@@ -8,20 +6,8 @@ import {
   insertReminderLetter,
 } from "../../database";
 import { generateSoaPdfHandler } from "../../engine/handlers";
-import {
-  formatDateEnglish,
-  formatDateIndonesian,
-  formatMonthEnglish,
-  formatMonthIndonesian,
-  excelSoaName,
-  reminderPdfName,
-  formatThousands,
-} from "../../utils/formatter";
-import {
-  generateExcel,
-  generateLetterNumber,
-  getSignature,
-} from "../../utils/generators";
+import { uploadFile } from "../../infrastructure/azure";
+import { readSoaParquet } from "../../pipeline/lib";
 import {
   type IAccount,
   type IGenerateReminderResult,
@@ -29,6 +15,20 @@ import {
   type ISoaReminder,
   SoaPhase,
 } from "../../types";
+import {
+  excelSoaName,
+  formatDateEnglish,
+  formatDateIndonesian,
+  formatMonthEnglish,
+  formatMonthIndonesian,
+  formatThousands,
+  reminderPdfName,
+} from "../../utils/formatter";
+import {
+  generateExcel,
+  generateLetterNumber,
+  getSignature,
+} from "../../utils/generators";
 import { sendReminderEmail } from "../email/send-reminder";
 import { reconcilePayment } from "../payment/reconcile-payment";
 
@@ -39,7 +39,7 @@ type GenerateReminderLetterParams = {
 };
 
 export const generateReminderLetter = async (
-  params: GenerateReminderLetterParams,
+  params: GenerateReminderLetterParams
 ): Promise<IGenerateReminderResult | null> => {
   const { customer, reminder, item } = params;
   const dateNow = new Date();
@@ -58,7 +58,7 @@ export const generateReminderLetter = async (
   // Skip conditions
   if (item.processingType === 1) {
     console.log(
-      `Skipping ${customer.code}: Type is SOA but has existing reminders`,
+      `Skipping ${customer.code}: Type is SOA but has existing reminders`
     );
     return null;
   }
@@ -88,7 +88,7 @@ export const generateReminderLetter = async (
   const soaList = await readSoaParquet(
     customer.code,
     branchCode,
-    item.testMode,
+    item.testMode
   );
 
   await completeJobPhase(jobId, SoaPhase.GetSoa);
@@ -100,18 +100,17 @@ export const generateReminderLetter = async (
   const currentParquetDcNotes = soaList.map((s) => s.debitAndCreditNoteNo);
   const dcNotesPaid = await reconcilePayment(
     reminder.id,
-    currentParquetDcNotes,
+    currentParquetDcNotes
   );
 
   // Step 5.1: Check if all DC Notes are paid - skip email if so
   const unpaidDcNotes = currentParquetDcNotes.filter(
-    (dc) =>
-      !dcNotesPaid.some((paid) => paid.toLowerCase() === dc.toLowerCase()),
+    (dc) => !dcNotesPaid.some((paid) => paid.toLowerCase() === dc.toLowerCase())
   );
 
   if (unpaidDcNotes.length === 0) {
     console.log(
-      `Skipping reminder for ${customer.code}: All ${dcNotesPaid.length} DC notes have been paid`,
+      `Skipping reminder for ${customer.code}: All ${dcNotesPaid.length} DC notes have been paid`
     );
     return {
       sent: false,
@@ -122,7 +121,7 @@ export const generateReminderLetter = async (
   }
 
   console.log(
-    `DC note status for ${customer.code}: ${dcNotesPaid.length} paid, ${unpaidDcNotes.length} unpaid`,
+    `DC note status for ${customer.code}: ${dcNotesPaid.length} paid, ${unpaidDcNotes.length} unpaid`
   );
 
   // Step 5.2: Filter soaList to include only unpaid items
@@ -130,14 +129,14 @@ export const generateReminderLetter = async (
   // so Excel and PDF only contain outstanding (unpaid) items.
   const unpaidItems = soaList.filter((soaItem) =>
     unpaidDcNotes.some(
-      (dc) => dc.toLowerCase() === soaItem.debitAndCreditNoteNo.toLowerCase(),
-    ),
+      (dc) => dc.toLowerCase() === soaItem.debitAndCreditNoteNo.toLowerCase()
+    )
   );
 
   // Step 6: Generate Letter Number
   const letterNo = await generateLetterNumber(
     reminderCount.toString(),
-    dateNow,
+    dateNow
   );
 
   // Step 7: Insert Reminder Letter record
@@ -170,7 +169,7 @@ export const generateReminderLetter = async (
     const branchName = unpaidItems.length > 0 ? unpaidItems[0].branch : "";
     const totalPremium = unpaidItems.reduce(
       (sum, soaItem) => sum + (soaItem.netPremiumIdr || 0),
-      0,
+      0
     );
 
     pdfTemplateData = {
@@ -230,7 +229,7 @@ export const generateReminderLetter = async (
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     },
     customer.code,
-    "excel",
+    "excel"
   );
 
   await uploadFile(
@@ -240,7 +239,7 @@ export const generateReminderLetter = async (
       contentType: "application/pdf",
     },
     customer.code,
-    "pdf",
+    "pdf"
   );
 
   await completeJobPhase(jobId, SoaPhase.UploadingToAzure);
@@ -252,7 +251,7 @@ export const generateReminderLetter = async (
   const branchName = unpaidItems.length > 0 ? unpaidItems[0].branch : "";
   const totalPremium = unpaidItems.reduce(
     (sum, soaItem) => sum + (soaItem.netPremiumIdr || 0),
-    0,
+    0
   );
 
   const emailResult = await sendReminderEmail({

@@ -1,7 +1,6 @@
 import { downloadSoaFiles } from "../../infrastructure/azure";
-
-import { excelSoaName, letterSoaPdfName } from "../../utils";
 import type { IAccount, ISendEmailResult } from "../../types";
+import { excelSoaName, letterSoaPdfName } from "../../utils";
 import { sendSoaEmail } from "./send-soa";
 
 export type SendWithAttachmentsParams = {
@@ -13,7 +12,7 @@ export type SendWithAttachmentsParams = {
 };
 
 export async function sendWithAttachments(
-  params: SendWithAttachmentsParams,
+  params: SendWithAttachmentsParams
 ): Promise<ISendEmailResult> {
   const { customerId, customerData, testMode, jobId, date } = params;
 
@@ -24,7 +23,7 @@ export async function sendWithAttachments(
     const { excelBuffer, pdfBuffer } = await downloadSoaFiles(
       customerId,
       excelFileName,
-      pdfFileName,
+      pdfFileName
     );
 
     const excelFile = {

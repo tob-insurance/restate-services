@@ -19,19 +19,19 @@ type ProcessReminderParams = {
 };
 
 export const processReminderLetter = async (
-  params: ProcessReminderParams,
+  params: ProcessReminderParams
 ): Promise<IProcessReminder> => {
   const { customer, item } = params;
 
   console.log(
     `Starting reminder letter processing for ${customer.code}, Type: ${
       SoaType[item.processingType]
-    }`,
+    }`
   );
 
   const reminders = (await getReminderByCustomerAndPeriod(
     customer.code,
-    item.timePeriod,
+    item.timePeriod
   )) as ISoaReminder[];
 
   if (!reminders || reminders.length === 0) {

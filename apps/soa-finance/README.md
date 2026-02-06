@@ -68,7 +68,7 @@ bun run dev
 Once the service is running, register it with the Restate runtime:
 
 ```bash
-restate deployments register http://localhost:9080
+http://host.docker.internal:9080
 ```
 
 ## Workflows

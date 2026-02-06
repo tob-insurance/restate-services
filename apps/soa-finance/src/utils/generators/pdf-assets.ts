@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const ASSETS_DIR = join(__dirname, "../../../assets");
+const ASSETS_DIR = join(__dirname, "../../assets");
 
 function getAssetAsBase64(filename: string): string {
   const filePath = join(ASSETS_DIR, filename);

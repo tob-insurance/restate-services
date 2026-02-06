@@ -12,8 +12,8 @@ import {
 import type { IAccount, SoaType, soaSchema } from "../../types";
 import { type SoaWorkflow, soaWorkflow } from "./soa-workflow";
 
-const POST_COMPLETION_DELAY = 30_000;
-const WORKER_START_DELAY = 30_000;
+const POST_COMPLETION_DELAY = 60_000;
+const WORKER_START_DELAY = 60_000;
 const MAX_WORKERS = 10;
 const PROGRESS_LOG_INTERVAL = 10;
 

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { renderTemplate } from "../template";
 import { getSignature } from "./pdf-assets";
 
-const TEMPLATES_DIR = join(__dirname, "../../../assets/email/templates");
+const TEMPLATES_DIR = join(__dirname, "../../assets/email/templates");
 
 export async function renderLiquidToHtml(
   templateName: string,

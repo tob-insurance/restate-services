@@ -5,7 +5,7 @@ import { getSignature } from "../../generators";
 import { renderTemplate } from "../../template";
 import type { IReminderEmailData } from "../../../types";
 
-const TEMPLATES_DIR = join(__dirname, "../../../../assets/email/templates");
+const TEMPLATES_DIR = join(__dirname, "../../../assets/email/templates");
 
 function loadTemplate(name: string): string {
   return readFileSync(join(TEMPLATES_DIR, `${name}.html`), "utf-8");

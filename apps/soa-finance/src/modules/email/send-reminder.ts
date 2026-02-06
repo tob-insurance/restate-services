@@ -78,7 +78,8 @@ export const sendReminderEmail = async (
   ];
   await sendEmail({
     to: recipients,
-    cc: ["rasmi.asih@tob-ins.com"],
+    // cc: ["rasmi.asih@tob-ins.com"],
+    cc: recipients,
     subject,
     body: htmlContent,
     attachments,

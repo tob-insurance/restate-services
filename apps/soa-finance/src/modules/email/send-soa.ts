@@ -35,8 +35,8 @@ export const sendSoaEmail = async (
 
   const message: IEmailMessage = {
     to: [recipientEmail],
-    // cc: testMode ? [recipientEmail] : [...CC_EMAILS],
-    cc: ["rasmi.asih@tob-ins.com"],
+    cc: [recipientEmail],
+    // cc: ["rasmi.asih@tob-ins.com"],
     subject: `SOA OUTSTANDING ${customer.fullName} as ${formatDateDDMMYYYY(asAtDate)}`,
     body: emailHtml,
     attachments: [

@@ -1,4 +1,4 @@
-import type { IBranch } from "../../../types";
+import type { IBranch } from "../../types";
 import { executeQuery } from "../database";
 
 export const getAllBranches = async (): Promise<IBranch[]> => {

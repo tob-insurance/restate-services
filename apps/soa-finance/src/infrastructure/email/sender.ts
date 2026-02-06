@@ -2,10 +2,7 @@
  * Email Sender using Microsoft Graph API
  */
 
-import type {
-  IEmailAttachment,
-  IEmailMessage,
-} from "../../module/utils/types/email";
+import type { IEmailAttachment, IEmailMessage } from "../../types";
 import { getGraphClient } from "./client";
 
 function formatRecipients(emails: string[]) {

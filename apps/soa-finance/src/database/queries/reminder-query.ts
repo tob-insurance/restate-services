@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 
-import { formatUUID } from "../../../utils/formatter";
+import { formatUUID } from "../../utils";
 import { executeMany, executeQuery } from "../database";
 
 type DcNoteRow = { DC_NOTE_ID: string };

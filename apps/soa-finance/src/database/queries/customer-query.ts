@@ -1,4 +1,4 @@
-import type { IAccount } from "../../../types";
+import type { IAccount } from "../../types";
 import { executeQuery } from "../database";
 
 export const getAllAccounts = async () => {

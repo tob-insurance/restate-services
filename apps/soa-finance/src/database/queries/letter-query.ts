@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
-import { formatUUID } from "../../../utils/formatter";
+import { formatUUID } from "../../utils";
 import { executeQuery } from "../database";
 
 type LatestLetterResult = {

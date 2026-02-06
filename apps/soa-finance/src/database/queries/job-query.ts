@@ -1,4 +1,4 @@
-import type { IGetSoaJob } from "../../../types";
+import type { IGetSoaJob } from "../../types";
 import { executeQuery } from "../database";
 
 /**

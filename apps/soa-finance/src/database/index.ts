@@ -1,2 +1,2 @@
-export * from "../infrastructure/database/database";
-export * from "../infrastructure/database/queries";
+export * from "./database";
+export * from "./queries";

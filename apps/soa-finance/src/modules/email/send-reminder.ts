@@ -25,7 +25,7 @@ type SendReminderEmailParams = {
 };
 
 export const sendReminderEmail = async (
-  params: SendReminderEmailParams
+  params: SendReminderEmailParams,
 ): Promise<boolean> => {
   const {
     customer,
@@ -61,7 +61,7 @@ export const sendReminderEmail = async (
   const htmlContent = await generateReminderEmailHtml(
     reminderType,
     emailData,
-    templateName
+    templateName,
   );
   const subject = getReminderEmailSubject(reminderType, customer.fullName);
   const recipient = testMode ? "gerardus.david@tob-ins.com" : toEmail;
@@ -80,8 +80,7 @@ export const sendReminderEmail = async (
   ];
   await sendEmail({
     to: recipients,
-    // cc: ["rasmi.asih@tob-ins.com"],
-    cc: recipients,
+    cc: ["dimaz.putra@tob-ins.com"],
     subject,
     body: htmlContent,
     attachments,

@@ -19,7 +19,7 @@ type SendSoaEmailOptions = {
 };
 
 export const sendSoaEmail = async (
-  options: SendSoaEmailOptions
+  options: SendSoaEmailOptions,
 ): Promise<boolean> => {
   const { customer, toEmail, excelFile, pdfFile, testMode, jobId } = options;
   const asAtDate = new Date();
@@ -34,8 +34,7 @@ export const sendSoaEmail = async (
 
   const message: IEmailMessage = {
     to: [recipientEmail],
-    cc: [recipientEmail],
-    // cc: ["rasmi.asih@tob-ins.com"],
+    cc: ["dimaz.putra@tob-ins.com"],
     subject: `SOA OUTSTANDING ${customer.fullName} as ${formatDateDDMMYYYY(asAtDate)}`,
     body: emailHtml,
     attachments: [

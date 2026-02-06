@@ -1,5 +1,5 @@
 import { uploadParquetToS3 } from "../../infrastructure/storage/s3/s3-uploader";
-import { writeSoaParquetToBuffer } from "../../data-pipeline/lib/writers";
+import { writeSoaParquetToBuffer } from "../lib";
 import type { IStatementOfAccountModel } from "../../types";
 
 export async function writeToParquet(

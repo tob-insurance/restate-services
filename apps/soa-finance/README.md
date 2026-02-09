@@ -29,12 +29,14 @@ The project follows a domain-driven structure to separate concerns:
 
 - **[Bun](https://bun.sh/)**: Runtime and package manager.
 - **[Docker](https://www.docker.com/)**: Required to run the Restate runtime and Gotenberg.
-- **Environment Variables**: Create a `.env` file with the following keys:
-  - `RESTATE_URL`: URL of the Restate server (default: `http://localhost:8080`).
-  - `DATABASE_URL`: Oracle database connection string.
-  - `AZURE_STORAGE_CONNECTION_STRING`: Azure Blob Storage connection.
-  - `SENDGRID_API_KEY`: API key for sending emails.
-  - `GOTENBERG_URL`: URL of the Gotenberg service (default: `http://localhost:3000`).
+- **Environment Variables**: Create a `.env` file based on `.env.example`:
+  - `ORACLE_URL`: Oracle database URL (format: `oracle://user:password@host:port/service`)
+  - `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`: Microsoft Graph credentials
+  - `AZURE_STORAGE_CONNECTION_STRING`: Azure Blob Storage connection
+  - `AZURE_STORAGE_CONTAINER_NAME`: Container name for SOA documents
+  - `AZURE_STORAGE_SOA_PREFIX`: Prefix for SOA files in storage
+  - `GOTENBERG_URL`: URL of the Gotenberg service (default: `http://localhost:3000`)
+  - `ORACLE_LIB_DIR` (optional): Oracle Instant Client path for macOS/Windows
 
 ## Getting Started
 

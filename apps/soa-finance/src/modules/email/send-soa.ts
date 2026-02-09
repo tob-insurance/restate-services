@@ -1,4 +1,7 @@
-import { completeJobPhase, insertJobPhase } from "../../database";
+import {
+  completeJobPhase,
+  insertJobPhase,
+} from "../../infrastructure/database/index.js";
 import { sendEmail } from "../../infrastructure/email";
 import {
   type IAccount,
@@ -19,7 +22,7 @@ type SendSoaEmailOptions = {
 };
 
 export const sendSoaEmail = async (
-  options: SendSoaEmailOptions,
+  options: SendSoaEmailOptions
 ): Promise<boolean> => {
   const { customer, toEmail, excelFile, pdfFile, testMode, jobId } = options;
   const asAtDate = new Date();

@@ -1,12 +1,12 @@
+import { generateSoaPdfHandler } from "../../engine/handlers";
+import { uploadFile } from "../../infrastructure/azure";
 import {
   completeJobPhase,
   getAccountEmails,
   getLatestLetter,
   insertJobPhase,
   insertReminderLetter,
-} from "../../database";
-import { generateSoaPdfHandler } from "../../engine/handlers";
-import { uploadFile } from "../../infrastructure/azure";
+} from "../../infrastructure/database/index.js";
 import { readSoaParquet } from "../../pipeline/lib";
 import {
   type IAccount,
@@ -38,8 +38,10 @@ type GenerateReminderLetterParams = {
   item: ISoaItem;
 };
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: existing complex logic
 export const generateReminderLetter = async (
   params: GenerateReminderLetterParams
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: existing complex logic
 ): Promise<IGenerateReminderResult | null> => {
   const { customer, reminder, item } = params;
   const dateNow = new Date();

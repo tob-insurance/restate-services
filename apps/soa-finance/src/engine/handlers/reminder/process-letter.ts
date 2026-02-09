@@ -1,6 +1,6 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
 
-import { getAllBranches } from "../../../database";
+import { getAllBranches } from "../../../infrastructure/database/index.js";
 import { processReminderLetter } from "../../../modules";
 import type { IAccount, ISoaItem } from "../../../types";
 

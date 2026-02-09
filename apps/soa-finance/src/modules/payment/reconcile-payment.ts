@@ -1,4 +1,7 @@
-import { getUnpaidReminderDetail, updatePaymentStatus } from "../../database";
+import {
+  getUnpaidReminderDetail,
+  updatePaymentStatus,
+} from "../../infrastructure/database/index.js";
 
 export const reconcilePayment = async (
   reminderId: string,

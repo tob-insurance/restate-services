@@ -1,6 +1,6 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
 
-import { getReminderByCustomerAndPeriod } from "../../database";
+import { getReminderByCustomerAndPeriod } from "../../infrastructure/database/index.js";
 import {
   type IAccount,
   type IBranch,

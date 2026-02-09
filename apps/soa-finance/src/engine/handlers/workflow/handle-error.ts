@@ -1,6 +1,9 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
 
-import { incrementFailedCount, updateJobStatus } from "../../../database";
+import {
+  incrementFailedCount,
+  updateJobStatus,
+} from "../../../infrastructure/database/index.js";
 
 export type ErrorWithRetryOptions = {
   ctx: WorkflowContext;

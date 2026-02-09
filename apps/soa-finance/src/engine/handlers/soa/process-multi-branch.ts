@@ -1,6 +1,9 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
-import { getAllBranches, getLatestLetter } from "../../../database";
 import { uploadFile } from "../../../infrastructure/azure";
+import {
+  getAllBranches,
+  getLatestLetter,
+} from "../../../infrastructure/database/index.js";
 import { generatePdfWithHeaderFooter } from "../../../infrastructure/gotenberg/gotenberg-client";
 import { createReminder, processBranch } from "../../../modules";
 import type {
@@ -54,6 +57,7 @@ export async function processMultiBranchSoa({
     if (branchResult.soaData && branchResult.soaData.length > 0) {
       await ctx.run(
         `generate-and-upload-pdf-${branchItem.officeCode}`,
+        // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: existing complex logic
         async () => {
           const isReminder = params.processingType > 1;
           const toDate = new Date(params.toDate * 1000);
@@ -68,9 +72,9 @@ export async function processMultiBranchSoa({
               0
             );
 
-            let letterNoReff = null;
-            let sentDateId = null;
-            let sentDateEn = null;
+            let letterNoReff: string | null = null;
+            let sentDateId: string | null = null;
+            let sentDateEn: string | null = null;
 
             if (params.processingType > 2) {
               const latestLetter = await getLatestLetter(params.jobId);

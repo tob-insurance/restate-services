@@ -1,5 +1,8 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
-import { insertReminder, insertReminderDetailsBulk } from "../../database";
+import {
+  insertReminder,
+  insertReminderDetailsBulk,
+} from "../../infrastructure/database/index.js";
 import type { IAccount, IStatementOfAccountModel } from "../../types";
 
 export type CreateReminderParams = {

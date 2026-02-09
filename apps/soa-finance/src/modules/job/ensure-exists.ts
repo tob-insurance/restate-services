@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
-import { getJobByBatchAndCustomer, insertJob } from "../../database";
+import {
+  getJobByBatchAndCustomer,
+  insertJob,
+} from "../../infrastructure/database/index.js";
 
 export type JobInfo = {
   jobId: string;

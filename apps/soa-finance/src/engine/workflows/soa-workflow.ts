@@ -4,7 +4,7 @@ import { workflow } from "@restatedev/restate-sdk";
 import {
   getReminderByCustomerAndPeriod,
   updateJobStatus,
-} from "../../database";
+} from "../../infrastructure/database/index.js";
 
 import {
   ensureJobExists,
@@ -20,11 +20,11 @@ import {
   processReminder,
 } from "../handlers";
 
-interface ISoaWorkflowResult {
+type ISoaWorkflowResult = {
   customerId: string;
   status: "completed" | "failed";
   jobId: string;
-}
+};
 
 /**
  * SoaWorkflow - Workflow untuk memproses Statement of Account (SOA) per customer.

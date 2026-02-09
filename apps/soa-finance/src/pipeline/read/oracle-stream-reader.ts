@@ -1,5 +1,5 @@
 import oracledb from "oracledb";
-import { initOracleClient } from "../../database";
+import { initOracleClient } from "../../infrastructure/database/index.js";
 import type { IOracleStreamOptions } from "../../types";
 
 type OracleBinds = {

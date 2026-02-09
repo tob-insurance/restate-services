@@ -2,7 +2,7 @@ import {
   completeJobPhase,
   getAccountById,
   insertJobPhase,
-} from "../../database";
+} from "../../infrastructure/database/index.js";
 import { type IAccount, SoaPhase } from "../../types";
 
 export const getCustomerData = async (

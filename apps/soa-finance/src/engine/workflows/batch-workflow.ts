@@ -2,7 +2,11 @@ import type { WorkflowContext } from "@restatedev/restate-sdk";
 import { RestatePromise, workflow } from "@restatedev/restate-sdk";
 import { v4 as uuidv4 } from "uuid";
 
-import { getAllAccounts, insertBatch, updateBatchStatus } from "../../database";
+import {
+  getAllAccounts,
+  insertBatch,
+  updateBatchStatus,
+} from "../../infrastructure/database/index.js";
 import type { IAccount, SoaType, soaSchema } from "../../types";
 import {
   formatDateToUnixTimestamp,
@@ -21,12 +25,12 @@ type ActiveWorkerSlot = {
   promise: RestatePromise<string>;
 };
 
-interface IBatchWorkflowResult {
+type IBatchWorkflowResult = {
   batchId: string;
   message: string;
   totalAccounts: number;
   status: "Completed";
-}
+};
 
 /**
  * BatchWorkflow - Workflow utama untuk memproses Statement of Account (SOA) secara batch.
@@ -160,7 +164,7 @@ export const batchWorkflow = workflow({
         nextAccountIndex < totalAccounts
       ) {
         startAccountProcessing(accountsToProcess[nextAccountIndex]);
-        nextAccountIndex++;
+        nextAccountIndex += 1;
         await ctx.sleep(WORKER_START_DELAY);
       }
 
@@ -173,7 +177,7 @@ export const batchWorkflow = workflow({
 
         // Hapus dari pool dan update counter
         workerPool.delete(completedAccountId);
-        processedAccountCount++;
+        processedAccountCount += 1;
 
         // Log progress setiap N akun
         if (processedAccountCount % PROGRESS_LOG_INTERVAL === 0) {
@@ -187,7 +191,7 @@ export const batchWorkflow = workflow({
         // Mulai proses akun berikutnya jika masih ada
         if (nextAccountIndex < totalAccounts) {
           startAccountProcessing(accountsToProcess[nextAccountIndex]);
-          nextAccountIndex++;
+          nextAccountIndex += 1;
           await ctx.sleep(WORKER_START_DELAY);
         }
       }

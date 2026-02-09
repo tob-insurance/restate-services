@@ -3,7 +3,7 @@ import { SCHEDULE_CONFIG } from "../../../constants/schedule";
 import {
   getAllBranches,
   getReminderByCustomerAndPeriod,
-} from "../../../database";
+} from "../../../infrastructure/database/index.js";
 import { processReminderLetter } from "../../../modules";
 import type { IAccount, ISoaItem } from "../../../types";
 
@@ -70,7 +70,7 @@ export async function runReminderSchedule({
           ctx,
         })
     );
-    remindersSent++;
+    remindersSent += 1;
     ctx.console.log(`${schedule.type} berhasil dikirim`);
   }
   ctx.console.log(

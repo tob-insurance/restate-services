@@ -1,10 +1,10 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
+import { uploadFile } from "../../infrastructure/azure";
 import {
   completeJobPhase,
   getDcNoteIdsByCustomer,
   insertJobPhase,
-} from "../../database";
-import { uploadFile } from "../../infrastructure/azure";
+} from "../../infrastructure/database/index.js";
 import { readSoaParquet } from "../../pipeline/lib";
 import {
   type IAccount,

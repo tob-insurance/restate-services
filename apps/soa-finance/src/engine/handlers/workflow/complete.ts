@@ -4,7 +4,7 @@ import {
   incrementProcessedAndCheckComplete,
   updateBatchStatus,
   updateJobStatus,
-} from "../../../database";
+} from "../../../infrastructure/database/index.js";
 
 export type CompleteWorkflowParams = {
   ctx: WorkflowContext;

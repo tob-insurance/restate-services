@@ -1,5 +1,5 @@
 import { ROMAN_MONTHS } from "../../constants";
-import { getNextLetterSequence } from "../../database";
+import { getNextLetterSequence } from "../../infrastructure/database/index.js";
 
 export async function generateLetterNumber(
   type: string,

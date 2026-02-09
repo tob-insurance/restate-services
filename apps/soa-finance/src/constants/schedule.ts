@@ -1,11 +1,11 @@
 import type { SoaType } from "../types";
 
-export interface IScheduleConfig {
+export type IScheduleConfig = {
   type: "SOA" | "RL1" | "RL2" | "RL3";
   soaType: SoaType;
   sendDay: number;
   dueDay?: number;
-}
+};
 
 export const SCHEDULE_CONFIG: IScheduleConfig[] = [
   { type: "SOA", soaType: 1, sendDay: 4 },

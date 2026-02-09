@@ -32,14 +32,16 @@ function groupAndAggregateSoa(
     if (!groupMap.has(groupKey)) {
       groupMap.set(groupKey, []);
     }
-    groupMap.get(groupKey)!.push(soa);
+    groupMap.get(groupKey)?.push(soa);
   }
 
   // Aggregate each group
   const aggregatedData: IStatementOfAccountModel[] = [];
 
   for (const group of groupMap.values()) {
-    if (group.length === 0) continue;
+    if (group.length === 0) {
+      continue;
+    }
 
     // Take first record as base
     const base = { ...group[0] };
@@ -92,13 +94,17 @@ function sortSoaData(
  * Converts timestamp (milliseconds or string) to DD/MM/YYYY format
  */
 export function formatTimestampToDate(value: string | number): string {
-  if (!value) return "";
+  if (!value) {
+    return "";
+  }
 
   // If it's a string that looks like a timestamp, convert to number
   const timestamp =
     typeof value === "string" ? Number.parseInt(value, 10) : value;
 
-  if (Number.isNaN(timestamp)) return value.toString();
+  if (Number.isNaN(timestamp)) {
+    return value.toString();
+  }
 
   const date = new Date(timestamp);
   const day = date.getDate().toString().padStart(2, "0");

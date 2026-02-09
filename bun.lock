@@ -45,9 +45,9 @@
         "@azure/identity": "^4.13.0",
         "@azure/storage-blob": "^12.30.0",
         "@microsoft/microsoft-graph-client": "^3.0.7",
+        "@restate-tob/oracle": "workspace:*",
         "@restatedev/restate-sdk": "^1.9.1",
         "@restatedev/restate-sdk-zod": "^1.9.1",
-        "@types/oracledb": "^6.10.1",
         "apache-arrow": "^21.1.0",
         "liquidjs": "^10.24.0",
         "parquet-wasm": "^0.7.1",
@@ -58,6 +58,8 @@
       },
       "devDependencies": {
         "@types/node": "^20.14.2",
+        "@types/oracledb": "^6.10.1",
+        "esbuild": "^0.25.4",
         "tsx": "^4.19.2",
         "typescript": "^5.4.5",
       },
@@ -914,6 +916,8 @@
     "@aws-sdk/xml-builder/fast-xml-parser": ["fast-xml-parser@5.3.4", "", { "dependencies": { "strnum": "^2.1.0" }, "bin": { "fxparser": "src/cli/cli.js" } }, "sha512-EFd6afGmXlCx8H8WTZHhAoDaWaGyuIBoZJ2mknrNxug+aZKjkp0a0dlars9Izl+jF+7Gu1/5f/2h68cQpe0IiA=="],
 
     "@azure/msal-node/uuid": ["uuid@8.3.2", "", { "bin": { "uuid": "dist/bin/uuid" } }, "sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg=="],
+
+    "@restate-tob/oracle/@types/oracledb": ["@types/oracledb@6.10.1", "", { "dependencies": { "@types/node": "*" } }, "sha512-/P478CfP8rYvXi6897OLn/BgXOP/RnDcKYCX3JRRNSZ/J94gmKJAT1vWiLA+HDRopBmqe0pzzud6hKhKQguJcw=="],
 
     "@restate-tob/soa-finance/@types/oracledb": ["@types/oracledb@6.10.1", "", { "dependencies": { "@types/node": "*" } }, "sha512-/P478CfP8rYvXi6897OLn/BgXOP/RnDcKYCX3JRRNSZ/J94gmKJAT1vWiLA+HDRopBmqe0pzzud6hKhKQguJcw=="],
 

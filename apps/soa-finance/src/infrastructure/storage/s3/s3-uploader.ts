@@ -7,7 +7,7 @@ type IUploadResult = {
   success: boolean;
 };
 
-function generateStorageSreviceKey(
+function generateStorageServiceKey(
   fileName: string,
   testMode?: boolean
 ): string {
@@ -30,7 +30,7 @@ export async function uploadParquetToS3(
   testMode?: boolean
 ): Promise<IUploadResult> {
   const storageServiceClient = getStorageServiceClient();
-  const storageServiceKey = generateStorageSreviceKey(fileName, testMode);
+  const storageServiceKey = generateStorageServiceKey(fileName, testMode);
 
   try {
     await storageServiceClient.send(

@@ -2,22 +2,28 @@
   "name": "@restate-tob/soa-finance",
   "version": "0.0.1",
   "description": "SOA Finance service running with Restate",
-  "main": "dist/app.js",
+  "main": "dist/app.local.js",
   "type": "commonjs",
   "scripts": {
-    "build": "tsc",
-    "start": "node ./dist/app.js",
-    "dev": "bun --watch ./src/app.ts",
-    "clean": "rm -rf dist"
+    "build": "tsc --noEmitOnError",
+    "start": "node ./dist/app.local.js",
+    "dev": "tsx watch ./src/app.local.ts",
+    "clean": "rm -rf dist",
+    "prebundle": "rm -rf dist",
+    "bundle": "esbuild src/app.local.ts --bundle --minify --sourcemap --platform=node --target=es2020 --outfile=dist/app.js",
+    "postbundle": "cd dist && zip -r index.zip app.js*",
+    "prebundle:lambda": "rm -rf dist-lambda",
+    "bundle:lambda": "esbuild src/app.lambda.ts --bundle --minify --sourcemap --platform=node --target=es2020 --external:oracledb --outfile=dist-lambda/app.js",
+    "postbundle:lambda": "cd dist-lambda && mkdir -p node_modules && cp -rL ../node_modules/oracledb node_modules/ && zip -r lambda.zip app.js* node_modules"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.982.0",
     "@azure/identity": "^4.13.0",
     "@azure/storage-blob": "^12.30.0",
     "@microsoft/microsoft-graph-client": "^3.0.7",
+    "@restate-tob/oracle": "workspace:*",
     "@restatedev/restate-sdk": "^1.9.1",
     "@restatedev/restate-sdk-zod": "^1.9.1",
-    "@types/oracledb": "^6.10.1",
     "apache-arrow": "^21.1.0",
     "liquidjs": "^10.24.0",
     "parquet-wasm": "^0.7.1",
@@ -28,6 +34,8 @@
   },
   "devDependencies": {
     "@types/node": "^20.14.2",
+    "@types/oracledb": "^6.10.1",
+    "esbuild": "^0.25.4",
     "tsx": "^4.19.2",
     "typescript": "^5.4.5"
   }

@@ -7,4 +7,11 @@ export {
 export type { CalculatedTrialBalance, OpenBalance } from "./entities.js";
 export type { IOpenBalanceRepository } from "./repository.js";
 export { OpenBalanceRepository } from "./repository.js";
-export type { OracleClient, OracleConfig } from "./types.js";
+export type {
+  ExecuteManyResult,
+  ExecuteQueryResult,
+  OracleClient,
+  OracleConfig,
+  ProcedureOutBindDef,
+  ProcedureResult,
+} from "./types.js";

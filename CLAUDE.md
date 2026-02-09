@@ -61,7 +61,10 @@ curl -X POST http://localhost:8080/DailyClosingScheduler/main/start
 
 - **Turborepo + Bun workspaces** manage the monorepo
 - Apps live in `apps/` directory, each with independent `package.json`
-- Shared packages go in `packages/` (currently unused)
+- Shared packages in `packages/`:
+  - `@restate-tob/oracle`: Oracle database client with connection pooling
+  - `@restate-tob/postgres`: PostgreSQL database client
+  - `@restate-tob/shared`: Shared utilities and types
 
 ### Restate Framework
 
@@ -149,15 +152,35 @@ Implements daily closing workflow orchestrating:
 
 ```
 src/
-├── app.ts                    # Entry point, registers services
-├── pg.ts                     # PostgreSQL connection pool
-├── oracle.ts                 # Oracle DB connection
-├── services/
-│   ├── geniusClosing.ts     # Oracle stored procedure execution
-│   ├── financialMetrics.ts  # PostgreSQL metrics calculation
-│   └── scheduler.ts         # Cron-style scheduler (Virtual Object)
-└── workflows/
-    └── dailyClosing.ts      # Main workflow orchestration
+├── app.lambda.ts             # Lambda entry point
+├── app.local.ts              # Local development entry point
+├── constants.ts              # Configuration constants
+├── infrastructure/
+│   └── database.ts           # Database clients (Oracle + PostgreSQL)
+└── modules/
+    ├── closing/              # Daily closing workflow
+    ├── financial-metrics/    # PostgreSQL metrics calculation
+    └── trial-balance-sync/   # Trial balance sync service
+```
+
+### SOA Finance App (`apps/soa-finance`)
+
+Implements Statement of Account (SOA) and Reminder Letter generation:
+
+```
+src/
+├── app.lambda.ts             # Lambda entry point
+├── app.local.ts              # Local development entry point
+├── infrastructure/
+│   ├── database/             # Oracle database client and queries
+│   ├── azure/                # Azure Blob Storage integration
+│   ├── email/                # Email sending service
+│   └── gotenberg/            # PDF generation client
+├── engine/
+│   ├── workflows/            # SOA and Batch workflows
+│   └── handlers/             # Workflow step handlers
+├── modules/                  # Business logic modules
+└── pipeline/                 # Data pipeline for Parquet processing
 ```
 
 **Service Ports:**
@@ -169,15 +192,35 @@ src/
 Required for `apps/finance`:
 
 ```env
-# Database Configuration
-PG_HOST, PG_PORT, PG_DATABASE, PG_USER, PG_PASSWORD, PG_SCHEMA
-ORACLE_USER, ORACLE_PASSWORD, ORACLE_CONNECT_STRING
+# Database Connection Strings
+POSTGRES_URL=postgresql://postgres:your_password@localhost:5432/finance?schema=financial_report
+ORACLE_URL=oracle://your_oracle_user:your_oracle_password@localhost:1521/ORCL
 
 # Optional: Oracle Instant Client Path (for macOS/Windows)
 ORACLE_INSTANT_CLIENT_PATH=/path/to/instantclient
 
 # Scheduler Configuration (Jakarta Time)
 DAILY_CLOSING_SCHEDULE_TIME=00:00    # Default: 00:00 (midnight)
+```
+
+Required for `apps/soa-finance`:
+
+```env
+# Oracle Database
+ORACLE_URL=oracle://your_oracle_user:your_oracle_password@localhost:1521/ORCL
+
+# Microsoft Graph (for email)
+AZURE_TENANT_ID=your-tenant-id
+AZURE_CLIENT_ID=your-client-id
+AZURE_CLIENT_SECRET=your-client-secret
+
+# Azure Storage
+AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=https;AccountName=...
+AZURE_STORAGE_CONTAINER_NAME=soa-documents
+AZURE_STORAGE_SOA_PREFIX=soa/
+
+# Optional: Oracle Instant Client library path (only needed on Windows/macOS)
+ORACLE_LIB_DIR=/path/to/instantclient
 ```
 
 **Schedule Configuration:**

@@ -1,6 +1,20 @@
-import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { getStorageServiceClient } from "./s3-client";
-import { storageServiceConfig } from "./s3-config";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+
+export const storageServiceConfig = {
+  bucketName: process.env.S3_BUCKET_NAME,
+  region: process.env.AWS_REGION,
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+};
+
+let storageServiceClient: S3Client | null = null;
+
+export const getStorageServiceClient = (): S3Client => {
+  if (!storageServiceClient) {
+    storageServiceClient = new S3Client(storageServiceConfig);
+  }
+  return storageServiceClient;
+};
 
 type IUploadResult = {
   key: string;
@@ -29,11 +43,11 @@ export async function uploadParquetToS3(
   buffer: Buffer,
   testMode?: boolean
 ): Promise<IUploadResult> {
-  const storageServiceClient = getStorageServiceClient();
+  const client = getStorageServiceClient();
   const storageServiceKey = generateStorageServiceKey(fileName, testMode);
 
   try {
-    await storageServiceClient.send(
+    await client.send(
       new PutObjectCommand({
         Bucket: storageServiceConfig.bucketName,
         Key: storageServiceKey,

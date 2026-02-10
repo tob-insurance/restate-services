@@ -31,7 +31,6 @@ type GenerateReminderLetterParams = {
   item: ISoaItem;
 };
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: existing complex logic
 export const generateReminderLetter = async (
   params: GenerateReminderLetterParams
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: existing complex logic

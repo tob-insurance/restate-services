@@ -1,4 +1,4 @@
-import { uploadParquetToS3 } from "../../infrastructure/storage/s3/s3-uploader";
+import { uploadParquetToS3 } from "../../infrastructure/s3";
 import type { IStatementOfAccountModel } from "../../types";
 import { writeSoaParquetToBuffer } from "../lib";
 

@@ -6,15 +6,11 @@ import {
   updateJobStatus,
 } from "../../../infrastructure/database/index.js";
 import type { ISoaItem } from "../../../types";
-import {
-  completeWorkflow,
-  ensureJobExists,
-  getCustomerData,
-  handleErrorWithRetry,
-  newSoa,
-  processReminder,
-  shouldProcessReminder,
-} from "../../";
+import { getCustomerData } from "../../customer";
+import { shouldProcessReminder } from "../../decision";
+import { ensureJobExists } from "../../job";
+import { processReminder } from "../../reminder";
+import { completeWorkflow, handleErrorWithRetry, newSoa } from "../services";
 
 type ISoaWorkflowResult = {
   customerId: string;

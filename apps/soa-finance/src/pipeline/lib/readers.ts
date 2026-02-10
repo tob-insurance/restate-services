@@ -2,8 +2,10 @@ import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { tableFromIPC } from "apache-arrow";
 import { readParquet } from "parquet-wasm";
 
-import { getStorageServiceClient } from "../../infrastructure/storage/s3/s3-client";
-import { storageServiceConfig } from "../../infrastructure/storage/s3/s3-config";
+import {
+  getStorageServiceClient,
+  storageServiceConfig,
+} from "../../infrastructure/s3";
 import type { IStatementOfAccountModel } from "../../types";
 
 /**

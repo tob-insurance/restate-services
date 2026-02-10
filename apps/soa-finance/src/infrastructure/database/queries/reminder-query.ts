@@ -61,23 +61,6 @@ export const insertReminder = async (
   return id;
 };
 
-export const insertReminderDetail = async (
-  dcNoteId: string,
-  reminderId: string,
-  isPaid = "N"
-): Promise<void> => {
-  const sql = `
-    INSERT INTO SOA_REMINDER_DETAIL (DC_NOTE_ID, REMINDER_ID, IS_PAID)
-    VALUES (:dcNoteId, hextoraw(:reminderId), :isPaid)
-  `;
-
-  await executeQuery(
-    sql,
-    { dcNoteId, reminderId, isPaid },
-    { autoCommit: true }
-  );
-};
-
 export const insertReminderDetailsBulk = async (
   details: { dcNoteId: string; reminderId: string; isPaid?: string }[]
 ): Promise<void> => {

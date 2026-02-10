@@ -1,7 +1,7 @@
 import { sendEmail } from "../../infrastructure/email";
-import type { IEmailAttachment } from "../../infrastructure/email/types";
 import type { IAccount } from "../../types";
 import type { IReminderEmailData } from "../reminder/types";
+import { buildEmailAttachments, DEFAULT_CC_RECIPIENTS } from "./attachments";
 import {
   generateReminderEmailHtml,
   getReminderEmailSubject,
@@ -64,24 +64,12 @@ export const sendReminderEmail = async (
   const subject = getReminderEmailSubject(reminderType, customer.fullName);
   const recipient = testMode ? "gerardus.david@tob-ins.com" : toEmail;
   const recipients = recipient.split(",").map((r) => r.trim());
-  const attachments: IEmailAttachment[] = [
-    {
-      name: excelFile.fileName,
-      contentType: excelFile.contentType,
-      contentBytes: excelFile.bytes.toString("base64"),
-    },
-    {
-      name: pdfFile.fileName,
-      contentType: pdfFile.contentType,
-      contentBytes: pdfFile.bytes.toString("base64"),
-    },
-  ];
   await sendEmail({
     to: recipients,
-    cc: ["dimaz.putra@tob-ins.com"],
+    cc: DEFAULT_CC_RECIPIENTS,
     subject,
     body: htmlContent,
-    attachments,
+    attachments: buildEmailAttachments(excelFile, pdfFile),
   });
   return true;
 };

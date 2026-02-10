@@ -2,12 +2,13 @@ import type { WorkflowContext } from "@restatedev/restate-sdk";
 import { workflow } from "@restatedev/restate-sdk";
 
 import {
+  completeJobPhase,
+  getAccountById,
   getReminderByCustomerAndPeriod,
+  insertJobPhase,
   updateJobStatus,
 } from "../../../infrastructure/database/index.js";
-import type { ISoaItem } from "../../../types";
-import { getCustomerData } from "../../customer";
-import { shouldProcessReminder } from "../../decision";
+import { type ISoaItem, SoaPhase } from "../../../types";
 import { ensureJobExists } from "../../job";
 import { processReminder } from "../../reminder";
 import { completeWorkflow, handleErrorWithRetry, newSoa } from "../services";
@@ -30,9 +31,9 @@ type ISoaWorkflowResult = {
  * Hubungan ke fungsi lain:
  * - Dipanggil oleh `batchWorkflow` sebagai child workflow untuk setiap customer
  * - Memanggil `ensureJobExists` untuk membuat/mendapatkan job record di database
- * - Memanggil `getCustomerData` untuk mengambil data lengkap customer
+ * - Mengambil data customer dari database via `getAccountById`
  * - Memanggil `getReminderByCustomerAndPeriod` untuk cek histori SOA
- * - Memanggil `shouldProcessReminder` untuk menentukan tipe proses (SOA baru vs Reminder)
+ * - Menentukan tipe proses berdasarkan existing reminders dan processingType
  * - Memanggil `newSoa` atau `processReminder` berdasarkan keputusan di atas
  * - Memanggil `completeWorkflow` untuk finalisasi dan update status batch
  * - Memanggil `handleErrorWithRetry` untuk error handling dengan retry mechanism
@@ -89,10 +90,12 @@ export const soaWorkflow = workflow({
           });
 
           // STEP 2b: Ambil data customer
-          const customerData = await ctx.run(
-            "get-customer-data",
-            async () => await getCustomerData(jobId, customerId)
-          );
+          const customerData = await ctx.run("get-customer-data", async () => {
+            await insertJobPhase(jobId, SoaPhase.RetrievingCustomerData);
+            const customer = await getAccountById(customerId);
+            await completeJobPhase(jobId, SoaPhase.RetrievingCustomerData);
+            return customer;
+          });
 
           if (!customerData) {
             throw new Error(`Customer ${customerId} tidak ditemukan`);
@@ -110,10 +113,8 @@ export const soaWorkflow = workflow({
 
           // STEP 2d: Tentukan tipe proses
           const hasExistingReminder = existingReminders.length > 0;
-          const shouldCreateReminder = shouldProcessReminder(
-            hasExistingReminder,
-            processingType
-          );
+          const shouldCreateReminder =
+            hasExistingReminder || processingType !== 1;
 
           // STEP 2e: Jalankan proses yang sesuai
           if (shouldCreateReminder) {

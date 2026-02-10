@@ -12,6 +12,7 @@
     "//#check": {},
     "//#fix": {
       "cache": false
-    }
+    },
+    "typecheck": {}
   }
 }

@@ -6,6 +6,9 @@
   "type": "commonjs",
   "scripts": {
     "build": "tsc --noEmitOnError",
+    "typecheck": "tsc --noEmit",
+    "lint": "ultracite check",
+    "lint:fix": "ultracite fix",
     "start": "node ./dist/app.local.js",
     "dev": "tsx watch ./src/app.local.ts",
     "clean": "rm -rf dist",

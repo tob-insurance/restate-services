@@ -21,6 +21,30 @@ bun run --filter @finance/closing dev
 bun run --filter @finance/closing build
 ```
 
+### Linting & Typechecking
+
+```bash
+# Lint (from root only)
+bun run check
+
+# Lint fix (from root only)
+bun run fix
+
+# Typecheck all apps and packages
+bun run typecheck
+
+# Typecheck single app
+cd apps/finance && bun run typecheck
+cd apps/soa-finance && bun run typecheck
+
+# Typecheck single package
+cd packages/oracle && bun run typecheck
+cd packages/postgres && bun run typecheck
+cd packages/shared && bun run typecheck
+```
+
+Linting uses [ultracite](https://github.com/harbordev/ultracite) (wraps Biome). Lefthook runs `ultracite fix` on pre-commit automatically.
+
 ### Finance App Specific
 
 ```bash
@@ -176,10 +200,13 @@ src/
 │   ├── azure/                # Azure Blob Storage integration
 │   ├── email/                # Email sending service
 │   └── gotenberg/            # PDF generation client
-├── engine/
-│   ├── workflows/            # SOA and Batch workflows
-│   └── handlers/             # Workflow step handlers
-├── modules/                  # Business logic modules
+├── modules/
+│   ├── document-generation/  # Shared PDF, Excel, letter number generation
+│   ├── email/                # Email sending and templates
+│   ├── job/                  # Job tracking
+│   ├── payment/              # Payment reconciliation
+│   ├── reminder/             # Reminder letter processing
+│   └── soa/                  # SOA workflows and services
 └── pipeline/                 # Data pipeline for Parquet processing
 ```
 

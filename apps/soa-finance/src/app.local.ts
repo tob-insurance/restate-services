@@ -1,6 +1,6 @@
 import { serve } from "@restatedev/restate-sdk";
-import { batchWorkflow, soaWorkflow } from "./engine/index.js";
 import { initOracleClient } from "./infrastructure/database/database.js";
+import { batchWorkflow, soaWorkflow } from "./modules/soa/workflows/index.js";
 import { pipelineScheduler } from "./pipeline/scheduler.js";
 
 const PORT = 9080;

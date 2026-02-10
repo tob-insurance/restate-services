@@ -6,13 +6,13 @@ import {
   getAllAccounts,
   insertBatch,
   updateBatchStatus,
-} from "../../infrastructure/database/index.js";
-import type { IAccount, SoaType, soaSchema } from "../../types";
+} from "../../../infrastructure/database/index.js";
+import type { IAccount, SoaType, soaSchema } from "../../../types";
 import {
   formatDateToUnixTimestamp,
   formatTimePeriod,
   formatUUID,
-} from "../../utils";
+} from "../../../utils";
 import { type SoaWorkflow, soaWorkflow } from "./soa-workflow";
 
 const POST_COMPLETION_DELAY = 60_000;

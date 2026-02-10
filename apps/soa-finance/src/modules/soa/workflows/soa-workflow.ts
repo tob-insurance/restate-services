@@ -4,7 +4,8 @@ import { workflow } from "@restatedev/restate-sdk";
 import {
   getReminderByCustomerAndPeriod,
   updateJobStatus,
-} from "../../infrastructure/database/index.js";
+} from "../../../infrastructure/database/index.js";
+import type { ISoaItem } from "../../../types";
 import {
   completeWorkflow,
   ensureJobExists,
@@ -13,8 +14,7 @@ import {
   newSoa,
   processReminder,
   shouldProcessReminder,
-} from "../../modules";
-import type { ISoaItem } from "../../types";
+} from "../../";
 
 type ISoaWorkflowResult = {
   customerId: string;

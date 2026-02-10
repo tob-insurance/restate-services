@@ -1,12 +1,12 @@
-import type { IAccount, IStatementOfAccountModel } from "../../../types";
+import type { IAccount, IStatementOfAccountModel } from "../../types";
 import {
   formatDateEnglish,
   formatDateIndonesian,
   formatMonthEnglish,
   formatMonthIndonesian,
   formatThousands,
-} from "../../../utils/formatter";
-import { getSignature } from "../../reminder/pdf-assets";
+} from "../../utils/formatter";
+import { getSignature } from "./pdf-assets";
 
 type LatestLetterInfo = {
   letterNo: string;

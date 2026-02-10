@@ -12,7 +12,7 @@ import {
   SoaPhase,
 } from "../../types";
 import { excelSoaName } from "../../utils/formatter";
-import { generateExcel } from "./excel.generator";
+import { generateExcel } from "../document-generation/excel.generator";
 
 type GenerateSoaOptions = {
   ctx?: WorkflowContext;

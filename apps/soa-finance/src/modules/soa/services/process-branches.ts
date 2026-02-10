@@ -10,14 +10,13 @@ import type {
   IStatementOfAccountModel,
 } from "../../../types";
 import { letterSoaPdfName } from "../../../utils/formatter";
+import { generateSoaPdfHandler } from "../../document-generation/generate-soa-pdf";
+import { generateLetterNumber } from "../../document-generation/letter-number.generator";
+import { buildPdfTemplateData } from "../../document-generation/pdf-template";
 import { createReminder } from "../../reminder";
+import { processBranch } from "../process-branch";
 
 const PDF_EXTENSION_REGEX = /\.pdf$/;
-
-import { generateLetterNumber } from "../../reminder/letter-number.generator";
-import { processBranch } from "../process-branch";
-import { generateSoaPdfHandler } from "./generate-soa-pdf";
-import { buildPdfTemplateData } from "./pdf-template";
 
 export type ProcessSoaParams = {
   ctx: WorkflowContext;

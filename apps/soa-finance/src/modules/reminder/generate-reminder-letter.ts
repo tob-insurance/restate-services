@@ -9,11 +9,14 @@ import {
 import { readSoaParquet } from "../../pipeline/lib";
 import { type IAccount, type ISoaItem, SoaPhase } from "../../types";
 import { excelSoaName, reminderPdfName } from "../../utils/formatter";
+import {
+  buildPdfTemplateData,
+  generateSoaPdfHandler,
+} from "../document-generation";
+import { generateExcel } from "../document-generation/excel.generator";
+import { generateLetterNumber } from "../document-generation/letter-number.generator";
 import { sendReminderEmail } from "../email/send-reminder";
 import { reconcilePayment } from "../payment/reconcile-payment";
-import { generateExcel } from "../soa/excel.generator";
-import { buildPdfTemplateData, generateSoaPdfHandler } from "../soa/services";
-import { generateLetterNumber } from "./letter-number.generator";
 import type { IGenerateReminderResult, ISoaReminder } from "./types";
 
 type GenerateReminderLetterParams = {

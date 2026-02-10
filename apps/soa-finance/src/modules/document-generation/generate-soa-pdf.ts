@@ -1,7 +1,7 @@
-import { generatePdfWithHeaderFooter } from "../../../infrastructure/gotenberg/gotenberg-client";
-import { createFooter, createHeader } from "../../email/templates";
-import { getFooter, getHeader } from "../../reminder/pdf-assets";
-import { renderLiquidToHtml } from "../../reminder/pdf-render";
+import { generatePdfWithHeaderFooter } from "../../infrastructure/gotenberg/gotenberg-client";
+import { createFooter, createHeader } from "../email/templates";
+import { getFooter, getHeader } from "./pdf-assets";
+import { renderLiquidToHtml } from "./pdf-render";
 
 export async function generateSoaPdfHandler(params: {
   templateName: string;

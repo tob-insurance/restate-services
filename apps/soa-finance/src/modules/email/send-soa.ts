@@ -1,3 +1,4 @@
+import { getTestEmailRecipient, isDevelopment } from "../../constants";
 import {
   completeJobPhase,
   insertJobPhase,
@@ -14,14 +15,13 @@ type SendSoaEmailOptions = {
   toEmail: string;
   excelFile: IFileData;
   pdfFile: IFileData;
-  testMode: boolean;
   jobId: string;
 };
 
 export const sendSoaEmail = async (
   options: SendSoaEmailOptions
 ): Promise<boolean> => {
-  const { customer, toEmail, excelFile, pdfFile, testMode, jobId } = options;
+  const { customer, toEmail, excelFile, pdfFile, jobId } = options;
   const asAtDate = new Date();
 
   const emailHtml = await generateSoaEmailHtml({
@@ -30,7 +30,9 @@ export const sendSoaEmail = async (
     asAtDate,
   });
 
-  const recipientEmail = testMode ? toEmail : customer.email || toEmail;
+  const recipientEmail = isDevelopment()
+    ? getTestEmailRecipient()
+    : customer.email || toEmail;
 
   const message: IEmailMessage = {
     to: [recipientEmail],

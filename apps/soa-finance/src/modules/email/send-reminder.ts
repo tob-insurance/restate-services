@@ -1,3 +1,4 @@
+import { getTestEmailRecipient, isDevelopment } from "../../constants";
 import { sendEmail } from "../../infrastructure/email";
 import type { IAccount } from "../../types";
 import type { IReminderEmailData } from "../reminder/types";
@@ -18,7 +19,6 @@ type SendReminderEmailParams = {
   totalPremium?: number;
   excelFile: { fileName: string; bytes: Buffer; contentType: string };
   pdfFile: { fileName: string; bytes: Buffer; contentType: string };
-  testMode: boolean;
   isReminder?: boolean;
 };
 
@@ -34,7 +34,6 @@ export const sendReminderEmail = async (
     previousLetterDate,
     branch,
     totalPremium,
-    testMode,
     excelFile,
     pdfFile,
     isReminder = true,
@@ -62,7 +61,7 @@ export const sendReminderEmail = async (
     templateName
   );
   const subject = getReminderEmailSubject(reminderType, customer.fullName);
-  const recipient = testMode ? "gerardus.david@tob-ins.com" : toEmail;
+  const recipient = isDevelopment() ? getTestEmailRecipient() : toEmail;
   const recipients = recipient.split(",").map((r) => r.trim());
   await sendEmail({
     to: recipients,

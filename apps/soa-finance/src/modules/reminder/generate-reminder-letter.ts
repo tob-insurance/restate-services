@@ -72,11 +72,7 @@ export const generateReminderLetter = async (
   // Step 4: Get SOA data (Phase: GetSoa)
   await insertJobPhase(jobId, SoaPhase.GetSoa);
 
-  const soaList = await readSoaParquet(
-    customer.code,
-    branchCode,
-    item.testMode
-  );
+  const soaList = await readSoaParquet(customer.code, branchCode);
 
   await completeJobPhase(jobId, SoaPhase.GetSoa);
   if (soaList.length === 0) {
@@ -223,8 +219,7 @@ export const generateReminderLetter = async (
     totalPremium,
     excelFile,
     pdfFile,
-    testMode: item.testMode,
-    isReminder, // Pass the isReminder flag for template selection
+    isReminder,
   });
 
   await completeJobPhase(jobId, SoaPhase.SendingEmail);

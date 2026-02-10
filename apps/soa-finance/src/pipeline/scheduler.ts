@@ -27,7 +27,7 @@ export async function pipelineScheduler() {
 
     console.log(`Executing Pipeline for schedule: ${nextRun.type}`);
     try {
-      await generateSoaPipeline(new Date(), false);
+      await generateSoaPipeline(new Date());
       console.log(`Pipeline ${nextRun.type} completed successfully`);
     } catch (error) {
       console.error(`Pipeline ${nextRun.type} failed:`, error);

@@ -22,7 +22,6 @@ type GenerateSoaOptions = {
   dateNow: Date;
   toDate: number;
   jobId: string;
-  testMode?: boolean;
   processingType: number;
   skipAgingFilter?: boolean;
   skipDcNoteCheck?: boolean;
@@ -62,7 +61,7 @@ export const generateSoa = async (
 
   let soaList = await runPhase("read-parquet", async () => {
     console.log(`Getting SOA data for ${customer.code}`);
-    return await readSoaParquet(customer.code, branchCode, options.testMode);
+    return await readSoaParquet(customer.code, branchCode);
   });
 
   // Filter Aging (Outstanding > 60 Days by default)

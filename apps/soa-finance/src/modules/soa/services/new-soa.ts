@@ -35,7 +35,6 @@ export async function newSoa(parameters: newSoaParams): Promise<void> {
       await sendWithAttachments({
         customerId: params.customerId,
         customerData,
-        testMode: params.testMode,
         jobId,
         date: dateNow,
       })

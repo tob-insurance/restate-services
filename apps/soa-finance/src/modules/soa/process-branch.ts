@@ -26,7 +26,6 @@ export const processBranch = async (
     dateNow,
     toDate: item.toDate,
     jobId: item.jobId || "",
-    testMode: item.testMode ?? false,
     skipAgingFilter: item.skipAgingFilter ?? false,
     skipDcNoteCheck: item.skipDcNoteCheck ?? false,
   });

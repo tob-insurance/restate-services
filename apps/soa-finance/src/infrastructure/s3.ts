@@ -1,4 +1,5 @@
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { getS3PathPrefix } from "../constants";
 
 export const storageServiceConfig = {
   bucketName: process.env.S3_BUCKET_NAME,
@@ -21,30 +22,21 @@ type IUploadResult = {
   success: boolean;
 };
 
-function generateStorageServiceKey(
-  fileName: string,
-  testMode?: boolean
-): string {
+function generateStorageServiceKey(fileName: string): string {
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
-  const baseProdPath = "production";
-  const baseDevPath = "development";
+  const prefix = getS3PathPrefix();
 
-  if (testMode === true) {
-    return `${baseDevPath}/${year}-${month}/${fileName}`;
-  }
-
-  return `${baseProdPath}/${year}-${month}/${fileName}`;
+  return `${prefix}/${year}-${month}/${fileName}`;
 }
 
 export async function uploadParquetToS3(
   fileName: string,
-  buffer: Buffer,
-  testMode?: boolean
+  buffer: Buffer
 ): Promise<IUploadResult> {
   const client = getStorageServiceClient();
-  const storageServiceKey = generateStorageServiceKey(fileName, testMode);
+  const storageServiceKey = generateStorageServiceKey(fileName);
 
   try {
     await client.send(

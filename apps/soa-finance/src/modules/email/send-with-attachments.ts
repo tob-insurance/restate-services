@@ -1,3 +1,4 @@
+import { getTestEmailRecipient, isDevelopment } from "../../constants";
 import { downloadSoaFiles } from "../../infrastructure/azure";
 import type { ISendEmailResult } from "../../infrastructure/email/types";
 import type { IAccount } from "../../types";
@@ -7,7 +8,6 @@ import { sendSoaEmail } from "./send-soa";
 export type SendWithAttachmentsParams = {
   customerId: string;
   customerData: IAccount;
-  testMode: boolean;
   jobId: string;
   date: Date;
 };
@@ -15,7 +15,7 @@ export type SendWithAttachmentsParams = {
 export async function sendWithAttachments(
   params: SendWithAttachmentsParams
 ): Promise<ISendEmailResult> {
-  const { customerId, customerData, testMode, jobId, date } = params;
+  const { customerId, customerData, jobId, date } = params;
 
   const excelFileName = excelSoaName(customerData.code, date);
   const pdfFileName = letterSoaPdfName(customerData.code);
@@ -40,13 +40,14 @@ export async function sendWithAttachments(
       contentType: "application/pdf",
     };
 
-    const customerEmail = "gerardus.david@tob-ins.com";
+    const customerEmail = isDevelopment()
+      ? getTestEmailRecipient()
+      : customerData.email || "";
     await sendSoaEmail({
       customer: customerData,
       toEmail: customerEmail,
       excelFile,
       pdfFile,
-      testMode,
       jobId,
     });
 

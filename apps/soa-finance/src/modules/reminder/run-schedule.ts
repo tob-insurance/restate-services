@@ -24,9 +24,7 @@ export async function runReminderSchedule({
   for (let i = 1; i < SCHEDULE_CONFIG.length; i++) {
     const schedule = SCHEDULE_CONFIG[i];
 
-    const waitTime = params.testMode
-      ? 2 * 60 * 1000
-      : calculateWaitUntilDay(schedule.sendDay);
+    const waitTime = calculateWaitUntilDay(schedule.sendDay);
 
     const targetTimeStr = new Date(Date.now() + waitTime).toLocaleString(
       "id-ID"

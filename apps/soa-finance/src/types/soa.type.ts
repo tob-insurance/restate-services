@@ -29,7 +29,6 @@ export type ISoaItem = {
   toDate: number;
   maxRetries: number;
   processingType: SoaType;
-  testMode: boolean;
   skipAgingFilter: boolean;
   skipDcNoteCheck: boolean;
 };

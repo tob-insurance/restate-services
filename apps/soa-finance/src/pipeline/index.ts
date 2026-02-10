@@ -7,8 +7,7 @@ import { writeToParquet } from "./write";
 // Run complete SOA pipeline: Oracle → Transform → Parquet by account code → upload to S3
 
 export async function generateSoaPipeline(
-  asAtDate: Date,
-  testMode?: boolean
+  asAtDate: Date
 ): Promise<ISoaPipelineResult> {
   const startTime = Date.now();
   console.log("Starting SOA pipeline");
@@ -18,7 +17,7 @@ export async function generateSoaPipeline(
   const transformedStream = transformSoaStream(oracleStream);
 
   // Write to Parquet
-  await writeToParquet(transformedStream, testMode);
+  await writeToParquet(transformedStream);
 
   const endTime = Date.now();
   const duration = formatDuration(endTime - startTime);

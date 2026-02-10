@@ -1,7 +1,7 @@
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { tableFromIPC } from "apache-arrow";
 import { readParquet } from "parquet-wasm";
-
+import { getS3PathPrefix } from "../../constants";
 import {
   getStorageServiceClient,
   storageServiceConfig,
@@ -10,19 +10,14 @@ import type { IStatementOfAccountModel } from "../../types";
 
 /**
  * Membaca file Parquet dari S3
- * Path berbeda berdasarkan testMode:
- * - testMode=true  : development/parquet/soa_${accountCode}.parquet
- * - testMode=false : production/parquet/soa_${accountCode}.parquet
  *
  * @param accountCode - Kode akun customer
  * @param branchCode - Kode cabang (opsional, "ALL" untuk semua)
- * @param testMode - Mode testing (true = development, false = production)
  * @returns Array of IStatementOfAccountModel
  */
 export async function readSoaParquet(
   accountCode: string,
-  branchCode: string,
-  testMode = false
+  branchCode: string
 ): Promise<IStatementOfAccountModel[]> {
   const s3Client = getStorageServiceClient();
   const bucketName = storageServiceConfig.bucketName;
@@ -30,8 +25,7 @@ export async function readSoaParquet(
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
 
-  // Path file di S3 berdasarkan testMode
-  const environment = testMode ? "development" : "production";
+  const environment = getS3PathPrefix();
   const s3Key = `${environment}/${year}-${month}/soa_${accountCode}.parquet`;
 
   try {

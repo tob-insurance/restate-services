@@ -3,8 +3,7 @@ import type { IStatementOfAccountModel } from "../../types";
 import { writeSoaParquetToBuffer } from "../lib";
 
 export async function writeToParquet(
-  source: AsyncIterable<IStatementOfAccountModel>,
-  testMode?: boolean
+  source: AsyncIterable<IStatementOfAccountModel>
 ) {
   const datasAccount = new Map<string, IStatementOfAccountModel[]>();
 
@@ -23,7 +22,7 @@ export async function writeToParquet(
 
     const buffer = writeSoaParquetToBuffer(rows);
 
-    const result = await uploadParquetToS3(fileName, buffer, testMode);
+    const result = await uploadParquetToS3(fileName, buffer);
 
     if (!result.success) {
       throw new Error(`Failed to upload ${fileName}`);

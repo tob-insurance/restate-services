@@ -1,7 +1,7 @@
 import { CONTENT_TYPES, excelColumns } from "../../constants";
 import type { IStatementOfAccountModel } from "../../types";
-import { excelGenerate } from "./excel-generator";
-import type { ISoaFileResult } from "./types";
+import { excelGenerate } from "../../utils/generators/excel-generator";
+import type { ISoaFileResult } from "../../utils/generators/types";
 
 type GenerateSoaExcelParams = {
   soaData: IStatementOfAccountModel[];

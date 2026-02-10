@@ -7,7 +7,6 @@ import type {
   ISoaItem,
   IStatementOfAccountModel,
 } from "../../../types";
-import { createFooter, createHeader } from "../../../utils/email";
 import {
   formatDateEnglish,
   formatDateIndonesian,
@@ -16,14 +15,11 @@ import {
   formatThousands,
   letterSoaPdfName,
 } from "../../../utils/formatter";
-import {
-  generateLetterNumber,
-  getFooter,
-  getHeader,
-  getSignature,
-  renderLiquidToHtml,
-} from "../../../utils/generators";
+import { createFooter, createHeader } from "../../email/templates";
 import { createReminder } from "../../reminder";
+import { generateLetterNumber } from "../../reminder/letter-number.generator";
+import { getFooter, getHeader, getSignature } from "../../reminder/pdf-assets";
+import { renderLiquidToHtml } from "../../reminder/pdf-render";
 import { processBranch } from "../process-branch";
 
 export type ProcessSoaParams = {

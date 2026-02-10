@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { renderTemplate } from "../template";
+import { renderTemplate } from "../../utils/template";
 import { getSignature } from "./pdf-assets";
 
 const TEMPLATES_DIR = join(__dirname, "../../assets/email/templates");

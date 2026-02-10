@@ -1,11 +1,11 @@
 import { sendEmail } from "../../infrastructure/email";
 import type { IEmailAttachment } from "../../infrastructure/email/types";
 import type { IAccount } from "../../types";
+import type { IReminderEmailData } from "../reminder/types";
 import {
   generateReminderEmailHtml,
   getReminderEmailSubject,
-} from "../../utils/email";
-import type { IReminderEmailData } from "../reminder/types";
+} from "./templates";
 
 type SendReminderEmailParams = {
   customer: IAccount;

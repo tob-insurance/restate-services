@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { IReminderEmailData } from "../../../modules/reminder/types";
-import { formatDateIndonesian } from "../../formatter";
-import { getSignature } from "../../generators";
-import { renderTemplate } from "../../template";
+import { formatDateIndonesian } from "../../../utils/formatter";
+import { renderTemplate } from "../../../utils/template";
+import { getSignature } from "../../reminder/pdf-assets";
+import type { IReminderEmailData } from "../../reminder/types";
 
 const TEMPLATES_DIR = join(__dirname, "../../../assets/email/templates");
 

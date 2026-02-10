@@ -17,14 +17,12 @@ import {
   formatThousands,
   reminderPdfName,
 } from "../../utils/formatter";
-import {
-  generateExcel,
-  generateLetterNumber,
-  getSignature,
-} from "../../utils/generators";
 import { sendReminderEmail } from "../email/send-reminder";
 import { reconcilePayment } from "../payment/reconcile-payment";
+import { generateExcel } from "../soa/excel.generator";
 import { generateSoaPdfHandler } from "../soa/services";
+import { generateLetterNumber } from "./letter-number.generator";
+import { getSignature } from "./pdf-assets";
 import type { IGenerateReminderResult, ISoaReminder } from "./types";
 
 type GenerateReminderLetterParams = {

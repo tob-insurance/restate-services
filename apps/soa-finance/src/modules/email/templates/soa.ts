@@ -3,8 +3,8 @@ import { join } from "node:path";
 
 const TEMPLATES_DIR = join(__dirname, "../../../assets/email/templates");
 
-import { formatDateIndonesian } from "../../formatter";
-import { renderTemplate } from "../../template";
+import { formatDateIndonesian } from "../../../utils/formatter";
+import { renderTemplate } from "../../../utils/template";
 
 const enDateFormatter = new Intl.DateTimeFormat("en-US", {
   day: "numeric",

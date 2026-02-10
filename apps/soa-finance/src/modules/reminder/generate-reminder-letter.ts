@@ -64,8 +64,8 @@ export const generateReminderLetter = async (
   console.log(`Processing reminder type ${reminderCount} for ${customer.code}`);
 
   // Step 3: Get email recipients
-  const _emails = await getAccountEmails(customer.code, branchCode);
-  const toEmail = "gerardus.david@tob-ins.com";
+  const emails = await getAccountEmails(customer.code, branchCode);
+  const toEmail = emails.join(",");
 
   const jobId = item.jobId ?? "";
 

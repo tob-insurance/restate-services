@@ -7,12 +7,13 @@ import {
   insertBatch,
   updateBatchStatus,
 } from "../../../infrastructure/database/index.js";
-import type { IAccount, SoaType, soaSchema } from "../../../types";
+import type { IAccount, SoaType } from "../../../types";
 import {
   formatDateToUnixTimestamp,
   formatTimePeriod,
   formatUUID,
 } from "../../../utils";
+import type { soaSchema } from "../types";
 import { type SoaWorkflow, soaWorkflow } from "./soa-workflow";
 
 const POST_COMPLETION_DELAY = 60_000;

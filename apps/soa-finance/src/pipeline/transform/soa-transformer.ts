@@ -1,5 +1,6 @@
-import { column, type IStatementOfAccountModel } from "../../types";
+import type { IStatementOfAccountModel } from "../../types";
 import { parseDate, parseNumber, parseString } from "../../utils";
+import { column } from "../types";
 
 export function transformSoaRow(
   row: unknown[]

@@ -7,13 +7,7 @@ import {
   insertReminderLetter,
 } from "../../infrastructure/database/index.js";
 import { readSoaParquet } from "../../pipeline/lib";
-import {
-  type IAccount,
-  type IGenerateReminderResult,
-  type ISoaItem,
-  type ISoaReminder,
-  SoaPhase,
-} from "../../types";
+import { type IAccount, type ISoaItem, SoaPhase } from "../../types";
 import {
   excelSoaName,
   formatDateEnglish,
@@ -31,6 +25,7 @@ import {
 import { sendReminderEmail } from "../email/send-reminder";
 import { reconcilePayment } from "../payment/reconcile-payment";
 import { generateSoaPdfHandler } from "../soa/services";
+import type { IGenerateReminderResult, ISoaReminder } from "./types";
 
 type GenerateReminderLetterParams = {
   customer: IAccount;

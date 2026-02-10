@@ -1,5 +1,6 @@
 import { downloadSoaFiles } from "../../infrastructure/azure";
-import type { IAccount, ISendEmailResult } from "../../types";
+import type { ISendEmailResult } from "../../infrastructure/email/types";
+import type { IAccount } from "../../types";
 import { excelSoaName, letterSoaPdfName } from "../../utils";
 import { sendSoaEmail } from "./send-soa";
 

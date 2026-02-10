@@ -3,12 +3,8 @@ import {
   insertJobPhase,
 } from "../../infrastructure/database/index.js";
 import { sendEmail } from "../../infrastructure/email";
-import {
-  type IAccount,
-  type IEmailMessage,
-  type IFileData,
-  SoaPhase,
-} from "../../types";
+import type { IEmailMessage } from "../../infrastructure/email/types";
+import { type IAccount, type IFileData, SoaPhase } from "../../types";
 import { formatDateDDMMYYYY } from "../../utils";
 import { generateSoaEmailHtml } from "../../utils/email";
 

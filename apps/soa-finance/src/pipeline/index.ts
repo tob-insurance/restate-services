@@ -1,7 +1,7 @@
-import type { ISoaPipelineResult } from "../types";
 import { formatDuration } from "../utils";
 import { streamSoaData } from "./read";
 import { transformSoaStream } from "./transform";
+import type { ISoaPipelineResult } from "./types";
 import { writeToParquet } from "./write";
 
 // Run complete SOA pipeline: Oracle → Transform → Parquet by account code → upload to S3

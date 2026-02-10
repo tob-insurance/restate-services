@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { IReminderEmailData } from "../../../types";
+import type { IReminderEmailData } from "../../../modules/reminder/types";
 import { formatDateIndonesian } from "../../formatter";
 import { getSignature } from "../../generators";
 import { renderTemplate } from "../../template";

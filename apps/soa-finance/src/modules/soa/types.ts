@@ -8,3 +8,5 @@ export const soaSchema = z.object({
 });
 
 export type soaSchema = z.infer<typeof soaSchema>;
+
+export const multiBranchCodes = ["DIC", "DIP", "DIG", "DID"];

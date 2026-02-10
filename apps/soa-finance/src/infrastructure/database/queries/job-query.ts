@@ -1,5 +1,5 @@
-import type { IGetSoaJob } from "../../../types";
 import { executeQuery } from "../database";
+import type { IGetSoaJob } from "../types";
 
 /**
  * Insert a new job

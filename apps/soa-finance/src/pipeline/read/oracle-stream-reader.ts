@@ -1,6 +1,6 @@
 import oracledb from "oracledb";
 import { initOracleClient } from "../../infrastructure/database/index.js";
-import type { IOracleStreamOptions } from "../../types";
+import type { IOracleStreamOptions } from "../types";
 
 type OracleBinds = {
   p_status: string;

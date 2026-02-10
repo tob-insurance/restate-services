@@ -2,8 +2,8 @@
  * Email Sender using Microsoft Graph API
  */
 
-import type { IEmailAttachment, IEmailMessage } from "../../types";
 import { getGraphClient } from "./client";
+import type { IEmailAttachment, IEmailMessage } from "./types";
 
 function formatRecipients(emails: string[]) {
   return emails.map((email) => ({ emailAddress: { address: email } }));

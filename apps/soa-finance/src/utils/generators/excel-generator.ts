@@ -1,6 +1,6 @@
 import { utils, write } from "xlsx";
 import { NUMBER_FORMATS } from "../../constants";
-import type { IExcelColumn, IExcelSheetData } from "../../types";
+import type { IExcelColumn, IExcelSheetData } from "./types";
 
 type WorksheetType = ReturnType<typeof utils.aoa_to_sheet>;
 

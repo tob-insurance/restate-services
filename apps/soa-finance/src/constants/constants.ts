@@ -1,4 +1,4 @@
-import type { IExcelColumn } from "../types";
+import type { IExcelColumn } from "../utils/generators/types";
 
 export const INDONESIAN_MONTHS = [
   "Januari",

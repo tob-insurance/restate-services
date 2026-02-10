@@ -5,20 +5,16 @@ import {
   getReminderByCustomerAndPeriod,
   updateJobStatus,
 } from "../../infrastructure/database/index.js";
-
-import {
-  ensureJobExists,
-  getCustomerData,
-  shouldProcessReminder,
-} from "../../modules";
-
-import type { ISoaItem } from "../../types";
 import {
   completeWorkflow,
+  ensureJobExists,
+  getCustomerData,
   handleErrorWithRetry,
   newSoa,
   processReminder,
-} from "../handlers";
+  shouldProcessReminder,
+} from "../../modules";
+import type { ISoaItem } from "../../types";
 
 type ISoaWorkflowResult = {
   customerId: string;

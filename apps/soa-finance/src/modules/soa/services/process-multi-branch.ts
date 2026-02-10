@@ -5,7 +5,6 @@ import {
   getLatestLetter,
 } from "../../../infrastructure/database/index.js";
 import { generatePdfWithHeaderFooter } from "../../../infrastructure/gotenberg/gotenberg-client";
-import { createReminder, processBranch } from "../../../modules";
 import type {
   IAccount,
   ISoaItem,
@@ -27,6 +26,8 @@ import {
   getSignature,
   renderLiquidToHtml,
 } from "../../../utils/generators";
+import { createReminder } from "../../reminder";
+import { processBranch } from "../process-branch";
 
 export type ProcessSoaParams = {
   ctx: WorkflowContext;

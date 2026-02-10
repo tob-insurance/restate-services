@@ -1,4 +1,3 @@
-import { generateSoaPdfHandler } from "../../engine/handlers";
 import { uploadFile } from "../../infrastructure/azure";
 import {
   completeJobPhase,
@@ -31,6 +30,7 @@ import {
 } from "../../utils/generators";
 import { sendReminderEmail } from "../email/send-reminder";
 import { reconcilePayment } from "../payment/reconcile-payment";
+import { generateSoaPdfHandler } from "../soa/services";
 
 type GenerateReminderLetterParams = {
   customer: IAccount;

@@ -1,8 +1,8 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
 
-import { getAllBranches } from "../../../infrastructure/database/index.js";
-import { processReminderLetter } from "../../../modules";
-import type { IAccount, ISoaItem } from "../../../types";
+import { getAllBranches } from "../../infrastructure/database/index.js";
+import type { IAccount, ISoaItem } from "../../types";
+import { processReminderLetter } from "./process-reminder";
 
 type ProcessReminderParams = {
   ctx: WorkflowContext;

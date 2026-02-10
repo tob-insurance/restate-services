@@ -1,11 +1,11 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
-import { SCHEDULE_CONFIG } from "../../../constants/schedule";
+import { SCHEDULE_CONFIG } from "../../constants/schedule";
 import {
   getAllBranches,
   getReminderByCustomerAndPeriod,
-} from "../../../infrastructure/database/index.js";
-import { processReminderLetter } from "../../../modules";
-import type { IAccount, ISoaItem } from "../../../types";
+} from "../../infrastructure/database/index.js";
+import type { IAccount, ISoaItem } from "../../types";
+import { processReminderLetter } from "./process-reminder";
 
 type ReminderScheduleParams = {
   ctx: WorkflowContext;
@@ -13,7 +13,7 @@ type ReminderScheduleParams = {
   params: ISoaItem;
 };
 
-import { calculateWaitUntilDay } from "../../../utils/formatter";
+import { calculateWaitUntilDay } from "../../utils/formatter";
 
 export async function runReminderSchedule({
   ctx,

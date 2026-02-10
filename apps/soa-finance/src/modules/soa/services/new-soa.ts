@@ -1,7 +1,7 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
-import { sendWithAttachments } from "../../../modules";
 import { type IAccount, type ISoaItem, multiBranchCodes } from "../../../types";
-import { runReminderSchedule } from "../reminder/run-schedule";
+import { sendWithAttachments } from "../../email";
+import { runReminderSchedule } from "../../reminder/run-schedule";
 import { processMultiBranchSoa } from "./process-multi-branch";
 import { processSingleBranchSoa } from "./process-single-branch";
 

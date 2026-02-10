@@ -3,8 +3,10 @@ import type { IAccount, ISoaItem } from "../../../types";
 import { sendWithAttachments } from "../../email";
 import { runReminderSchedule } from "../../reminder/run-schedule";
 import { multiBranchCodes } from "../types";
-import { processMultiBranchSoa } from "./process-multi-branch";
-import { processSingleBranchSoa } from "./process-single-branch";
+import {
+  processMultiBranchSoa,
+  processSingleBranchSoa,
+} from "./process-branches";
 
 type newSoaParams = {
   ctx: WorkflowContext;

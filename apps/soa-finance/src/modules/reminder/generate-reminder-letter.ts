@@ -8,21 +8,12 @@ import {
 } from "../../infrastructure/database/index.js";
 import { readSoaParquet } from "../../pipeline/lib";
 import { type IAccount, type ISoaItem, SoaPhase } from "../../types";
-import {
-  excelSoaName,
-  formatDateEnglish,
-  formatDateIndonesian,
-  formatMonthEnglish,
-  formatMonthIndonesian,
-  formatThousands,
-  reminderPdfName,
-} from "../../utils/formatter";
+import { excelSoaName, reminderPdfName } from "../../utils/formatter";
 import { sendReminderEmail } from "../email/send-reminder";
 import { reconcilePayment } from "../payment/reconcile-payment";
 import { generateExcel } from "../soa/excel.generator";
-import { generateSoaPdfHandler } from "../soa/services";
+import { buildPdfTemplateData, generateSoaPdfHandler } from "../soa/services";
 import { generateLetterNumber } from "./letter-number.generator";
-import { getSignature } from "./pdf-assets";
 import type { IGenerateReminderResult, ISoaReminder } from "./types";
 
 type GenerateReminderLetterParams = {
@@ -33,7 +24,6 @@ type GenerateReminderLetterParams = {
 
 export const generateReminderLetter = async (
   params: GenerateReminderLetterParams
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: existing complex logic
 ): Promise<IGenerateReminderResult | null> => {
   const { customer, reminder, item } = params;
   const dateNow = new Date();
@@ -155,46 +145,18 @@ export const generateReminderLetter = async (
   const pdfFileName = reminderPdfName(reminderCount);
   const toDate = new Date(item.toDate * 1000);
 
-  // Prepare PDF template data based on whether it's a reminder or initial SOA
-  let pdfTemplateData: Record<string, unknown>;
+  const branchName = unpaidItems.length > 0 ? unpaidItems[0].branch : "";
 
-  if (isReminder) {
-    // For Reminder Letters (RL1, RL2, WL): include all reminder-specific fields
-    const branchName = unpaidItems.length > 0 ? unpaidItems[0].branch : "";
-    const totalPremium = unpaidItems.reduce(
-      (sum, soaItem) => sum + (soaItem.netPremiumIdr || 0),
-      0
-    );
-
-    pdfTemplateData = {
-      AsAtDateId: formatDateIndonesian(toDate),
-      AsAtDateEn: formatDateEnglish(toDate),
-      LetterNo: letterNo,
-      Name: customer.fullName,
-      Branch: branchName,
-      ReminderCount: reminderCount.toString(),
-      TotalPremium: formatThousands(totalPremium),
-      OutstandingMonthId: formatMonthIndonesian(toDate),
-      OutstandingMonthEn: formatMonthEnglish(toDate),
-      LetterNoReff: latestLetter?.letterNo ?? null,
-      SentDateId: latestLetter?.sentDate
-        ? formatDateIndonesian(latestLetter.sentDate)
-        : null,
-      SentDateEn: latestLetter?.sentDate
-        ? formatDateEnglish(latestLetter.sentDate)
-        : null,
-      VirtualNumber: customer.virtualAccount,
-      ImgSign: await getSignature(),
-    };
-  } else {
-    // For initial SOA: use simpler data structure
-    pdfTemplateData = {
-      asAtDate: formatDateIndonesian(toDate),
-      customerName: customer.fullName,
-      virtualAccount: customer.virtualAccount,
-      signature: await getSignature(),
-    };
-  }
+  const pdfTemplateData = await buildPdfTemplateData({
+    isReminder,
+    toDate,
+    customerData: customer,
+    branchName,
+    soaData: unpaidItems,
+    letterNo,
+    reminderCount: reminderCount.toString(),
+    latestLetter,
+  });
 
   const pdfFileBase64 = await generateSoaPdfHandler({
     templateName: isReminder
@@ -241,8 +203,7 @@ export const generateReminderLetter = async (
   // Step 10: Send Email (Phase: SendingEmail)
   await insertJobPhase(jobId, SoaPhase.SendingEmail);
 
-  // Calculate total, branch, etc for Email (using unpaidItems defined in Step 5.2)
-  const branchName = unpaidItems.length > 0 ? unpaidItems[0].branch : "";
+  // Calculate total for Email (using unpaidItems defined in Step 5.2)
   const totalPremium = unpaidItems.reduce(
     (sum, soaItem) => sum + (soaItem.netPremiumIdr || 0),
     0

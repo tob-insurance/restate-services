@@ -2,14 +2,12 @@ import type { WorkflowContext } from "@restatedev/restate-sdk";
 import { TerminalError, workflow } from "@restatedev/restate-sdk";
 
 import {
-  completeJobPhase,
   getAccountById,
   getReminderByCustomerAndPeriod,
-  insertJobPhase,
   updateJobStatus,
 } from "../../../infrastructure/database/index.js";
 import { type ISoaItem, SoaPhase } from "../../../types";
-import { ensureJobExists } from "../../job";
+import { ensureJobExists, trackPhase } from "../../job";
 import { processReminderLetter } from "../../reminder";
 import { completeWorkflow, newSoa } from "../services";
 
@@ -51,12 +49,12 @@ export const soaWorkflow = workflow({
         await updateJobStatus(jobId, "Processing");
       });
 
-      const customerData = await ctx.run("get-customer-data", async () => {
-        await insertJobPhase(jobId, SoaPhase.RetrievingCustomerData);
-        const customer = await getAccountById(customerId);
-        await completeJobPhase(jobId, SoaPhase.RetrievingCustomerData);
-        return customer;
-      });
+      const customerData = await trackPhase(
+        ctx,
+        jobId,
+        SoaPhase.RetrievingCustomerData,
+        () => ctx.run("get-customer-data", () => getAccountById(customerId))
+      );
 
       if (!customerData) {
         throw new TerminalError(`Customer ${customerId} tidak ditemukan`);

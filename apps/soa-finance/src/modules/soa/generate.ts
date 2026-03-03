@@ -1,10 +1,6 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
 import { uploadFile } from "../../infrastructure/azure";
-import {
-  completeJobPhase,
-  getDcNoteIdsByCustomer,
-  insertJobPhase,
-} from "../../infrastructure/database/index.js";
+import { getDcNoteIdsByCustomer } from "../../infrastructure/database/index.js";
 import { readSoaParquet } from "../../pipeline/lib";
 import {
   type IAccount,
@@ -13,6 +9,7 @@ import {
 } from "../../types";
 import { excelSoaName } from "../../utils/formatter";
 import { generateExcel } from "../document-generation/excel.generator";
+import { trackPhase } from "../job";
 
 type GenerateSoaOptions = {
   ctx: WorkflowContext;
@@ -44,30 +41,30 @@ export const generateSoa = async (
   );
 
   // ========== Phase: Get SOA Data ==========
-  await insertJobPhase(jobId, SoaPhase.GetSoa);
+  let soaList = await trackPhase(ctx, jobId, SoaPhase.GetSoa, async () => {
+    let list = await ctx.run("read-parquet", async () => {
+      console.log(`Getting SOA data for ${customer.code}`);
+      return await readSoaParquet(customer.code, branchCode);
+    });
 
-  let soaList = await ctx.run("read-parquet", async () => {
-    console.log(`Getting SOA data for ${customer.code}`);
-    return await readSoaParquet(customer.code, branchCode);
-  });
-
-  // Filter Aging (Outstanding > 60 Days by default)
-  // biome-ignore lint/suspicious/useAwait: Async required by ctx.run signature
-  soaList = await ctx.run("filter-aging", async () => {
-    if (skipAgingFilter) {
+    // Filter Aging (Outstanding > 60 Days by default)
+    // biome-ignore lint/suspicious/useAwait: Async required by ctx.run signature
+    list = await ctx.run("filter-aging", async () => {
+      if (skipAgingFilter) {
+        console.log(
+          `[AgingFilter] DISABLED for ${customer.code} - keeping all ${list.length} records`
+        );
+        return list;
+      }
+      const filtered = list.filter((soa) => soa.aging >= 60);
       console.log(
-        `[AgingFilter] DISABLED for ${customer.code} - keeping all ${soaList.length} records`
+        `[AgingFilter] ENABLED for ${customer.code}: Filtered ${list.length} down to ${filtered.length} SOA records (aging >= 60 days)`
       );
-      return soaList;
-    }
-    const filtered = soaList.filter((soa) => soa.aging >= 60);
-    console.log(
-      `[AgingFilter] ENABLED for ${customer.code}: Filtered ${soaList.length} down to ${filtered.length} SOA records (aging >= 60 days)`
-    );
-    return filtered;
-  });
+      return filtered;
+    });
 
-  await completeJobPhase(jobId, SoaPhase.GetSoa);
+    return list;
+  });
 
   if (soaList.length === 0) {
     ctx.console.log(`Skipping ${customer.code}: No SOA records found`);
@@ -133,20 +130,18 @@ export const generateSoa = async (
   // ========== Phase: Generate & Upload Files ==========
 
   // Excel: Generate and Upload in one durable step to avoid binary serialization issues
-  await ctx.run("generate-and-upload-excel", async () => {
-    await insertJobPhase(jobId, SoaPhase.GeneratingFiles);
+  await trackPhase(ctx, jobId, SoaPhase.GeneratingFiles, async () => {
+    await ctx.run("generate-and-upload-excel", async () => {
+      console.log(`Generating Excel for ${customer.code}`);
+      const excelFile = generateExcel({
+        soaData: soaList,
+        customerId: customer.code,
+      });
+      excelFile.fileName = excelSoaName(customer.code, options.dateNow);
 
-    console.log(`Generating Excel for ${customer.code}`);
-    const excelFile = generateExcel({
-      soaData: soaList,
-      customerId: customer.code,
+      console.log(`Uploading Excel for ${customer.code}`);
+      await uploadFile(excelFile, customer.code, "excel");
     });
-    excelFile.fileName = excelSoaName(customer.code, options.dateNow);
-
-    console.log(`Uploading Excel for ${customer.code}`);
-    await uploadFile(excelFile, customer.code, "excel");
-
-    await completeJobPhase(jobId, SoaPhase.GeneratingFiles);
   });
 
   ctx.console.log(

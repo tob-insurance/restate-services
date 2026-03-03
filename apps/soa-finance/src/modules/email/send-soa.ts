@@ -1,11 +1,7 @@
 import { getTestEmailRecipient, isDevelopment } from "../../constants";
-import {
-  completeJobPhase,
-  insertJobPhase,
-} from "../../infrastructure/database/index.js";
 import { sendEmail } from "../../infrastructure/email";
 import type { IEmailMessage } from "../../infrastructure/email/types";
-import { type IAccount, type IFileData, SoaPhase } from "../../types";
+import type { IAccount, IFileData } from "../../types";
 import { formatDateDDMMYYYY } from "../../utils";
 import { buildEmailAttachments, DEFAULT_CC_RECIPIENTS } from "./attachments";
 import { generateSoaEmailHtml } from "./templates";
@@ -15,14 +11,14 @@ type SendSoaEmailOptions = {
   toEmail: string;
   excelFile: IFileData;
   pdfFile: IFileData;
-  jobId: string;
+  date: Date;
 };
 
 export const sendSoaEmail = async (
   options: SendSoaEmailOptions
 ): Promise<boolean> => {
-  const { customer, toEmail, excelFile, pdfFile, jobId } = options;
-  const asAtDate = new Date();
+  const { customer, toEmail, excelFile, pdfFile, date } = options;
+  const asAtDate = date;
 
   const emailHtml = await generateSoaEmailHtml({
     customerName: customer.fullName,
@@ -44,9 +40,7 @@ export const sendSoaEmail = async (
 
   console.log(`Sending SOA email for ${customer.code} to: ${recipientEmail}`);
 
-  await insertJobPhase(jobId, SoaPhase.SendingEmail);
   const sent = await sendEmail(message);
-  await completeJobPhase(jobId, SoaPhase.SendingEmail);
 
   return sent;
 };

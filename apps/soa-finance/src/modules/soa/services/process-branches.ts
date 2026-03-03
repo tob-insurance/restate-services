@@ -1,5 +1,4 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
-import { uploadFile } from "../../../infrastructure/azure";
 import {
   getAllBranches,
   getLatestLetter,
@@ -10,13 +9,12 @@ import type {
   IStatementOfAccountModel,
 } from "../../../types";
 import { letterSoaPdfName } from "../../../utils/formatter";
-import { generateSoaPdfHandler } from "../../document-generation/generate-soa-pdf";
-import { generateLetterNumber } from "../../document-generation/letter-number.generator";
-import { buildPdfTemplateData } from "../../document-generation/pdf-template";
+import {
+  generateAndUploadDocuments,
+  generateLetterNumber,
+} from "../../document-generation";
 import { createReminder } from "../../reminder";
 import { processBranch } from "../process-branch";
-
-const PDF_EXTENSION_REGEX = /\.pdf$/;
 
 export type ProcessSoaParams = {
   ctx: WorkflowContext;
@@ -24,7 +22,7 @@ export type ProcessSoaParams = {
   params: ISoaItem;
 };
 
-async function generateAndUploadPdf(
+async function generateSoaDocuments(
   soaData: IStatementOfAccountModel[],
   customerData: IAccount,
   params: ISoaItem,
@@ -43,39 +41,15 @@ async function generateAndUploadPdf(
     ? await generateLetterNumber(reminderCount, toDate)
     : "";
 
-  const templateData = await buildPdfTemplateData({
-    isReminder,
-    toDate,
-    customerData,
-    branchName,
+  await generateAndUploadDocuments({
     soaData,
+    customerData,
+    params,
+    branchName,
     letterNo,
-    reminderCount,
     latestLetter,
+    pdfFileName: letterSoaPdfName(customerData.code),
   });
-
-  const templateName = isReminder
-    ? "TemplateReminderLetterSOA"
-    : "TemplateOutstandingStatementOfAccount";
-
-  const pdfFileName = letterSoaPdfName(customerData.code);
-  const pdfFileNameWithoutExt = pdfFileName.replace(PDF_EXTENSION_REGEX, "");
-
-  const pdfResult = await generateSoaPdfHandler({
-    templateName,
-    data: templateData,
-    filename: pdfFileNameWithoutExt,
-  });
-
-  await uploadFile(
-    {
-      fileName: pdfFileName,
-      bytes: Buffer.from(pdfResult.bytes as string, "base64"),
-      contentType: "application/pdf",
-    },
-    customerData.code,
-    "pdf"
-  );
 }
 
 export async function processSingleBranchSoa({
@@ -92,7 +66,7 @@ export async function processSingleBranchSoa({
 
   if (singleResult.soaData && singleResult.soaData.length > 0) {
     await ctx.run("generate-and-upload-pdf", async () => {
-      await generateAndUploadPdf(
+      await generateSoaDocuments(
         singleResult.soaData as IStatementOfAccountModel[],
         customerData,
         params,
@@ -134,7 +108,7 @@ export async function processMultiBranchSoa({
       await ctx.run(
         `generate-and-upload-pdf-${branchItem.officeCode}`,
         async () => {
-          await generateAndUploadPdf(
+          await generateSoaDocuments(
             branchResult.soaData as IStatementOfAccountModel[],
             customerData,
             params,

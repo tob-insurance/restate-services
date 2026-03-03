@@ -14,8 +14,6 @@ import {
 import type { soaSchema } from "../types";
 import { type SoaWorkflow, soaWorkflow } from "./soa-workflow";
 
-const POST_COMPLETION_DELAY = 60_000;
-const WORKER_START_DELAY = 60_000;
 const MAX_WORKERS = 10;
 const PROGRESS_LOG_INTERVAL = 10;
 
@@ -102,7 +100,7 @@ export const batchWorkflow = workflow({
         await insertBatch(batchId, totalAccounts, "Queued");
       });
 
-      ctx.console.log(`mulai: ${batchId} dengan total ${totalAccounts} akun`);
+      ctx.console.log(`start: ${batchId} with ${totalAccounts} accounts`);
 
       // STEP 4: Update Status ke Processing
       await ctx.run("processing-status-update", async () => {
@@ -159,7 +157,6 @@ export const batchWorkflow = workflow({
       ) {
         startAccountProcessing(accountsToProcess[nextAccountIndex]);
         nextAccountIndex += 1;
-        await ctx.sleep(WORKER_START_DELAY);
       }
 
       // Proses sampai semua akun selesai
@@ -180,13 +177,10 @@ export const batchWorkflow = workflow({
           );
         }
 
-        await ctx.sleep(POST_COMPLETION_DELAY);
-
         // Mulai proses akun berikutnya jika masih ada
         if (nextAccountIndex < totalAccounts) {
           startAccountProcessing(accountsToProcess[nextAccountIndex]);
           nextAccountIndex += 1;
-          await ctx.sleep(WORKER_START_DELAY);
         }
       }
 

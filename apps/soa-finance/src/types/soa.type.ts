@@ -27,7 +27,6 @@ export type ISoaItem = {
   classOfBusiness: string;
   branch: string;
   toDate: number;
-  maxRetries: number;
   processingType: SoaType;
   skipAgingFilter: boolean;
   skipDcNoteCheck: boolean;

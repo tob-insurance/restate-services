@@ -1,5 +1,5 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
-import { workflow } from "@restatedev/restate-sdk";
+import { TerminalError, workflow } from "@restatedev/restate-sdk";
 
 import {
   completeJobPhase,
@@ -11,7 +11,7 @@ import {
 import { type ISoaItem, SoaPhase } from "../../../types";
 import { ensureJobExists } from "../../job";
 import { processReminderLetter } from "../../reminder";
-import { completeWorkflow, handleErrorWithRetry, newSoa } from "../services";
+import { completeWorkflow, newSoa } from "../services";
 
 type ISoaWorkflowResult = {
   customerId: string;
@@ -19,36 +19,6 @@ type ISoaWorkflowResult = {
   jobId: string;
 };
 
-/**
- * SoaWorkflow - Workflow untuk memproses Statement of Account (SOA) per customer.
- *
- * Tujuan:
- * - Memproses SOA untuk satu customer tertentu
- * - Menentukan apakah customer perlu diproses sebagai SOA baru atau reminder letter
- * - Mengelola retry logic jika terjadi error
- * - Melaporkan hasil proses ke batch workflow
- *
- * Hubungan ke fungsi lain:
- * - Dipanggil oleh `batchWorkflow` sebagai child workflow untuk setiap customer
- * - Memanggil `ensureJobExists` untuk membuat/mendapatkan job record di database
- * - Mengambil data customer dari database via `getAccountById`
- * - Memanggil `getReminderByCustomerAndPeriod` untuk cek histori SOA
- * - Menentukan tipe proses berdasarkan existing reminders dan processingType
- * - Memanggil `newSoa` atau `processReminder` berdasarkan keputusan di atas
- * - Memanggil `completeWorkflow` untuk finalisasi dan update status batch
- * - Memanggil `handleErrorWithRetry` untuk error handling dengan retry mechanism
- *
- * Alur proses:
- * 1. Buat/ambil job record untuk customer ini
- * 2. Loop retry sampai sukses atau max retry tercapai:
- *    a. Update status job ke "Processing"
- *    b. Ambil data customer dari database
- *    c. Cek histori reminder untuk periode ini
- *    d. Tentukan apakah proses sebagai reminder atau SOA baru
- *    e. Jalankan proses yang sesuai
- *    f. Tandai workflow selesai
- * 3. Return hasil dengan status completed/failed
- */
 export const soaWorkflow = workflow({
   name: "SoaWorkflow",
   options: {
@@ -63,12 +33,11 @@ export const soaWorkflow = workflow({
       ctx: WorkflowContext,
       soaParams: ISoaItem
     ): Promise<ISoaWorkflowResult> => {
-      const { customerId, batchId, timePeriod, maxRetries, processingType } =
-        soaParams;
+      const { customerId, batchId, timePeriod, processingType } = soaParams;
 
       ctx.console.log(`Starting SOA for customer: ${customerId}`);
 
-      const { jobId, retryAttempt } = await ctx.run(
+      const { jobId } = await ctx.run(
         "get-or-create-job",
         async () => await ensureJobExists(batchId, customerId)
       );
@@ -78,89 +47,48 @@ export const soaWorkflow = workflow({
         jobId,
       };
 
-      let isProcessingSuccess = false;
-      let currentRetryAttempt = retryAttempt;
+      await ctx.run("update-job-processing", async () => {
+        await updateJobStatus(jobId, "Processing");
+      });
 
-      // STEP 2: Loop retry sampai sukses atau max retry
-      while (!isProcessingSuccess && currentRetryAttempt <= maxRetries) {
-        try {
-          // STEP 2a: Update status job ke Processing
-          await ctx.run("update-job-processing", async () => {
-            await updateJobStatus(jobId, "Processing");
-          });
+      const customerData = await ctx.run("get-customer-data", async () => {
+        await insertJobPhase(jobId, SoaPhase.RetrievingCustomerData);
+        const customer = await getAccountById(customerId);
+        await completeJobPhase(jobId, SoaPhase.RetrievingCustomerData);
+        return customer;
+      });
 
-          // STEP 2b: Ambil data customer
-          const customerData = await ctx.run("get-customer-data", async () => {
-            await insertJobPhase(jobId, SoaPhase.RetrievingCustomerData);
-            const customer = await getAccountById(customerId);
-            await completeJobPhase(jobId, SoaPhase.RetrievingCustomerData);
-            return customer;
-          });
-
-          if (!customerData) {
-            throw new Error(`Customer ${customerId} tidak ditemukan`);
-          }
-
-          // STEP 2c: Cek histori reminder untuk periode ini
-          const existingReminders = await ctx.run(
-            "check-soa-history",
-            async () =>
-              await getReminderByCustomerAndPeriod(
-                customerData.code,
-                timePeriod
-              )
-          );
-
-          // STEP 2d: Tentukan tipe proses
-          const hasExistingReminder = existingReminders.length > 0;
-          const shouldCreateReminder =
-            hasExistingReminder || processingType !== 1;
-
-          // STEP 2e: Jalankan proses yang sesuai
-          if (shouldCreateReminder) {
-            await processReminderLetter({
-              customer: customerData,
-              item: processingItem,
-            });
-          } else {
-            await newSoa({
-              ctx,
-              customerData,
-              params: processingItem,
-              jobId,
-            });
-          }
-
-          isProcessingSuccess = true;
-
-          // STEP 2f: Finalisasi workflow
-          await completeWorkflow({
-            ctx,
-            jobId,
-            batchId,
-          });
-
-          ctx.console.log(`selesai: ${customerId}`);
-        } catch (error: unknown) {
-          const errorResult = await handleErrorWithRetry({
-            ctx,
-            error,
-            jobId,
-            batchId,
-            customerId,
-            currentRetryAttempt,
-            maxRetries,
-          });
-
-          if (!errorResult.shouldContinue) {
-            return errorResult.result as unknown as ISoaWorkflowResult;
-          }
-
-          currentRetryAttempt += 1;
-        }
+      if (!customerData) {
+        throw new TerminalError(`Customer ${customerId} tidak ditemukan`);
       }
 
-      // STEP 3: Return hasil
+      const existingReminders = await ctx.run(
+        "check-soa-history",
+        async () =>
+          await getReminderByCustomerAndPeriod(customerData.code, timePeriod)
+      );
+
+      const hasExistingReminder = existingReminders.length > 0;
+      const shouldCreateReminder = hasExistingReminder || processingType !== 1;
+
+      if (shouldCreateReminder) {
+        await processReminderLetter({
+          customer: customerData,
+          item: processingItem,
+        });
+      } else {
+        await newSoa({
+          ctx,
+          customerData,
+          params: processingItem,
+          jobId,
+        });
+      }
+
+      await completeWorkflow({ ctx, jobId, batchId });
+
+      ctx.console.log(`selesai: ${customerId}`);
+
       return {
         customerId,
         status: "completed",

@@ -80,7 +80,6 @@ export const batchWorkflow = workflow({
       const soaOptions = {
         classOfBusiness: "ALL",
         branch: "ALL",
-        maxRetries: 3,
         skipAgingFilter: soaRequest.skipAgingFilter ?? false,
         skipDcNoteCheck: soaRequest.skipDcNoteCheck ?? false,
       };
@@ -144,7 +143,6 @@ export const batchWorkflow = workflow({
             classOfBusiness: soaOptions.classOfBusiness,
             branch: soaOptions.branch,
             toDate: processingDates.toDate,
-            maxRetries: soaOptions.maxRetries,
             processingType: soaProcessingType,
             skipAgingFilter: soaOptions.skipAgingFilter,
             skipDcNoteCheck: soaOptions.skipDcNoteCheck,

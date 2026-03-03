@@ -10,7 +10,7 @@ import {
 } from "../../../infrastructure/database/index.js";
 import { type ISoaItem, SoaPhase } from "../../../types";
 import { ensureJobExists } from "../../job";
-import { processReminder } from "../../reminder";
+import { processReminderLetter } from "../../reminder";
 import { completeWorkflow, handleErrorWithRetry, newSoa } from "../services";
 
 type ISoaWorkflowResult = {
@@ -79,7 +79,7 @@ export const soaWorkflow = workflow({
       };
 
       let isProcessingSuccess = false;
-      const currentRetryAttempt = retryAttempt;
+      let currentRetryAttempt = retryAttempt;
 
       // STEP 2: Loop retry sampai sukses atau max retry
       while (!isProcessingSuccess && currentRetryAttempt <= maxRetries) {
@@ -118,10 +118,9 @@ export const soaWorkflow = workflow({
 
           // STEP 2e: Jalankan proses yang sesuai
           if (shouldCreateReminder) {
-            await processReminder({
-              ctx,
-              customerData,
-              params: processingItem,
+            await processReminderLetter({
+              customer: customerData,
+              item: processingItem,
             });
           } else {
             await newSoa({
@@ -156,6 +155,8 @@ export const soaWorkflow = workflow({
           if (!errorResult.shouldContinue) {
             return errorResult.result as unknown as ISoaWorkflowResult;
           }
+
+          currentRetryAttempt += 1;
         }
       }
 

@@ -1,7 +1,5 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
 import { RestatePromise, workflow } from "@restatedev/restate-sdk";
-import { v4 as uuidv4 } from "uuid";
-
 import {
   getAllAccounts,
   insertBatch,
@@ -99,10 +97,9 @@ export const batchWorkflow = workflow({
       const totalAccounts = accountsToProcess.length;
 
       // STEP 3: Buat Record Batch
-      const batchId = await ctx.run("create-batch", async () => {
-        const newBatchId = formatUUID(uuidv4());
-        await insertBatch(newBatchId, totalAccounts, "Queued");
-        return newBatchId;
+      const batchId = formatUUID(ctx.rand.uuidv4());
+      await ctx.run("create-batch", async () => {
+        await insertBatch(batchId, totalAccounts, "Queued");
       });
 
       ctx.console.log(`mulai: ${batchId} dengan total ${totalAccounts} akun`);

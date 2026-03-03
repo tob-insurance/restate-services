@@ -4,7 +4,7 @@ import type { IAccount, ISoaItem, IStatementOfAccountModel } from "../../types";
 import { generateSoa } from "./generate";
 
 export const processBranch = async (
-  ctx: WorkflowContext | undefined,
+  ctx: WorkflowContext,
   branchCode: string,
   customer: IAccount,
   item: ISoaItem
@@ -15,7 +15,9 @@ export const processBranch = async (
 }> => {
   const dateNow = new Date(item.processingDate);
 
-  console.log(`Processing branch ${branchCode} for customer ${customer.code}`);
+  ctx.console.log(
+    `Processing branch ${branchCode} for customer ${customer.code}`
+  );
 
   const result = await generateSoa({
     ctx,
@@ -24,14 +26,13 @@ export const processBranch = async (
     classOfBusiness: item.classOfBusiness,
     processingType: item.processingType,
     dateNow,
-    toDate: item.toDate,
     jobId: item.jobId || "",
     skipAgingFilter: item.skipAgingFilter ?? false,
     skipDcNoteCheck: item.skipDcNoteCheck ?? false,
   });
 
   if (result && result.length > 0) {
-    console.log(
+    ctx.console.log(
       `SOA generated for ${customer.code} branch ${branchCode}: ${result.length} records`
     );
 

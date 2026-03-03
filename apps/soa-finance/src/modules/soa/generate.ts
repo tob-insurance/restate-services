@@ -15,12 +15,11 @@ import { excelSoaName } from "../../utils/formatter";
 import { generateExcel } from "../document-generation/excel.generator";
 
 type GenerateSoaOptions = {
-  ctx?: WorkflowContext;
+  ctx: WorkflowContext;
   branchCode: string;
   customer: IAccount;
   classOfBusiness: string;
   dateNow: Date;
-  toDate: number;
   jobId: string;
   processingType: number;
   skipAgingFilter?: boolean;
@@ -35,38 +34,26 @@ export const generateSoa = async (
     branchCode,
     customer,
     classOfBusiness,
-    toDate,
     jobId,
     skipAgingFilter = false,
     skipDcNoteCheck = false,
   } = options;
 
-  console.log(
+  ctx.console.log(
     `GenerateSOA started for ${customer.code}, Branch: ${branchCode}, COB: ${classOfBusiness}`
   );
-
-  // Helper to run with or without context
-  const runPhase = async <T>(
-    name: string,
-    fn: () => Promise<T>
-  ): Promise<T> => {
-    if (ctx) {
-      return await ctx.run(name, fn);
-    }
-    return await fn();
-  };
 
   // ========== Phase: Get SOA Data ==========
   await insertJobPhase(jobId, SoaPhase.GetSoa);
 
-  let soaList = await runPhase("read-parquet", async () => {
+  let soaList = await ctx.run("read-parquet", async () => {
     console.log(`Getting SOA data for ${customer.code}`);
     return await readSoaParquet(customer.code, branchCode);
   });
 
   // Filter Aging (Outstanding > 60 Days by default)
-  // biome-ignore lint/suspicious/useAwait: Async required by runPhase signature
-  soaList = await runPhase("filter-aging", async () => {
+  // biome-ignore lint/suspicious/useAwait: Async required by ctx.run signature
+  soaList = await ctx.run("filter-aging", async () => {
     if (skipAgingFilter) {
       console.log(
         `[AgingFilter] DISABLED for ${customer.code} - keeping all ${soaList.length} records`
@@ -83,12 +70,12 @@ export const generateSoa = async (
   await completeJobPhase(jobId, SoaPhase.GetSoa);
 
   if (soaList.length === 0) {
-    console.log(`Skipping ${customer.code}: No SOA records found`);
+    ctx.console.log(`Skipping ${customer.code}: No SOA records found`);
     return null;
   }
 
   // Extract unique DC notes (O(N) with Set)
-  const newSoaList = await runPhase("filter-dc-notes", async () => {
+  const newSoaList = await ctx.run("filter-dc-notes", async () => {
     const dcNotesSet = new Set(
       soaList.flatMap((soa) => soa.debitAndCreditNoteNo?.split(",") || [])
     );
@@ -132,21 +119,21 @@ export const generateSoa = async (
   });
 
   if (newSoaList.length === 0) {
-    console.log(
+    ctx.console.log(
       `Skipping ${customer.code}: No matching SOA records after filter`
     );
     return null;
   }
 
   soaList = newSoaList;
-  console.log(`SOA data ready for ${customer.code}: ${soaList.length} records`);
+  ctx.console.log(
+    `SOA data ready for ${customer.code}: ${soaList.length} records`
+  );
 
   // ========== Phase: Generate & Upload Files ==========
-  const toDateObj = new Date(toDate * 1000);
-  const _dateStr = toDateObj.toISOString().split("T")[0];
 
   // Excel: Generate and Upload in one durable step to avoid binary serialization issues
-  await runPhase("generate-and-upload-excel", async () => {
+  await ctx.run("generate-and-upload-excel", async () => {
     await insertJobPhase(jobId, SoaPhase.GeneratingFiles);
 
     console.log(`Generating Excel for ${customer.code}`);
@@ -162,7 +149,9 @@ export const generateSoa = async (
     await completeJobPhase(jobId, SoaPhase.GeneratingFiles);
   });
 
-  console.log(`Files generated and uploaded successfully for ${customer.code}`);
+  ctx.console.log(
+    `Files generated and uploaded successfully for ${customer.code}`
+  );
 
   return soaList;
 };

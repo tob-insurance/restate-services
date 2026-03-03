@@ -9,11 +9,12 @@ export const reconcilePayment = async (
 ): Promise<string[]> => {
   const unpaidDcNotes = await getUnpaidReminderDetail(reminderId);
 
+  const currentDcNotesSet = new Set(
+    currentDcNotes.map((dc) => dc.toLowerCase())
+  );
+
   const paidDcNotes = unpaidDcNotes.filter(
-    (dcNote) =>
-      !currentDcNotes.some(
-        (pNote) => pNote.toLowerCase() === dcNote.toLowerCase()
-      )
+    (dcNote) => !currentDcNotesSet.has(dcNote.toLowerCase())
   );
 
   for (const dcNote of paidDcNotes) {

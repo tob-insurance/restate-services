@@ -1,16 +1,11 @@
-import type { WorkflowContext } from "@restatedev/restate-sdk";
-
 import { getReminderByCustomerAndPeriod } from "../../infrastructure/database/index.js";
-import type { IBranch } from "../../infrastructure/database/types";
 import { type IAccount, type ISoaItem, SoaType } from "../../types";
 import { generateReminderLetter } from "./generate-reminder-letter";
 import type { IProcessReminder, ISoaReminder } from "./types";
 
 type ProcessReminderParams = {
   customer: IAccount;
-  branches: IBranch[];
   item: ISoaItem;
-  ctx: WorkflowContext;
 };
 
 export const processReminderLetter = async (

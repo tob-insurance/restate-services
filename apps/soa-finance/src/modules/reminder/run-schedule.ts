@@ -1,9 +1,6 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
 import { SCHEDULE_CONFIG } from "../../constants/schedule";
-import {
-  getAllBranches,
-  getReminderByCustomerAndPeriod,
-} from "../../infrastructure/database/index.js";
+import { getReminderByCustomerAndPeriod } from "../../infrastructure/database/index.js";
 import type { IAccount, ISoaItem } from "../../types";
 import { processReminderLetter } from "./process-reminder";
 
@@ -26,9 +23,8 @@ export async function runReminderSchedule({
 
     const waitTime = calculateWaitUntilDay(schedule.sendDay);
 
-    const targetTimeStr = new Date(Date.now() + waitTime).toLocaleString(
-      "id-ID"
-    );
+    const now = await ctx.date.now();
+    const targetTimeStr = new Date(now + waitTime).toLocaleString("id-ID");
     ctx.console.log(
       `Menunggu jadwal ${schedule.type} (tanggal ${schedule.sendDay}). Target: ${targetTimeStr}`
     );
@@ -54,20 +50,10 @@ export async function runReminderSchedule({
     ctx.console.log(
       `Memproses ${schedule.type} - Due Date: ${schedule.dueDay ?? "N/A"}`
     );
-    const branchesForReminder = await ctx.run(
-      `get-branches-for-${schedule.type.toLowerCase()}`,
-      async () => await getAllBranches()
-    );
-    await ctx.run(
-      `send-${schedule.type.toLowerCase()}`,
-      async () =>
-        await processReminderLetter({
-          customer: customerData,
-          branches: branchesForReminder,
-          item: reminderProcessingItem,
-          ctx,
-        })
-    );
+    await processReminderLetter({
+      customer: customerData,
+      item: reminderProcessingItem,
+    });
     remindersSent += 1;
     ctx.console.log(`${schedule.type} berhasil dikirim`);
   }

@@ -22,6 +22,7 @@ export async function readSoaParquet(
   const s3Client = getStorageServiceClient();
   const bucketName = storageServiceConfig.bucketName;
   const now = new Date();
+  now.setMonth(now.getMonth() - 1);
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
 

@@ -157,6 +157,8 @@ export const batchWorkflow = workflow({
       ) {
         startAccountProcessing(accountsToProcess[nextAccountIndex]);
         nextAccountIndex += 1;
+        // Delay 30 detik antar customer untuk mengurangi beban database
+        await ctx.sleep(30_000);
       }
 
       // Proses sampai semua akun selesai
@@ -181,6 +183,8 @@ export const batchWorkflow = workflow({
         if (nextAccountIndex < totalAccounts) {
           startAccountProcessing(accountsToProcess[nextAccountIndex]);
           nextAccountIndex += 1;
+          // Delay 30 detik antar customer untuk mengurangi beban database
+          await ctx.sleep(30_000);
         }
       }
 

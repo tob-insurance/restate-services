@@ -10,7 +10,7 @@ export type CreateReminderParams = {
   timePeriod: string;
   branchCode: string;
   soaList: IStatementOfAccountModel[];
-  ctx?: WorkflowContext;
+  ctx: WorkflowContext;
 };
 
 export const createReminder = async (
@@ -22,15 +22,10 @@ export const createReminder = async (
   );
 
   // 1. Insert reminder and get ID (Always deterministic since reminderId is generated inside)
-  const reminderId = await (async () => {
-    if (ctx) {
-      return await ctx.run(
-        "insert-reminder-header",
-        async () => await insertReminder(customer.code, timePeriod, branchCode)
-      );
-    }
-    return await insertReminder(customer.code, timePeriod, branchCode);
-  })();
+  const reminderId = await ctx.run(
+    "insert-reminder-header",
+    async () => await insertReminder(customer.code, timePeriod, branchCode)
+  );
 
   // 2. Insert details in chunks using bulk insert (Batch of 5000 is safe and fast)
   const chunkSize = 5000;
@@ -47,14 +42,10 @@ export const createReminder = async (
       reminderId,
     }));
 
-    if (ctx) {
-      await ctx.run(
-        `insert-reminder-details-chunk-${chunkNo}`,
-        async () => await insertReminderDetailsBulk(details)
-      );
-    } else {
-      await insertReminderDetailsBulk(details);
-    }
+    await ctx.run(
+      `insert-reminder-details-chunk-${chunkNo}`,
+      async () => await insertReminderDetailsBulk(details)
+    );
   }
 
   console.log(

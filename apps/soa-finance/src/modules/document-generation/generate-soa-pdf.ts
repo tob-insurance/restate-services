@@ -1,5 +1,6 @@
 import { generatePdfWithHeaderFooter } from "../../infrastructure/gotenberg/gotenberg-client";
-import { createFooter, createHeader } from "../email/templates";
+import { createFooter } from "./html/footer";
+import { createHeader } from "./html/header";
 import { getFooter, getHeader } from "./pdf-assets";
 import { renderLiquidToHtml } from "./pdf-render";
 

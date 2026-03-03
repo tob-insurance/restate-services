@@ -56,7 +56,7 @@ export async function processSingleBranchSoa({
   ctx,
   customerData,
   params,
-}: ProcessSoaParams): Promise<void> {
+}: ProcessSoaParams): Promise<boolean> {
   const singleResult = await processBranch(
     ctx,
     params.branch,
@@ -81,20 +81,26 @@ export async function processSingleBranchSoa({
       soaList: singleResult.soaData as IStatementOfAccountModel[],
       ctx,
     });
+
+    return true;
   }
+
+  return false;
 }
 
 export async function processMultiBranchSoa({
   ctx,
   customerData,
   params,
-}: ProcessSoaParams): Promise<void> {
+}: ProcessSoaParams): Promise<boolean> {
   const branches = await ctx.run(
     "get-branches",
     async () => await getAllBranches()
   );
 
   ctx.console.log(`Processing ${branches.length} branches`);
+
+  let hasDocuments = false;
 
   for (const branchItem of branches) {
     const branchResult = await processBranch(
@@ -124,6 +130,10 @@ export async function processMultiBranchSoa({
         soaList: branchResult.soaData as IStatementOfAccountModel[],
         ctx,
       });
+
+      hasDocuments = true;
     }
   }
+
+  return hasDocuments;
 }

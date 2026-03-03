@@ -23,25 +23,29 @@ export async function newSoa(parameters: newSoaParams): Promise<void> {
   const isMultiBranchCustomer = () =>
     multiBranchCodes.includes(customerData.actingCode);
 
-  if (isMultiBranchCustomer()) {
-    await processMultiBranchSoa({ ctx, customerData, params });
+  const hasDocuments = isMultiBranchCustomer()
+    ? await processMultiBranchSoa({ ctx, customerData, params })
+    : await processSingleBranchSoa({ ctx, customerData, params });
+
+  if (hasDocuments) {
+    const dateNow = new Date(params.processingDate);
+
+    await trackPhase(ctx, jobId, SoaPhase.SendingEmail, async () => {
+      await ctx.run(
+        "send-email",
+        async () =>
+          await sendWithAttachments({
+            customerId: params.customerId,
+            customerData,
+            date: dateNow,
+          })
+      );
+    });
+
+    await runReminderSchedule({ ctx, customerData, params });
   } else {
-    await processSingleBranchSoa({ ctx, customerData, params });
-  }
-
-  const dateNow = new Date(params.processingDate);
-
-  await trackPhase(ctx, jobId, SoaPhase.SendingEmail, async () => {
-    await ctx.run(
-      "send-email",
-      async () =>
-        await sendWithAttachments({
-          customerId: params.customerId,
-          customerData,
-          date: dateNow,
-        })
+    ctx.console.log(
+      `Skipping email for ${params.customerId}: no documents generated`
     );
-  });
-
-  await runReminderSchedule({ ctx, customerData, params });
+  }
 }

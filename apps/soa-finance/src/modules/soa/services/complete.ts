@@ -21,12 +21,18 @@ export async function completeWorkflow({
     await updateJobStatus(jobId, "Completed");
   });
 
-  await ctx.run("batch-completed", async () => {
+  const batchResult = await ctx.run("batch-completed", async () => {
     const { isComplete, status } =
       await incrementProcessedAndCheckComplete(batchId);
     if (isComplete) {
       await updateBatchStatus(batchId, status);
-      ctx.console.log(`Batch ${batchId} completed with status ${status}`);
     }
+    return { isComplete, status };
   });
+
+  if (batchResult.isComplete) {
+    ctx.console.log(
+      `Batch ${batchId} completed with status ${batchResult.status}`
+    );
+  }
 }

@@ -20,6 +20,7 @@ type SendReminderEmailParams = {
   excelFile: { fileName: string; bytes: Buffer; contentType: string };
   pdfFile: { fileName: string; bytes: Buffer; contentType: string };
   isReminder?: boolean;
+  date: Date;
 };
 
 export const sendReminderEmail = async (
@@ -37,11 +38,12 @@ export const sendReminderEmail = async (
     excelFile,
     pdfFile,
     isReminder = true,
+    date,
   } = params;
 
   const emailData: IReminderEmailData = {
     customerName: customer.fullName,
-    asAtDate: new Date(),
+    asAtDate: date,
     virtualAccount: customer.virtualAccount || "-",
     letterNo,
     previousLetterNo,

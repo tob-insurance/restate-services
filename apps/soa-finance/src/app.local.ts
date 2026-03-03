@@ -1,3 +1,4 @@
+import "varlock/auto-load";
 import { serve } from "@restatedev/restate-sdk";
 import { initOracleClient } from "./infrastructure/database/database.js";
 import { batchWorkflow, soaWorkflow } from "./modules/soa/workflows/index.js";

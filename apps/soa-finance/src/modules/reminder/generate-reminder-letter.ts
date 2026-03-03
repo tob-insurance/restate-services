@@ -1,4 +1,3 @@
-import { uploadFile } from "../../infrastructure/azure";
 import {
   completeJobPhase,
   getAccountEmails,
@@ -8,13 +7,11 @@ import {
 } from "../../infrastructure/database/index.js";
 import { readSoaParquet } from "../../pipeline/lib";
 import { type IAccount, type ISoaItem, SoaPhase } from "../../types";
-import { excelSoaName, reminderPdfName } from "../../utils/formatter";
+import { reminderPdfName } from "../../utils/formatter";
 import {
-  buildPdfTemplateData,
-  generateSoaPdfHandler,
+  generateAndUploadDocuments,
+  generateLetterNumber,
 } from "../document-generation";
-import { generateExcel } from "../document-generation/excel.generator";
-import { generateLetterNumber } from "../document-generation/letter-number.generator";
 import { sendReminderEmail } from "../email/send-reminder";
 import { reconcilePayment } from "../payment/reconcile-payment";
 import type { IGenerateReminderResult, ISoaReminder } from "./types";
@@ -29,7 +26,7 @@ export const generateReminderLetter = async (
   params: GenerateReminderLetterParams
 ): Promise<IGenerateReminderResult | null> => {
   const { customer, reminder, item } = params;
-  const dateNow = new Date();
+  const dateNow = new Date(item.processingDate);
 
   const branchCode = reminder.officeId || "ALL";
 
@@ -131,73 +128,19 @@ export const generateReminderLetter = async (
     sentDate: dateNow,
   });
 
-  // Step 8: Generate Files (Phase: GeneratingFiles)
-  await insertJobPhase(jobId, SoaPhase.GeneratingFiles);
-
-  // Generate Excel with ONLY unpaid items (matches C# logic)
-  const excelFile = generateExcel({
-    soaData: unpaidItems,
-    customerId: customer.code,
-  });
-
-  const isReminder = reminderCount !== Number(item.processingType);
+  // Step 8-9: Generate and upload documents
   const pdfFileName = reminderPdfName(reminderCount);
-  const toDate = new Date(item.toDate * 1000);
-
   const branchName = unpaidItems.length > 0 ? unpaidItems[0].branch : "";
-
-  const pdfTemplateData = await buildPdfTemplateData({
-    isReminder,
-    toDate,
-    customerData: customer,
-    branchName,
+  const isReminder = item.processingType > 1;
+  const { excelFile, pdfFile } = await generateAndUploadDocuments({
     soaData: unpaidItems,
+    customerData: customer,
+    params: item,
+    branchName,
     letterNo,
-    reminderCount: reminderCount.toString(),
     latestLetter,
+    pdfFileName,
   });
-
-  const pdfFileBase64 = await generateSoaPdfHandler({
-    templateName: isReminder
-      ? "TemplateReminderLetterSOA"
-      : "TemplateOutstandingStatementOfAccount",
-    data: pdfTemplateData,
-    filename: pdfFileName,
-  });
-
-  const pdfFile = {
-    ...pdfFileBase64,
-    bytes: Buffer.from(pdfFileBase64.bytes as string, "base64"),
-  };
-
-  await completeJobPhase(jobId, SoaPhase.GeneratingFiles);
-
-  // Step 9: Upload to Azure (Phase: UploadingToAzure)
-  await insertJobPhase(jobId, SoaPhase.UploadingToAzure);
-
-  const excelFileName = excelSoaName(customer.code, dateNow);
-  await uploadFile(
-    {
-      ...excelFile,
-      fileName: excelFileName,
-      contentType:
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    },
-    customer.code,
-    "excel"
-  );
-
-  await uploadFile(
-    {
-      ...pdfFile,
-      fileName: pdfFileName,
-      contentType: "application/pdf",
-    },
-    customer.code,
-    "pdf"
-  );
-
-  await completeJobPhase(jobId, SoaPhase.UploadingToAzure);
 
   // Step 10: Send Email (Phase: SendingEmail)
   await insertJobPhase(jobId, SoaPhase.SendingEmail);
@@ -220,6 +163,7 @@ export const generateReminderLetter = async (
     excelFile,
     pdfFile,
     isReminder,
+    date: dateNow,
   });
 
   await completeJobPhase(jobId, SoaPhase.SendingEmail);

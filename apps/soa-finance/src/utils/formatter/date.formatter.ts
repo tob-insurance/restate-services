@@ -115,7 +115,7 @@ export function calculateWaitUntilDay(
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth();
 
-  // 1. Tentukan target date pada bulan berjalan
+  // 1. Set target date in the current month
   let targetDate = new Date(
     currentYear,
     currentMonth,
@@ -126,7 +126,7 @@ export function calculateWaitUntilDay(
     0
   );
 
-  // 2. Jika waktu sekarang sudah melewati target di bulan ini, jadwalkan untuk bulan depan
+  // 2. If current time has passed the target this month, schedule for next month
   if (now.getTime() >= targetDate.getTime()) {
     targetDate = new Date(
       currentYear,

@@ -10,7 +10,10 @@ type ReminderScheduleParams = {
   params: ISoaItem;
 };
 
+import { isDevelopment } from "../../constants/environment";
 import { calculateWaitUntilDay } from "../../utils/formatter";
+
+const DEV_SCHEDULE_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
 
 export async function runReminderSchedule({
   ctx,
@@ -21,12 +24,14 @@ export async function runReminderSchedule({
   for (let i = 1; i < SCHEDULE_CONFIG.length; i++) {
     const schedule = SCHEDULE_CONFIG[i];
 
-    const waitTime = calculateWaitUntilDay(schedule.sendDay);
+    const waitTime = isDevelopment()
+      ? DEV_SCHEDULE_INTERVAL_MS
+      : calculateWaitUntilDay(schedule.sendDay);
 
     const now = await ctx.date.now();
     const targetTimeStr = new Date(now + waitTime).toLocaleString("id-ID");
     ctx.console.log(
-      `Menunggu jadwal ${schedule.type} (tanggal ${schedule.sendDay}). Target: ${targetTimeStr}`
+      `Waiting for schedule ${schedule.type} (day ${schedule.sendDay}). Target: ${targetTimeStr}`
     );
     await ctx.sleep(waitTime);
     const outstandingReminders = await ctx.run(
@@ -38,7 +43,7 @@ export async function runReminderSchedule({
         )
     );
     if (!outstandingReminders || outstandingReminders.length === 0) {
-      ctx.console.log("Semua SOA sudah dibayar, menghentikan reminder");
+      ctx.console.log("All SOAs have been paid, stopping reminder");
       break;
     }
 
@@ -48,17 +53,17 @@ export async function runReminderSchedule({
     };
 
     ctx.console.log(
-      `Memproses ${schedule.type} - Due Date: ${schedule.dueDay ?? "N/A"}`
+      `Processing ${schedule.type} - Due Date: ${schedule.dueDay ?? "N/A"}`
     );
     await processReminderLetter({
       customer: customerData,
       item: reminderProcessingItem,
     });
     remindersSent += 1;
-    ctx.console.log(`${schedule.type} berhasil dikirim`);
+    ctx.console.log(`${schedule.type} successfully sent`);
   }
   ctx.console.log(
-    `Jadwal reminder selesai, total ${remindersSent} reminder terkirim`
+    `Reminder schedule complete, total ${remindersSent} reminders sent`
   );
   return remindersSent;
 }

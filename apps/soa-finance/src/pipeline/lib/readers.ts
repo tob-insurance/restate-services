@@ -9,10 +9,10 @@ import {
 import type { IStatementOfAccountModel } from "../../types";
 
 /**
- * Membaca file Parquet dari S3
+ * Read Parquet file from S3
  *
- * @param accountCode - Kode akun customer
- * @param branchCode - Kode cabang (opsional, "ALL" untuk semua)
+ * @param accountCode - Customer account code
+ * @param branchCode - Branch code (optional, "ALL" for all)
  * @returns Array of IStatementOfAccountModel
  */
 export async function readSoaParquet(
@@ -32,7 +32,7 @@ export async function readSoaParquet(
   try {
     console.log(`[S3] Fetching parquet from: s3://${bucketName}/${s3Key}`);
 
-    // Download file dari S3
+    // Download file from S3
     const command = new GetObjectCommand({
       Bucket: bucketName,
       Key: s3Key,
@@ -45,10 +45,10 @@ export async function readSoaParquet(
       return [];
     }
 
-    // Convert stream ke buffer
+    // Convert stream to buffer
     const bodyContents = await streamToBuffer(response.Body);
 
-    // Parse parquet menggunakan parquet-wasm
+    // Parse parquet using parquet-wasm
     const table = readParquet(new Uint8Array(bodyContents));
     const rows = tableToArray(table) as unknown as IStatementOfAccountModel[];
 
@@ -56,7 +56,7 @@ export async function readSoaParquet(
       `[S3 Parquet] Read ${rows.length} raw rows from S3 (${environment})`
     );
 
-    // Filter by branch jika diperlukan
+    // Filter by branch if needed
     if (branchCode && branchCode !== "ALL") {
       const filteredBranch = rows.filter((row) => row.branch === branchCode);
       console.log(
@@ -81,18 +81,18 @@ export async function readSoaParquet(
 }
 
 /**
- * Convert AWS SDK stream ke Buffer
+ * Convert AWS SDK stream to Buffer
  */
 async function streamToBuffer(
   stream: NodeJS.ReadableStream | ReadableStream | Blob
 ): Promise<Buffer> {
-  // Jika stream adalah Blob (browser/node 18+)
+  // If stream is a Blob (browser/node 18+)
   if (stream instanceof Blob) {
     const arrayBuffer = await stream.arrayBuffer();
     return Buffer.from(arrayBuffer);
   }
 
-  // Jika stream adalah ReadableStream (web streams)
+  // If stream is a ReadableStream (web streams)
   if ("getReader" in stream) {
     const reader = stream.getReader();
     const chunks: Uint8Array[] = [];
@@ -108,7 +108,7 @@ async function streamToBuffer(
     return Buffer.concat(chunks);
   }
 
-  // Fallback untuk Node.js streams
+  // Fallback for Node.js streams
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     (stream as NodeJS.ReadableStream).on("data", (chunk) =>
@@ -122,7 +122,7 @@ async function streamToBuffer(
 }
 
 /**
- * Convert parquet table ke array of objects
+ * Convert parquet table to array of objects
  */
 function tableToArray(
   table: ReturnType<typeof readParquet>

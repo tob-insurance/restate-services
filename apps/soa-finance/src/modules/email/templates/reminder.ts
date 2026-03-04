@@ -82,6 +82,6 @@ export function getReminderEmailSubject(
     case "3":
       return `Warning Letter - ${customerName}`;
     default:
-      return `Tagihan Premi - ${customerName}`;
+      return `Premium Invoice - ${customerName}`;
   }
 }

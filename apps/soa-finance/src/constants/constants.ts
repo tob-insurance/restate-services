@@ -1,20 +1,5 @@
 import type { IExcelColumn } from "../utils/generators/types";
 
-export const INDONESIAN_MONTHS = [
-  "Januari",
-  "Februari",
-  "Maret",
-  "April",
-  "Mei",
-  "Juni",
-  "Juli",
-  "Agustus",
-  "September",
-  "Oktober",
-  "November",
-  "Desember",
-] as const;
-
 // CC recipients for SOA and Reminder emails
 export const CC_EMAILS = ["finance@tob-ins.com"] as const;
 
@@ -130,5 +115,4 @@ export function getContentType(filename: string): string {
 
 export type NumberFormat = (typeof NUMBER_FORMATS)[keyof typeof NUMBER_FORMATS];
 export type ContentType = (typeof CONTENT_TYPES)[keyof typeof CONTENT_TYPES];
-export type IndonesianMonth = (typeof INDONESIAN_MONTHS)[number];
 export type RomanMonth = (typeof ROMAN_MONTHS)[number];

@@ -11,8 +11,6 @@ export type ISoaItem = {
   customerId: string;
   timePeriod: string;
   processingDate: string;
-  batchId: string;
-  jobId?: string;
   classOfBusiness: string;
   branch: string;
   toDate: number;

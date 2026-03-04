@@ -1,16 +1,8 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
 import { RestatePromise, workflow } from "@restatedev/restate-sdk";
-import {
-  getAllAccounts,
-  insertBatch,
-  updateBatchStatus,
-} from "../../../infrastructure/database/index.js";
+import { getAllAccounts } from "../../../infrastructure/database/index.js";
 import type { IAccount, SoaType } from "../../../types";
-import {
-  formatDateToUnixTimestamp,
-  formatTimePeriod,
-  formatUUID,
-} from "../../../utils";
+import { formatDateToUnixTimestamp, formatTimePeriod } from "../../../utils";
 import type { soaSchema } from "../types";
 import { type SoaWorkflow, soaWorkflow } from "./soa-workflow";
 
@@ -23,7 +15,6 @@ type ActiveWorkerSlot = {
 };
 
 type IBatchWorkflowResult = {
-  batchId: string;
   message: string;
   totalAccounts: number;
   status: "Completed";
@@ -34,25 +25,19 @@ type IBatchWorkflowResult = {
  *
  * Purpose:
  * - Fetch all customer accounts from database
- * - Create a new batch record for tracking process status
  * - Process each customer in parallel with max worker limit (10 concurrent)
  * - Manage customer queue using worker pool
  * - Return batch status after all customers are processed
  *
  * Related functions:
  * - Calls `getAllAccounts` from queries to fetch customer data
- * - Calls `insertBatch` to create a new batch record in database
- * - Calls `updateBatchStatus` to update batch status (Processing → Completed)
  * - Delegates per-customer processing to `soaWorkflow` as child workflow
  *
  * Process flow:
  * 1. Initialize date parameters (timePeriod, toDate, processingDate) used across services
  * 2. Fetch all customer accounts from database
- * 3. Create batch record with status "Queued"
- * 4. Update batch status to "Processing"
- * 5. Process customers using worker pool (max 10 concurrent)
- * 6. Update batch status to "Completed"
- * 7. Return batch result
+ * 3. Process customers using worker pool (max 10 concurrent)
+ * 4. Return batch result
  */
 
 export const batchWorkflow = workflow({
@@ -94,18 +79,7 @@ export const batchWorkflow = workflow({
 
       const totalAccounts = accountsToProcess.length;
 
-      // STEP 3: Create Batch Record
-      const batchId = formatUUID(ctx.rand.uuidv4());
-      await ctx.run("create-batch", async () => {
-        await insertBatch(batchId, totalAccounts, "Queued");
-      });
-
-      ctx.console.log(`start: ${batchId} with ${totalAccounts} accounts`);
-
-      // STEP 4: Update Status to Processing
-      await ctx.run("processing-status-update", async () => {
-        await updateBatchStatus(batchId, "Processing");
-      });
+      ctx.console.log(`Starting batch with ${totalAccounts} accounts`);
 
       // STEP 5: Process with Worker Pool
       const workerPool: Map<string, ActiveWorkerSlot> = new Map();
@@ -134,7 +108,6 @@ export const batchWorkflow = workflow({
             customerId: accountId,
             timePeriod: processingDates.timePeriod,
             processingDate: processingDates.processingDate,
-            batchId,
             classOfBusiness: soaOptions.classOfBusiness,
             branch: soaOptions.branch,
             toDate: processingDates.toDate,
@@ -188,18 +161,11 @@ export const batchWorkflow = workflow({
         }
       }
 
-      // STEP 6: Update Status to Completed
-      await ctx.run("completed-status-update", async () => {
-        await updateBatchStatus(batchId, "Completed");
-      });
-
       ctx.console.log(
-        `${batchId} completed, processed: ${processedAccountCount} accounts`
+        `Batch completed, processed: ${processedAccountCount} accounts`
       );
 
-      // STEP 7: Return Batch Result
       return {
-        batchId,
         message: "SOA batch processing completed successfully",
         totalAccounts,
         status: "Completed",

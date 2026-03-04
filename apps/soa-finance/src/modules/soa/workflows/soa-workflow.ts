@@ -4,17 +4,14 @@ import { TerminalError, workflow } from "@restatedev/restate-sdk";
 import {
   getAccountById,
   getReminderByCustomerAndPeriod,
-  updateJobStatus,
 } from "../../../infrastructure/database/index.js";
 import type { ISoaItem } from "../../../types";
-import { ensureJobExists } from "../../job";
 import { processReminderLetter } from "../../reminder";
-import { completeWorkflow, newSoa } from "../services";
+import { newSoa } from "../services";
 
 type ISoaWorkflowResult = {
   customerId: string;
   status: "completed" | "failed";
-  jobId: string;
 };
 
 export const soaWorkflow = workflow({
@@ -31,23 +28,9 @@ export const soaWorkflow = workflow({
       ctx: WorkflowContext,
       soaParams: ISoaItem
     ): Promise<ISoaWorkflowResult> => {
-      const { customerId, batchId, timePeriod, processingType } = soaParams;
+      const { customerId, timePeriod, processingType } = soaParams;
 
       ctx.console.log(`Starting SOA for customer: ${customerId}`);
-
-      const { jobId } = await ctx.run(
-        "get-or-create-job",
-        async () => await ensureJobExists(batchId, customerId)
-      );
-
-      const processingItem: ISoaItem = {
-        ...soaParams,
-        jobId,
-      };
-
-      await ctx.run("update-job-processing", async () => {
-        await updateJobStatus(jobId, "Processing");
-      });
 
       const customerData = await ctx.run("get-customer-data", () =>
         getAccountById(customerId)
@@ -69,24 +52,21 @@ export const soaWorkflow = workflow({
       if (shouldCreateReminder) {
         await processReminderLetter({
           customer: customerData,
-          item: processingItem,
+          item: soaParams,
         });
       } else {
         await newSoa({
           ctx,
           customerData,
-          params: processingItem,
+          params: soaParams,
         });
       }
-
-      await completeWorkflow({ ctx, jobId, batchId });
 
       ctx.console.log(`completed: ${customerId}`);
 
       return {
         customerId,
         status: "completed",
-        jobId,
       };
     },
   },

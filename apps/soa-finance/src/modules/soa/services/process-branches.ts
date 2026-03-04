@@ -1,8 +1,5 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
-import {
-  getAllBranches,
-  getLatestLetter,
-} from "../../../infrastructure/database/index.js";
+import { getAllBranches } from "../../../infrastructure/database/index.js";
 import type {
   IAccount,
   ISoaItem,
@@ -32,11 +29,6 @@ async function generateSoaDocuments(
   const toDate = new Date(params.toDate * 1000);
   const reminderCount = (params.processingType - 1).toString();
 
-  let latestLetter: { letterNo: string; sentDate: Date } | null = null;
-  if (params.processingType > 2) {
-    latestLetter = await getLatestLetter(params.jobId);
-  }
-
   const letterNo = isReminder
     ? await generateLetterNumber(reminderCount, toDate)
     : "";
@@ -47,7 +39,7 @@ async function generateSoaDocuments(
     params,
     branchName,
     letterNo,
-    latestLetter,
+    latestLetter: null,
     pdfFileName: letterSoaPdfName(customerData.code),
   });
 }

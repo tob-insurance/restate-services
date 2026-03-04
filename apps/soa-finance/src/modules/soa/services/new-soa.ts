@@ -1,7 +1,6 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
 import type { IAccount, ISoaItem } from "../../../types";
 import { sendWithAttachments } from "../../email";
-import { runReminderSchedule } from "../../reminder/run-schedule";
 import { multiBranchCodes } from "../types";
 import {
   processMultiBranchSoa,
@@ -36,8 +35,6 @@ export async function newSoa(parameters: newSoaParams): Promise<void> {
           date: dateNow,
         })
     );
-
-    await runReminderSchedule({ ctx, customerData, params });
   } else {
     ctx.console.log(
       `Skipping email for ${params.customerId}: no documents generated`

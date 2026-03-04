@@ -45,7 +45,7 @@ export async function uploadFile(
   try {
     if (isLargeFile) {
       console.log(
-        `Large file detected (${(fileSize / (1024 * 1024)).toFixed(2)}MB), using chunked upload...`
+        `[Azure] Large file detected (${(fileSize / (1024 * 1024)).toFixed(2)}MB), using chunked upload...`
       );
       const stream = Readable.from(fileData.bytes);
 
@@ -54,7 +54,7 @@ export async function uploadFile(
         abortSignal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
         onProgress: (progress) => {
           const percent = ((progress.loadedBytes / fileSize) * 100).toFixed(1);
-          console.log(`Upload progress: ${percent}%`);
+          console.log(`[Azure] Upload progress: ${percent}%`);
         },
       });
     } else {
@@ -64,12 +64,12 @@ export async function uploadFile(
       });
     }
 
-    console.log(`File uploaded ${blobName} successfully`);
+    console.log(`[Azure] Uploaded ${blobName} successfully`);
     return { url: blockBlobClient.url, blobName, success: true };
   } catch (error: unknown) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
-    console.error(`Failed to upload file ${blobName}: ${errorMessage}`);
+    console.error(`[Azure] Failed to upload ${blobName}: ${errorMessage}`);
     throw error;
   }
 }
@@ -99,7 +99,7 @@ export async function deleteFile(blobName: string): Promise<boolean> {
   } catch (error: unknown) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
-    console.error(`Failed to delete file ${blobName}: ${errorMessage}`);
+    console.error(`[Azure] Failed to delete ${blobName}: ${errorMessage}`);
     return false;
   }
 }
@@ -117,16 +117,16 @@ export async function downloadSoaFiles(
   const excelBlobName = generateBlobPath(customerCode, "excel", excelFileName);
   const pdfBlobName = generateBlobPath(customerCode, "pdf", pdfFileName);
 
-  console.log(`Downloading Excel from: ${excelBlobName}`);
-  console.log(`Downloading PDF from: ${pdfBlobName}`);
+  console.log(`[Azure] Downloading Excel: ${excelBlobName}`);
+  console.log(`[Azure] Downloading PDF: ${pdfBlobName}`);
 
   const [excelBuffer, pdfBuffer] = await Promise.all([
     downloadFile(excelBlobName),
     downloadFile(pdfBlobName),
   ]);
 
-  console.log(`Downloaded Excel: ${excelBuffer.length} bytes`);
-  console.log(`Downloaded PDF: ${pdfBuffer.length} bytes`);
+  console.log(`[Azure] Downloaded Excel: ${excelBuffer.length} bytes`);
+  console.log(`[Azure] Downloaded PDF: ${pdfBuffer.length} bytes`);
 
   return {
     excelBuffer,

@@ -42,10 +42,12 @@ export async function sendEmail(message: IEmailMessage): Promise<boolean> {
 
   try {
     await client.api(`/users/${senderEmail}/sendMail`).post(mailBody);
-    console.log(`Email sent to: ${message.to.join(", ")}`);
+    console.log(
+      `[Email] Sent to: ${message.to.join(", ")}, subject: ${message.subject}`
+    );
     return true;
   } catch (error: unknown) {
-    console.error("Failed to send email:", error);
+    console.error("[Email] Failed to send:", error);
     throw error;
   }
 }

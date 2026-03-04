@@ -81,16 +81,15 @@ export async function executeSoaProcedure(
     }
   );
 
-  console.log(`StoredProcedure Status: ${result.outBinds.p_status}`);
+  console.log(`[Database] StoredProcedure status: ${result.outBinds.p_status}`);
   console.log(
-    `StoredProcedure Error Message: ${result.outBinds.p_error_message}`
+    `[Database] StoredProcedure error: ${result.outBinds.p_error_message}`
   );
-  console.log(`StoredProcedure Returned ${result.rows.length} rows`);
+  console.log(`[Database] StoredProcedure returned ${result.rows.length} rows`);
 
   if (result.rows.length > 0) {
     console.log(
-      "StoredProcedure First row sample:",
-      JSON.stringify(result.rows[0], null, 2)
+      `[Database] StoredProcedure first row: ${JSON.stringify(result.rows[0], null, 2)}`
     );
   }
 

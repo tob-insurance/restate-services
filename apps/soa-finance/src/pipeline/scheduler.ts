@@ -3,7 +3,7 @@ import { calculateWaitUntilDay } from "../utils/formatter";
 import { generateSoaPipeline } from "./index";
 
 export async function pipelineScheduler() {
-  console.log("Pipeline Scheduler Started");
+  console.log("[Scheduler] Pipeline scheduler started");
 
   while (true) {
     const targetHour = 5;
@@ -20,17 +20,17 @@ export async function pipelineScheduler() {
 
     const targetDate = new Date(Date.now() + nextRun.waitTime);
     console.log(
-      `Next Pipeline Run (${nextRun.type}): ${targetDate.toLocaleString()}`
+      `[Scheduler] Next run (${nextRun.type}): ${targetDate.toLocaleString()}`
     );
 
     await sleep(nextRun.waitTime);
 
-    console.log(`Executing Pipeline for schedule: ${nextRun.type}`);
+    console.log(`[Scheduler] Executing pipeline for: ${nextRun.type}`);
     try {
       await generateSoaPipeline(new Date());
-      console.log(`Pipeline ${nextRun.type} completed successfully`);
+      console.log(`[Scheduler] Pipeline ${nextRun.type} completed`);
     } catch (error) {
-      console.error(`Pipeline ${nextRun.type} failed:`, error);
+      console.error(`[Scheduler] Pipeline ${nextRun.type} failed:`, error);
     }
 
     await sleep(5000);

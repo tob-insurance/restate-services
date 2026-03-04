@@ -38,7 +38,7 @@ export const sendSoaEmail = async (
     attachments: buildEmailAttachments(excelFile, pdfFile),
   };
 
-  console.log(`Sending SOA email for ${customer.code} to: ${recipientEmail}`);
+  console.log(`[Email] Sending SOA for ${customer.code} to: ${recipientEmail}`);
 
   const sent = await sendEmail(message);
 

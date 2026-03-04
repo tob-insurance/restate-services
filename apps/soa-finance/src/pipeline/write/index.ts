@@ -29,7 +29,7 @@ export async function writeToParquet(
     }
 
     console.log(
-      `Uploaded ${rows.length} rows for ${distributionCode} to ${result.key}`
+      `[Pipeline] Uploaded ${rows.length} rows for ${distributionCode} to ${result.key}`
     );
   }
 }

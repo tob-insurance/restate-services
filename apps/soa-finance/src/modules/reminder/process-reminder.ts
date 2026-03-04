@@ -14,7 +14,7 @@ export const processReminderLetter = async (
   const { customer, item } = params;
 
   console.log(
-    `Starting reminder letter processing for ${customer.code}, Type: ${
+    `[Reminder] Processing for ${customer.code}, type: ${
       SoaType[item.processingType]
     }`
   );
@@ -25,7 +25,9 @@ export const processReminderLetter = async (
   )) as ISoaReminder[];
 
   if (!reminders || reminders.length === 0) {
-    console.log(`Skipping ${customer.code}: No previous reminder records`);
+    console.log(
+      `[Reminder] Skipping ${customer.code}: no previous reminder records`
+    );
     return { processed: false, remindersSent: 0, dcNotesPaid: [] };
   }
 

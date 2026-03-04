@@ -86,7 +86,7 @@ export async function generatePdfWithHeaderFooter(
     const arrayBuffer = await response.arrayBuffer();
     return Buffer.from(arrayBuffer);
   } catch (error) {
-    console.error("Error generating PDF with header/footer:", error);
+    console.error("[Gotenberg] PDF generation failed:", error);
     throw new Error(
       `Failed to generate PDF: ${error instanceof Error ? error.message : String(error)}`
     );

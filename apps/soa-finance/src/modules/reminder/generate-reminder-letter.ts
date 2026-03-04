@@ -35,23 +35,29 @@ const validateReminderType = (
 
   if (item.processingType === 1) {
     console.log(
-      `Skipping ${customer.code}: Type is SOA but has existing reminders`
+      `[Reminder] Skipping ${customer.code}: type is SOA but has existing reminders`
     );
     return null;
   }
 
   if (previousType >= expectedType) {
-    console.log(`Skipping ${customer.code}: Already sent type ${previousType}`);
+    console.log(
+      `[Reminder] Skipping ${customer.code}: already sent type ${previousType}`
+    );
     return null;
   }
 
   if (expectedType > 3) {
-    console.log(`Skipping ${customer.code}: Expected type exceeds max (3)`);
+    console.log(
+      `[Reminder] Skipping ${customer.code}: expected type exceeds max (3)`
+    );
     return null;
   }
 
   const reminderCount = expectedType;
-  console.log(`Processing reminder type ${reminderCount} for ${customer.code}`);
+  console.log(
+    `[Reminder] Processing type ${reminderCount} for ${customer.code}`
+  );
   return reminderCount;
 };
 
@@ -84,13 +90,13 @@ const getUnpaidSoaData = async (
 
   if (unpaidDcNotes.length === 0) {
     console.log(
-      `Skipping reminder for ${customer.code}: All ${dcNotesPaid.length} DC notes have been paid`
+      `[Reminder] Skipping ${customer.code}: all ${dcNotesPaid.length} DC notes paid`
     );
     return { unpaidItems: [], dcNotesPaid };
   }
 
   console.log(
-    `DC note status for ${customer.code}: ${dcNotesPaid.length} paid, ${unpaidDcNotes.length} unpaid`
+    `[Reminder] DC notes for ${customer.code}: ${dcNotesPaid.length} paid, ${unpaidDcNotes.length} unpaid`
   );
 
   const unpaidSet = new Set(unpaidDcNotes.map((dc) => dc.toLowerCase()));

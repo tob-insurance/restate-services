@@ -7,9 +7,9 @@ import { pipelineScheduler } from "./pipeline/scheduler.js";
 const PORT = 9080;
 
 async function main() {
-  console.log("Testing Oracle connection...");
+  console.log("[App] Testing Oracle connection...");
   await initOracleClient();
-  console.log("✅ Oracle connection successful");
+  console.log("[App] Oracle connection successful");
 
   const services = [soaWorkflow, batchWorkflow];
 
@@ -18,17 +18,17 @@ async function main() {
     port: PORT,
   });
 
-  console.log(`✅ Server started on port ${PORT}`);
-  console.log("Registered services:");
+  console.log(`[App] Server started on port ${PORT}`);
+  console.log("[App] Registered services:");
   for (const service of services) {
-    console.log(`  - ${service.name}`);
+    console.log(`[App]   - ${service.name}`);
   }
 
   await pipelineScheduler();
-  console.log("✅ Pipeline scheduler started");
+  console.log("[App] Pipeline scheduler started");
 }
 
 main().catch((err) => {
-  console.error("Failed to start application:", err);
+  console.error("[App] Failed to start application:", err);
   process.exit(1);
 });

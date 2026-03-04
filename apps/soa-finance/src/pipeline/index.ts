@@ -10,7 +10,7 @@ export async function generateSoaPipeline(
   asAtDate: Date
 ): Promise<ISoaPipelineResult> {
   const startTime = Date.now();
-  console.log("Starting SOA pipeline");
+  console.log("[Pipeline] Starting SOA pipeline");
 
   // Create pipeline: Reader → Transformer
   const oracleStream = streamSoaData(asAtDate);
@@ -22,7 +22,7 @@ export async function generateSoaPipeline(
   const endTime = Date.now();
   const duration = formatDuration(endTime - startTime);
 
-  console.log(`Pipeline completed in ${duration}`);
+  console.log(`[Pipeline] Completed in ${duration}`);
 
   return {
     success: true,

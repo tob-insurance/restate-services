@@ -1,5 +1,9 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
-import { RestatePromise, workflow } from "@restatedev/restate-sdk";
+import {
+  RestatePromise,
+  TerminalError,
+  workflow,
+} from "@restatedev/restate-sdk";
 import { getAllAccounts } from "../../../infrastructure/database/index.js";
 import type { IAccount, SoaType } from "../../../types";
 import { formatDateToUnixTimestamp, formatTimePeriod } from "../../../utils";
@@ -9,9 +13,15 @@ import { type SoaWorkflow, soaWorkflow } from "./soa-workflow";
 const MAX_WORKERS = 5;
 const PROGRESS_LOG_INTERVAL = 10;
 
+type WorkerResult = {
+  accountId: string;
+  failed: boolean;
+  error?: string;
+};
+
 type ActiveWorkerSlot = {
   accountId: string;
-  promise: RestatePromise<string>;
+  promise: RestatePromise<WorkerResult>;
 };
 
 type IBatchWorkflowResult = {
@@ -25,7 +35,7 @@ type IBatchWorkflowResult = {
  *
  * Purpose:
  * - Fetch all customer accounts from database
- * - Process each customer in parallel with max worker limit (10 concurrent)
+ * - Process each customer in parallel with max worker limit (5 concurrent)
  * - Manage customer queue using worker pool
  * - Return batch status after all customers are processed
  *
@@ -36,7 +46,7 @@ type IBatchWorkflowResult = {
  * Process flow:
  * 1. Initialize date parameters (timePeriod, toDate, processingDate) used across services
  * 2. Fetch all customer accounts from database
- * 3. Process customers using worker pool (max 10 concurrent)
+ * 3. Process customers using worker pool (max 5 concurrent)
  * 4. Return batch result
  */
 
@@ -69,7 +79,7 @@ export const batchWorkflow = workflow({
         async (): Promise<IAccount[]> => {
           const accounts = await getAllAccounts();
           if (!accounts || accounts.length === 0) {
-            throw new Error("No customer accounts found");
+            throw new TerminalError("No customer accounts found");
           }
           return accounts;
         }
@@ -79,7 +89,7 @@ export const batchWorkflow = workflow({
 
       ctx.console.log(`Starting batch with ${totalAccounts} accounts`);
 
-      // STEP 5: Process with Worker Pool
+      // STEP 3: Process with Worker Pool
       const workerPool: Map<string, ActiveWorkerSlot> = new Map();
       let nextAccountIndex = 0;
       let processedAccountCount = 0;
@@ -111,7 +121,12 @@ export const batchWorkflow = workflow({
             toDate: processingDates.toDate,
             processingType: soaProcessingType,
           })
-          .map(() => accountId);
+          .map((_value, failure): WorkerResult => {
+            if (failure) {
+              return { accountId, failed: true, error: failure.message };
+            }
+            return { accountId, failed: false };
+          });
 
         workerPool.set(accountId, {
           accountId,
@@ -126,20 +141,25 @@ export const batchWorkflow = workflow({
       ) {
         startAccountProcessing(accountsToProcess[nextAccountIndex]);
         nextAccountIndex += 1;
-        // Delay 30 seconds between customers to reduce database load
-        // await ctx.sleep(30_000);
       }
 
       // Process until all accounts are complete
+      let failedAccountCount = 0;
+
       while (workerPool.size > 0) {
-        // Wait for any worker to finish
-        const completedAccountId = await RestatePromise.race(
+        const result = await RestatePromise.race(
           Array.from(workerPool.values()).map((slot) => slot.promise)
         );
 
-        // Remove from pool and update counter
-        workerPool.delete(completedAccountId);
+        workerPool.delete(result.accountId);
         processedAccountCount += 1;
+
+        if (result.failed) {
+          failedAccountCount += 1;
+          ctx.console.log(
+            `[Batch] Worker failed for ${result.accountId}: ${result.error}`
+          );
+        }
 
         // Log progress every N accounts
         if (processedAccountCount % PROGRESS_LOG_INTERVAL === 0) {
@@ -152,13 +172,11 @@ export const batchWorkflow = workflow({
         if (nextAccountIndex < totalAccounts) {
           startAccountProcessing(accountsToProcess[nextAccountIndex]);
           nextAccountIndex += 1;
-          // Delay 30 seconds between customers to reduce database load
-          // await ctx.sleep(30_000);
         }
       }
 
       ctx.console.log(
-        `Batch completed, processed: ${processedAccountCount} accounts`
+        `Batch completed: ${processedAccountCount - failedAccountCount} succeeded, ${failedAccountCount} failed, out of ${totalAccounts} accounts`
       );
 
       return {

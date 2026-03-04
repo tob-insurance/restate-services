@@ -17,8 +17,8 @@ export const createReminder = async (
   params: CreateReminderParams
 ): Promise<string> => {
   const { customer, timePeriod, branchCode, soaList, ctx } = params;
-  console.log(
-    `Creating SOA reminder for ${customer.code}, branch: ${branchCode}`
+  ctx.console.log(
+    `[Reminder] Creating SOA reminder for ${customer.code}, branch: ${branchCode}`
   );
 
   // 1. Insert reminder and get ID (Always deterministic since reminderId is generated inside)
@@ -33,8 +33,8 @@ export const createReminder = async (
     const chunk = soaList.slice(i, i + chunkSize);
     const chunkNo = Math.floor(i / chunkSize) + 1;
 
-    console.log(
-      `Inserting reminder details chunk ${chunkNo} (${chunk.length} items)`
+    ctx.console.log(
+      `[Reminder] Inserting details chunk ${chunkNo} (${chunk.length} items)`
     );
 
     const details = chunk.map((soa) => ({
@@ -48,8 +48,8 @@ export const createReminder = async (
     );
   }
 
-  console.log(
-    `Created reminder ${reminderId} with ${soaList.length} details for ${customer.code}`
+  ctx.console.log(
+    `[Reminder] Created reminder ${reminderId} with ${soaList.length} details for ${customer.code}`
   );
 
   return reminderId;

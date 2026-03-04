@@ -73,37 +73,3 @@ export const updateJobStatus = async (
     { autoCommit: true }
   );
 };
-
-/**
- * Insert a job phase
- */
-export const insertJobPhase = async (jobId: string, phase: string) => {
-  const query = `
-    INSERT INTO SOA_PROCESSING_JOB_DETAILS
-    (DETAIL_ID, JOB_ID, PHASE, STARTED_AT)
-    VALUES (SYS_GUID(), hextoraw(:jobId), :phase, SYSDATE)
-  `;
-
-  await executeQuery(query, { jobId, phase }, { autoCommit: true });
-};
-
-export const completeJobPhase = async (
-  jobId: string,
-  phase: string,
-  errorMessage?: string
-) => {
-  const query = `
-    UPDATE SOA_PROCESSING_JOB_DETAILS
-    SET COMPLETED_AT = SYSDATE,
-        ERROR_MESSAGE = :errorMessage
-    WHERE JOB_ID = hextoraw(:jobId)
-      AND PHASE = :phase
-      AND COMPLETED_AT IS NULL
-  `;
-
-  await executeQuery(
-    query,
-    { jobId, phase, errorMessage: errorMessage ?? null },
-    { autoCommit: true }
-  );
-};

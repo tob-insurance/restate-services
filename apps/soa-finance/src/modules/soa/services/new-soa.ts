@@ -1,8 +1,6 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
 import type { IAccount, ISoaItem } from "../../../types";
-import { SoaPhase } from "../../../types";
 import { sendWithAttachments } from "../../email";
-import { trackPhase } from "../../job";
 import { runReminderSchedule } from "../../reminder/run-schedule";
 import { multiBranchCodes } from "../types";
 import {
@@ -14,11 +12,10 @@ type newSoaParams = {
   ctx: WorkflowContext;
   customerData: IAccount;
   params: ISoaItem;
-  jobId: string;
 };
 
 export async function newSoa(parameters: newSoaParams): Promise<void> {
-  const { ctx, customerData, params, jobId } = parameters;
+  const { ctx, customerData, params } = parameters;
 
   const isMultiBranchCustomer = () =>
     multiBranchCodes.includes(customerData.actingCode);
@@ -30,17 +27,15 @@ export async function newSoa(parameters: newSoaParams): Promise<void> {
   if (hasDocuments) {
     const dateNow = new Date(params.processingDate);
 
-    await trackPhase(ctx, jobId, SoaPhase.SendingEmail, async () => {
-      await ctx.run(
-        "send-email",
-        async () =>
-          await sendWithAttachments({
-            customerId: params.customerId,
-            customerData,
-            date: dateNow,
-          })
-      );
-    });
+    await ctx.run(
+      "send-email",
+      async () =>
+        await sendWithAttachments({
+          customerId: params.customerId,
+          customerData,
+          date: dateNow,
+        })
+    );
 
     await runReminderSchedule({ ctx, customerData, params });
   } else {

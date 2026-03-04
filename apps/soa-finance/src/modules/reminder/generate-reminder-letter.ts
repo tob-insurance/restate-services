@@ -1,17 +1,10 @@
 import {
-  completeJobPhase,
   getAccountEmails,
   getLatestLetter,
-  insertJobPhase,
   insertReminderLetter,
 } from "../../infrastructure/database/index.js";
 import { readSoaParquet } from "../../pipeline/lib";
-import {
-  type IAccount,
-  type ISoaItem,
-  type IStatementOfAccountModel,
-  SoaPhase,
-} from "../../types";
+import type { IAccount, ISoaItem, IStatementOfAccountModel } from "../../types";
 import { reminderPdfName } from "../../utils/formatter";
 import {
   generateAndUploadDocuments,
@@ -64,18 +57,14 @@ const validateReminderType = (
 
 const getUnpaidSoaData = async (
   customer: IAccount,
-  reminder: ISoaReminder,
-  item: ISoaItem
+  reminder: ISoaReminder
 ): Promise<{
   unpaidItems: IStatementOfAccountModel[];
   dcNotesPaid: string[];
 } | null> => {
   const branchCode = reminder.officeId || "ALL";
-  const jobId = item.jobId ?? "";
 
-  await insertJobPhase(jobId, SoaPhase.GetSoa);
   const soaList = await readSoaParquet(customer.code, branchCode);
-  await completeJobPhase(jobId, SoaPhase.GetSoa);
 
   if (soaList.length === 0) {
     return null;
@@ -120,21 +109,13 @@ type CreateAndSendReminderParams = {
   latestLetter: LatestLetter;
   reminderCount: number;
   toEmail: string;
-  jobId: string;
 };
 
 const createAndSendReminder = async (
   params: CreateAndSendReminderParams
 ): Promise<IGenerateReminderResult> => {
-  const {
-    customer,
-    item,
-    unpaidItems,
-    latestLetter,
-    reminderCount,
-    toEmail,
-    jobId,
-  } = params;
+  const { customer, item, unpaidItems, latestLetter, reminderCount, toEmail } =
+    params;
   const dateNow = new Date(item.processingDate);
 
   const letterNo = await generateLetterNumber(
@@ -162,8 +143,6 @@ const createAndSendReminder = async (
     pdfFileName,
   });
 
-  await insertJobPhase(jobId, SoaPhase.SendingEmail);
-
   const totalPremium = unpaidItems.reduce(
     (sum, soaItem) => sum + (soaItem.netPremiumIdr || 0),
     0
@@ -184,8 +163,6 @@ const createAndSendReminder = async (
     date: dateNow,
   });
 
-  await completeJobPhase(jobId, SoaPhase.SendingEmail);
-
   return { sent: emailResult, dcNotesPaid: [], letterNo, reason: "SENT" };
 };
 
@@ -204,7 +181,7 @@ export const generateReminderLetter = async (
   const emails = await getAccountEmails(customer.code, branchCode);
   const toEmail = emails.join(",");
 
-  const unpaidData = await getUnpaidSoaData(customer, reminder, item);
+  const unpaidData = await getUnpaidSoaData(customer, reminder);
   if (!unpaidData) {
     return null;
   }
@@ -226,7 +203,6 @@ export const generateReminderLetter = async (
     latestLetter,
     reminderCount,
     toEmail,
-    jobId: item.jobId ?? "",
   });
 
   return { ...result, dcNotesPaid: unpaidData.dcNotesPaid };

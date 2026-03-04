@@ -30,29 +30,29 @@ type IBatchWorkflowResult = {
 };
 
 /**
- * BatchWorkflow - Workflow utama untuk memproses Statement of Account (SOA) secara batch.
+ * BatchWorkflow - Main workflow for processing Statement of Account (SOA) in batch.
  *
- * Tujuan:
- * - Mengambil semua akun customer dari database
- * - Membuat record batch baru untuk tracking status proses
- * - Memproses setiap customer secara paralel dengan batasan maksimum worker (10 concurrent)
- * - Mengelola antrian customer menggunakan worker pool
- * - Mengembalikan status batch setelah semua customer selesai diproses
+ * Purpose:
+ * - Fetch all customer accounts from database
+ * - Create a new batch record for tracking process status
+ * - Process each customer in parallel with max worker limit (10 concurrent)
+ * - Manage customer queue using worker pool
+ * - Return batch status after all customers are processed
  *
- * Hubungan ke fungsi lain:
- * - Memanggil `getAllAccounts` dari queries untuk mengambil data customer
- * - Memanggil `insertBatch` untuk membuat record batch baru di database
- * - Memanggil `updateBatchStatus` untuk update status batch (Processing → Completed)
- * - Mendelegasi proses per-customer ke `soaWorkflow` sebagai child workflow
+ * Related functions:
+ * - Calls `getAllAccounts` from queries to fetch customer data
+ * - Calls `insertBatch` to create a new batch record in database
+ * - Calls `updateBatchStatus` to update batch status (Processing → Completed)
+ * - Delegates per-customer processing to `soaWorkflow` as child workflow
  *
- * Alur proses:
- * 1. Inisialisasi parameter tanggal (timePeriod, toDate, processingDate) > karena nilainya akan digunakan untuk beberapa service
- * 2. Ambil semua akun customer dari database
- * 3. Buat record batch dengan status "Queued"
- * 4. Update status batch menjadi "Processing"
- * 5. Proses customer menggunakan worker pool (max 10 concurrent)
- * 6. Update status batch menjadi "Completed"
- * 7. Return hasil batch
+ * Process flow:
+ * 1. Initialize date parameters (timePeriod, toDate, processingDate) used across services
+ * 2. Fetch all customer accounts from database
+ * 3. Create batch record with status "Queued"
+ * 4. Update batch status to "Processing"
+ * 5. Process customers using worker pool (max 10 concurrent)
+ * 6. Update batch status to "Completed"
+ * 7. Return batch result
  */
 
 export const batchWorkflow = workflow({
@@ -62,7 +62,7 @@ export const batchWorkflow = workflow({
       ctx: WorkflowContext,
       soaRequest: soaSchema
     ): Promise<IBatchWorkflowResult> => {
-      // STEP 1: Inisialisasi Parameter Tanggal
+      // STEP 1: Initialize Date Parameters
       const processingDates = await ctx.run("initialize-dates", () => {
         const currentDate = new Date();
         return {
@@ -80,13 +80,13 @@ export const batchWorkflow = workflow({
         skipDcNoteCheck: soaRequest.skipDcNoteCheck ?? false,
       };
 
-      // STEP 2: Ambil Data Akun Customer
+      // STEP 2: Fetch Customer Accounts
       const accountsToProcess = await ctx.run(
         "get-all-accounts",
         async (): Promise<IAccount[]> => {
           const accounts = await getAllAccounts();
           if (!accounts || accounts.length === 0) {
-            throw new Error("Tidak ada akun customer yang ditemukan");
+            throw new Error("No customer accounts found");
           }
           return accounts;
         }
@@ -94,7 +94,7 @@ export const batchWorkflow = workflow({
 
       const totalAccounts = accountsToProcess.length;
 
-      // STEP 3: Buat Record Batch
+      // STEP 3: Create Batch Record
       const batchId = formatUUID(ctx.rand.uuidv4());
       await ctx.run("create-batch", async () => {
         await insertBatch(batchId, totalAccounts, "Queued");
@@ -102,28 +102,28 @@ export const batchWorkflow = workflow({
 
       ctx.console.log(`start: ${batchId} with ${totalAccounts} accounts`);
 
-      // STEP 4: Update Status ke Processing
+      // STEP 4: Update Status to Processing
       await ctx.run("processing-status-update", async () => {
         await updateBatchStatus(batchId, "Processing");
       });
 
-      // STEP 5: Proses dengan Worker Pool
+      // STEP 5: Process with Worker Pool
       const workerPool: Map<string, ActiveWorkerSlot> = new Map();
       let nextAccountIndex = 0;
       let processedAccountCount = 0;
 
       /**
-       * Memulai proses SOA untuk satu akun customer.
+       * Start SOA processing for a single customer account.
        *
-       * Tujuan:
-       * - Membuat workflow client untuk customer berdasarkan accountId
-       * - Memanggil soaWorkflow.run() dengan parameter lengkap
-       * - Mendaftarkan promise ke worker pool untuk tracking
+       * Purpose:
+       * - Create a workflow client for the customer based on accountId
+       * - Call soaWorkflow.run() with complete parameters
+       * - Register the promise in worker pool for tracking
        *
-       * Hubungan ke fungsi lain:
-       * - Dipanggil oleh main loop setiap kali ada slot worker kosong
-       * - Menggunakan `soaWorkflow` sebagai child workflow untuk proses detail
-       * - Promise yang dibuat akan di-race untuk mendeteksi completion
+       * Related functions:
+       * - Called by main loop whenever a worker slot is available
+       * - Uses `soaWorkflow` as child workflow for detailed processing
+       * - The created promise will be raced to detect completion
        */
       const startAccountProcessing = (account: IAccount): void => {
         const accountId = account.code;
@@ -150,57 +150,57 @@ export const batchWorkflow = workflow({
         });
       };
 
-      // Isi worker pool sampai penuh atau semua akun sudah dimulai
+      // Fill worker pool until full or all accounts have been started
       while (
         workerPool.size < MAX_WORKERS &&
         nextAccountIndex < totalAccounts
       ) {
         startAccountProcessing(accountsToProcess[nextAccountIndex]);
         nextAccountIndex += 1;
-        // Delay 30 detik antar customer untuk mengurangi beban database
-        await ctx.sleep(30_000);
+        // Delay 30 seconds between customers to reduce database load
+        // await ctx.sleep(30_000);
       }
 
-      // Proses sampai semua akun selesai
+      // Process until all accounts are complete
       while (workerPool.size > 0) {
-        // Tunggu salah satu worker selesai
+        // Wait for any worker to finish
         const completedAccountId = await RestatePromise.race(
           Array.from(workerPool.values()).map((slot) => slot.promise)
         );
 
-        // Hapus dari pool dan update counter
+        // Remove from pool and update counter
         workerPool.delete(completedAccountId);
         processedAccountCount += 1;
 
-        // Log progress setiap N akun
+        // Log progress every N accounts
         if (processedAccountCount % PROGRESS_LOG_INTERVAL === 0) {
           ctx.console.log(
             `[Batch] Progress: ${processedAccountCount}/${totalAccounts}`
           );
         }
 
-        // Mulai proses akun berikutnya jika masih ada
+        // Start processing next account if available
         if (nextAccountIndex < totalAccounts) {
           startAccountProcessing(accountsToProcess[nextAccountIndex]);
           nextAccountIndex += 1;
-          // Delay 30 detik antar customer untuk mengurangi beban database
-          await ctx.sleep(30_000);
+          // Delay 30 seconds between customers to reduce database load
+          // await ctx.sleep(30_000);
         }
       }
 
-      // STEP 6: Update Status ke Completed
+      // STEP 6: Update Status to Completed
       await ctx.run("completed-status-update", async () => {
         await updateBatchStatus(batchId, "Completed");
       });
 
       ctx.console.log(
-        `${batchId} selesai, proses: ${processedAccountCount} akun`
+        `${batchId} completed, processed: ${processedAccountCount} accounts`
       );
 
-      // STEP 7: Return Hasil Batch
+      // STEP 7: Return Batch Result
       return {
         batchId,
-        message: "Proses SOA batch berhasil diselesaikan",
+        message: "SOA batch processing completed successfully",
         totalAccounts,
         status: "Completed",
       };

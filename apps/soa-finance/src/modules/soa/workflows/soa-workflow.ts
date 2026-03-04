@@ -6,8 +6,8 @@ import {
   getReminderByCustomerAndPeriod,
   updateJobStatus,
 } from "../../../infrastructure/database/index.js";
-import { type ISoaItem, SoaPhase } from "../../../types";
-import { ensureJobExists, trackPhase } from "../../job";
+import type { ISoaItem } from "../../../types";
+import { ensureJobExists } from "../../job";
 import { processReminderLetter } from "../../reminder";
 import { completeWorkflow, newSoa } from "../services";
 
@@ -49,15 +49,12 @@ export const soaWorkflow = workflow({
         await updateJobStatus(jobId, "Processing");
       });
 
-      const customerData = await trackPhase(
-        ctx,
-        jobId,
-        SoaPhase.RetrievingCustomerData,
-        () => ctx.run("get-customer-data", () => getAccountById(customerId))
+      const customerData = await ctx.run("get-customer-data", () =>
+        getAccountById(customerId)
       );
 
       if (!customerData) {
-        throw new TerminalError(`Customer ${customerId} tidak ditemukan`);
+        throw new TerminalError(`Customer ${customerId} not found`);
       }
 
       const existingReminders = await ctx.run(
@@ -79,13 +76,12 @@ export const soaWorkflow = workflow({
           ctx,
           customerData,
           params: processingItem,
-          jobId,
         });
       }
 
       await completeWorkflow({ ctx, jobId, batchId });
 
-      ctx.console.log(`selesai: ${customerId}`);
+      ctx.console.log(`completed: ${customerId}`);
 
       return {
         customerId,

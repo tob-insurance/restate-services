@@ -7,17 +7,6 @@ export const SoaType = {
 
 export type SoaType = keyof typeof SoaType;
 
-export const SoaPhase = {
-  RetrievingCustomerData: "RetrievingCustomerData",
-  CheckingSoaHistory: "CheckingSoaHistory",
-  GetSoa: "GetSoa",
-  GeneratingFiles: "GeneratingFiles",
-  UploadingToAzure: "UploadingToAzure",
-  SendingEmail: "SendingEmail",
-};
-
-export type SoaPhase = (typeof SoaPhase)[keyof typeof SoaPhase];
-
 export type ISoaItem = {
   customerId: string;
   timePeriod: string;

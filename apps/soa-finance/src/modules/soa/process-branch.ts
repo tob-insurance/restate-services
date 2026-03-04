@@ -26,7 +26,6 @@ export const processBranch = async (
     classOfBusiness: item.classOfBusiness,
     processingType: item.processingType,
     dateNow,
-    jobId: item.jobId || "",
     skipAgingFilter: item.skipAgingFilter ?? false,
     skipDcNoteCheck: item.skipDcNoteCheck ?? false,
   });

@@ -6,7 +6,7 @@ import { formatDateToUnixTimestamp, formatTimePeriod } from "../../../utils";
 import type { soaSchema } from "../types";
 import { type SoaWorkflow, soaWorkflow } from "./soa-workflow";
 
-const MAX_WORKERS = 10;
+const MAX_WORKERS = 5;
 const PROGRESS_LOG_INTERVAL = 10;
 
 type ActiveWorkerSlot = {

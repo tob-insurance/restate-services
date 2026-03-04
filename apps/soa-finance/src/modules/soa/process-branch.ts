@@ -26,8 +26,6 @@ export const processBranch = async (
     classOfBusiness: item.classOfBusiness,
     processingType: item.processingType,
     dateNow,
-    skipAgingFilter: item.skipAgingFilter ?? false,
-    skipDcNoteCheck: item.skipDcNoteCheck ?? false,
   });
 
   if (result && result.length > 0) {

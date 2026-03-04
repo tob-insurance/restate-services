@@ -61,8 +61,6 @@ export const batchWorkflow = workflow({
       const soaOptions = {
         classOfBusiness: "ALL",
         branch: "ALL",
-        skipAgingFilter: soaRequest.skipAgingFilter ?? false,
-        skipDcNoteCheck: soaRequest.skipDcNoteCheck ?? false,
       };
 
       // STEP 2: Fetch Customer Accounts
@@ -112,8 +110,6 @@ export const batchWorkflow = workflow({
             branch: soaOptions.branch,
             toDate: processingDates.toDate,
             processingType: soaProcessingType,
-            skipAgingFilter: soaOptions.skipAgingFilter,
-            skipDcNoteCheck: soaOptions.skipDcNoteCheck,
           })
           .map(() => accountId);
 

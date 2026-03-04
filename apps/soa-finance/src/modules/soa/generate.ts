@@ -13,21 +13,12 @@ type GenerateSoaOptions = {
   classOfBusiness: string;
   dateNow: Date;
   processingType: number;
-  skipAgingFilter?: boolean;
-  skipDcNoteCheck?: boolean;
 };
 
 export const generateSoa = async (
   options: GenerateSoaOptions
 ): Promise<IStatementOfAccountModel[] | null> => {
-  const {
-    ctx,
-    branchCode,
-    customer,
-    classOfBusiness,
-    skipAgingFilter = false,
-    skipDcNoteCheck = false,
-  } = options;
+  const { ctx, branchCode, customer, classOfBusiness } = options;
 
   ctx.console.log(
     `GenerateSOA started for ${customer.code}, Branch: ${branchCode}, COB: ${classOfBusiness}`
@@ -39,18 +30,12 @@ export const generateSoa = async (
     return await readSoaParquet(customer.code, branchCode);
   });
 
-  // Filter Aging (Outstanding > 60 Days by default)
+  // Filter Aging (Outstanding >= 60 Days)
   // biome-ignore lint/suspicious/useAwait: Async required by ctx.run signature
   soaList = await ctx.run("filter-aging", async () => {
-    if (skipAgingFilter) {
-      console.log(
-        `[AgingFilter] DISABLED for ${customer.code} - keeping all ${soaList.length} records`
-      );
-      return soaList;
-    }
     const filtered = soaList.filter((soa) => soa.aging >= 60);
     console.log(
-      `[AgingFilter] ENABLED for ${customer.code}: Filtered ${soaList.length} down to ${filtered.length} SOA records (aging >= 60 days)`
+      `[AgingFilter] ${customer.code}: Filtered ${soaList.length} down to ${filtered.length} SOA records (aging >= 60 days)`
     );
     return filtered;
   });
@@ -60,7 +45,7 @@ export const generateSoa = async (
     return null;
   }
 
-  // Extract unique DC notes (O(N) with Set)
+  // Extract unique DC notes and filter already-processed ones
   const newSoaList = await ctx.run("filter-dc-notes", async () => {
     const dcNotesSet = new Set(
       soaList.flatMap((soa) => soa.debitAndCreditNoteNo?.split(",") || [])
@@ -73,32 +58,19 @@ export const generateSoa = async (
       `Found ${existingDcNotes.length} DC notes in previous reminders`
     );
 
-    let processedDcNotes: string[];
-    if (skipDcNoteCheck) {
-      processedDcNotes = dcNotes;
-      console.log(
-        `Skip DC note check enabled - processing all ${processedDcNotes.length} DC notes`
-      );
-    } else {
-      // Optimization: Use a Set of lowercased existing IDs for O(1) lookup
-      const existingSet = new Set(
-        existingDcNotes.map((id) => id.toLowerCase())
-      );
+    const existingSet = new Set(existingDcNotes.map((id) => id.toLowerCase()));
 
-      processedDcNotes = dcNotes.filter(
-        (note) => !existingSet.has(note.toLowerCase())
-      );
+    const processedDcNotes = dcNotes.filter(
+      (note) => !existingSet.has(note.toLowerCase())
+    );
 
-      if (processedDcNotes.length === 0) {
-        console.log(
-          `Skipping ${customer.code}: All DC notes already processed`
-        );
-        return [];
-      }
-      console.log(
-        `Processing ${processedDcNotes.length} new DC notes (filtered)`
-      );
+    if (processedDcNotes.length === 0) {
+      console.log(`Skipping ${customer.code}: All DC notes already processed`);
+      return [];
     }
+    console.log(
+      `Processing ${processedDcNotes.length} new DC notes (filtered)`
+    );
 
     const processedSet = new Set(processedDcNotes);
     return soaList.filter((soa) => processedSet.has(soa.debitAndCreditNoteNo));

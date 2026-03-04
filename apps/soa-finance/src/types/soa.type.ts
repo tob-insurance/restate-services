@@ -15,8 +15,6 @@ export type ISoaItem = {
   branch: string;
   toDate: number;
   processingType: SoaType;
-  skipAgingFilter: boolean;
-  skipDcNoteCheck: boolean;
 };
 
 export type IStatementOfAccountModel = {

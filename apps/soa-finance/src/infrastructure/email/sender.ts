@@ -21,7 +21,7 @@ function formatAttachments(attachments?: IEmailAttachment[]) {
 }
 
 function getSenderEmail(): string {
-  return "gerardus.david@tob-ins.com";
+  return process.env.SENDER_EMAIL || "gerardus.david@tob-ins.com";
 }
 
 export async function sendEmail(message: IEmailMessage): Promise<boolean> {

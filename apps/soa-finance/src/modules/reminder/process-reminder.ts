@@ -1,9 +1,12 @@
+import type { WorkflowContext } from "@restatedev/restate-sdk";
+
 import { getReminderByCustomerAndPeriod } from "../../infrastructure/database/index.js";
 import { type IAccount, type ISoaItem, SoaType } from "../../types";
 import { generateReminderLetter } from "./generate-reminder-letter";
 import type { IProcessReminder, ISoaReminder } from "./types";
 
 type ProcessReminderParams = {
+  ctx: WorkflowContext;
   customer: IAccount;
   item: ISoaItem;
 };
@@ -11,21 +14,20 @@ type ProcessReminderParams = {
 export const processReminderLetter = async (
   params: ProcessReminderParams
 ): Promise<IProcessReminder> => {
-  const { customer, item } = params;
+  const { ctx, customer, item } = params;
 
-  console.log(
+  ctx.console.log(
     `[Reminder] Processing for ${customer.code}, type: ${
       SoaType[item.processingType]
     }`
   );
 
-  const reminders = (await getReminderByCustomerAndPeriod(
-    customer.code,
-    item.timePeriod
+  const reminders = (await ctx.run("get-reminders-by-customer-period", () =>
+    getReminderByCustomerAndPeriod(customer.code, item.timePeriod)
   )) as ISoaReminder[];
 
   if (!reminders || reminders.length === 0) {
-    console.log(
+    ctx.console.log(
       `[Reminder] Skipping ${customer.code}: no previous reminder records`
     );
     return { processed: false, remindersSent: 0, dcNotesPaid: [] };
@@ -36,6 +38,7 @@ export const processReminderLetter = async (
 
   for (const reminder of reminders) {
     const result = await generateReminderLetter({
+      ctx,
       customer,
       reminder,
       item,

@@ -1,3 +1,5 @@
+import type { WorkflowContext } from "@restatedev/restate-sdk";
+import { downloadSoaFiles } from "../../infrastructure/azure";
 import {
   getAccountEmails,
   getLatestLetter,
@@ -15,6 +17,7 @@ import { reconcilePayment } from "../payment/reconcile-payment";
 import type { IGenerateReminderResult, ISoaReminder } from "./types";
 
 type GenerateReminderLetterParams = {
+  ctx: WorkflowContext;
   customer: IAccount;
   reminder: ISoaReminder;
   item: ISoaItem;
@@ -23,6 +26,7 @@ type GenerateReminderLetterParams = {
 type LatestLetter = Awaited<ReturnType<typeof getLatestLetter>>;
 
 const validateReminderType = (
+  ctx: WorkflowContext,
   customer: IAccount,
   item: ISoaItem,
   latestLetter: LatestLetter
@@ -34,34 +38,35 @@ const validateReminderType = (
   const expectedType = item.processingType - 1;
 
   if (item.processingType === 1) {
-    console.log(
+    ctx.console.log(
       `[Reminder] Skipping ${customer.code}: type is SOA but has existing reminders`
     );
     return null;
   }
 
   if (previousType >= expectedType) {
-    console.log(
+    ctx.console.log(
       `[Reminder] Skipping ${customer.code}: already sent type ${previousType}`
     );
     return null;
   }
 
   if (expectedType > 3) {
-    console.log(
+    ctx.console.log(
       `[Reminder] Skipping ${customer.code}: expected type exceeds max (3)`
     );
     return null;
   }
 
   const reminderCount = expectedType;
-  console.log(
+  ctx.console.log(
     `[Reminder] Processing type ${reminderCount} for ${customer.code}`
   );
   return reminderCount;
 };
 
 const getUnpaidSoaData = async (
+  ctx: WorkflowContext,
   customer: IAccount,
   reminder: ISoaReminder
 ): Promise<{
@@ -70,16 +75,17 @@ const getUnpaidSoaData = async (
 } | null> => {
   const branchCode = reminder.officeId || "ALL";
 
-  const soaList = await readSoaParquet(customer.code, branchCode);
+  const soaList = await ctx.run("read-soa-parquet", () =>
+    readSoaParquet(customer.code, branchCode)
+  );
 
   if (soaList.length === 0) {
     return null;
   }
 
   const currentParquetDcNotes = soaList.map((s) => s.debitAndCreditNoteNo);
-  const dcNotesPaid = await reconcilePayment(
-    reminder.id,
-    currentParquetDcNotes
+  const dcNotesPaid = await ctx.run("reconcile-payment", () =>
+    reconcilePayment(reminder.id, currentParquetDcNotes)
   );
 
   const paidSet = new Set(dcNotesPaid.map((dc) => dc.toLowerCase()));
@@ -89,13 +95,13 @@ const getUnpaidSoaData = async (
   );
 
   if (unpaidDcNotes.length === 0) {
-    console.log(
+    ctx.console.log(
       `[Reminder] Skipping ${customer.code}: all ${dcNotesPaid.length} DC notes paid`
     );
     return { unpaidItems: [], dcNotesPaid };
   }
 
-  console.log(
+  ctx.console.log(
     `[Reminder] DC notes for ${customer.code}: ${dcNotesPaid.length} paid, ${unpaidDcNotes.length} unpaid`
   );
 
@@ -108,6 +114,7 @@ const getUnpaidSoaData = async (
 };
 
 type CreateAndSendReminderParams = {
+  ctx: WorkflowContext;
   customer: IAccount;
   reminder: ISoaReminder;
   item: ISoaItem;
@@ -120,54 +127,92 @@ type CreateAndSendReminderParams = {
 const createAndSendReminder = async (
   params: CreateAndSendReminderParams
 ): Promise<IGenerateReminderResult> => {
-  const { customer, item, unpaidItems, latestLetter, reminderCount, toEmail } =
-    params;
+  const {
+    ctx,
+    customer,
+    item,
+    unpaidItems,
+    latestLetter,
+    reminderCount,
+    toEmail,
+  } = params;
   const dateNow = new Date(item.processingDate);
 
-  const letterNo = await generateLetterNumber(
-    reminderCount.toString(),
-    dateNow
+  const letterNo = await ctx.run("generate-letter-number", () =>
+    generateLetterNumber(reminderCount.toString(), dateNow)
   );
 
-  await insertReminderLetter({
-    reminderId: params.reminder.id,
-    type: reminderCount.toString(),
-    letterNo,
-    referenceId: latestLetter ? latestLetter.id : null,
-    sentDate: dateNow,
-  });
+  await ctx.run("insert-reminder-letter", () =>
+    insertReminderLetter({
+      reminderId: params.reminder.id,
+      type: reminderCount.toString(),
+      letterNo,
+      referenceId: latestLetter ? latestLetter.id : null,
+      sentDate: dateNow,
+    })
+  );
 
   const pdfFileName = reminderPdfName(reminderCount);
   const branchName = unpaidItems.length > 0 ? unpaidItems[0].branch : "";
-  const { excelFile, pdfFile } = await generateAndUploadDocuments({
-    soaData: unpaidItems,
-    customerData: customer,
-    params: item,
-    branchName,
-    letterNo,
-    latestLetter,
-    pdfFileName,
-  });
+
+  const { excelFileName } = await ctx.run(
+    "generate-and-upload-documents",
+    async () => {
+      const result = await generateAndUploadDocuments({
+        soaData: unpaidItems,
+        customerData: customer,
+        params: item,
+        branchName,
+        letterNo,
+        latestLetter,
+        pdfFileName,
+      });
+      return {
+        excelFileName: result.excelFile.fileName,
+        pdfFileName: result.pdfFile.fileName,
+      };
+    }
+  );
 
   const totalPremium = unpaidItems.reduce(
     (sum, soaItem) => sum + (soaItem.netPremiumIdr || 0),
     0
   );
 
-  const emailResult = await sendReminderEmail({
-    customer,
-    toEmail,
-    reminderType: reminderCount.toString(),
-    letterNo,
-    previousLetterNo: latestLetter?.letterNo,
-    previousLetterDate: latestLetter?.sentDate,
-    branch: branchName,
-    totalPremium,
-    excelFile,
-    pdfFile,
-    isReminder: item.processingType > 1,
-    date: dateNow,
-  });
+  const emailResult = await ctx.run(
+    "download-and-send-reminder-email",
+    async () => {
+      const { excelBuffer, pdfBuffer } = await downloadSoaFiles(
+        customer.code,
+        excelFileName,
+        pdfFileName
+      );
+
+      return sendReminderEmail({
+        customer,
+        toEmail,
+        reminderType: reminderCount.toString(),
+        letterNo,
+        previousLetterNo: latestLetter?.letterNo,
+        previousLetterDate: latestLetter?.sentDate,
+        branch: branchName,
+        totalPremium,
+        excelFile: {
+          fileName: excelFileName,
+          bytes: excelBuffer,
+          contentType:
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        },
+        pdfFile: {
+          fileName: pdfFileName,
+          bytes: pdfBuffer,
+          contentType: "application/pdf",
+        },
+        isReminder: item.processingType > 1,
+        date: dateNow,
+      });
+    }
+  );
 
   return { sent: emailResult, dcNotesPaid: [], letterNo, reason: "SENT" };
 };
@@ -175,19 +220,23 @@ const createAndSendReminder = async (
 export const generateReminderLetter = async (
   params: GenerateReminderLetterParams
 ): Promise<IGenerateReminderResult | null> => {
-  const { customer, reminder, item } = params;
+  const { ctx, customer, reminder, item } = params;
 
-  const latestLetter = await getLatestLetter(reminder.id);
-  const reminderCount = validateReminderType(customer, item, latestLetter);
+  const latestLetter = await ctx.run("get-latest-letter", () =>
+    getLatestLetter(reminder.id)
+  );
+  const reminderCount = validateReminderType(ctx, customer, item, latestLetter);
   if (reminderCount === null) {
     return null;
   }
 
   const branchCode = reminder.officeId || "ALL";
-  const emails = await getAccountEmails(customer.code, branchCode);
+  const emails = await ctx.run("get-account-emails", () =>
+    getAccountEmails(customer.code, branchCode)
+  );
   const toEmail = emails.join(",");
 
-  const unpaidData = await getUnpaidSoaData(customer, reminder);
+  const unpaidData = await getUnpaidSoaData(ctx, customer, reminder);
   if (!unpaidData) {
     return null;
   }
@@ -202,6 +251,7 @@ export const generateReminderLetter = async (
   }
 
   const result = await createAndSendReminder({
+    ctx,
     customer,
     reminder,
     item,

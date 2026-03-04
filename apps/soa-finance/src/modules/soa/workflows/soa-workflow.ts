@@ -51,6 +51,7 @@ export const soaWorkflow = workflow({
 
       if (shouldCreateReminder) {
         await processReminderLetter({
+          ctx,
           customer: customerData,
           item: soaParams,
         });

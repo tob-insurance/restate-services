@@ -31,8 +31,7 @@ export const generateSoa = async (
   });
 
   // Filter Aging (Outstanding >= 60 Days)
-  // biome-ignore lint/suspicious/useAwait: Async required by ctx.run signature
-  soaList = await ctx.run("filter-aging", async () => {
+  soaList = await ctx.run("filter-aging", () => {
     const filtered = soaList.filter((soa) => soa.aging >= 60);
     console.log(
       `[AgingFilter] ${customer.code}: Filtered ${soaList.length} down to ${filtered.length} SOA records (aging >= 60 days)`

@@ -46,10 +46,11 @@ export const soaWorkflow = workflow({
           await getReminderByCustomerAndPeriod(customerData.code, timePeriod)
       );
 
+      const isReminderType = processingType !== 1;
       const hasExistingReminder = existingReminders.length > 0;
-      const shouldCreateReminder = hasExistingReminder || processingType !== 1;
+      const shouldFollowReminderPath = isReminderType || hasExistingReminder;
 
-      if (shouldCreateReminder) {
+      if (shouldFollowReminderPath) {
         await processReminderLetter({
           ctx,
           customer: customerData,

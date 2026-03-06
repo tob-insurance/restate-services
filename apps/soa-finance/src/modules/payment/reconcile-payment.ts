@@ -1,6 +1,6 @@
 import {
   getUnpaidReminderDetail,
-  updatePaymentStatus,
+  updatePaymentStatusBulk,
 } from "../../infrastructure/database/index.js";
 
 export const reconcilePayment = async (
@@ -17,9 +17,7 @@ export const reconcilePayment = async (
     (dcNote) => !currentDcNotesSet.has(dcNote.toLowerCase())
   );
 
-  for (const dcNote of paidDcNotes) {
-    await updatePaymentStatus(dcNote, "Y");
-  }
+  await updatePaymentStatusBulk(paidDcNotes, "Y");
 
   return paidDcNotes;
 };

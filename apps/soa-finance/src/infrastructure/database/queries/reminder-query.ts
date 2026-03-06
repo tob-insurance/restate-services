@@ -91,6 +91,24 @@ export const updatePaymentStatus = async (
   await executeQuery(query, { dcNoteId, isPaid }, { autoCommit: true });
 };
 
+export const updatePaymentStatusBulk = async (
+  dcNoteIds: string[],
+  isPaid: string
+): Promise<void> => {
+  if (dcNoteIds.length === 0) {
+    return;
+  }
+
+  const sql = `
+    UPDATE SOA_REMINDER_DETAIL
+    SET IS_PAID = :isPaid
+    WHERE DC_NOTE_ID = :dcNoteId
+  `;
+
+  const binds = dcNoteIds.map((dcNoteId) => ({ dcNoteId, isPaid }));
+  await executeMany(sql, binds, { autoCommit: true });
+};
+
 export const getUnpaidReminderDetail = async (reminderId: string) => {
   const query = `
     SELECT DC_NOTE_ID as "dcNoteId", REMINDER_ID as "reminderId", IS_PAID as "isPaid" 

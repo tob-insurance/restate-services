@@ -1,11 +1,7 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
 import type { IAccount, ISoaItem } from "../../../types";
 import { sendWithAttachments } from "../../email";
-import { multiBranchCodes } from "../types";
-import {
-  processMultiBranchSoa,
-  processSingleBranchSoa,
-} from "./process-branches";
+import { processBranchSoa } from "./process-branches";
 
 type newSoaParams = {
   ctx: WorkflowContext;
@@ -16,12 +12,7 @@ type newSoaParams = {
 export async function newSoa(parameters: newSoaParams): Promise<void> {
   const { ctx, customerData, params } = parameters;
 
-  const isMultiBranchCustomer = () =>
-    multiBranchCodes.includes(customerData.actingCode);
-
-  const hasDocuments = isMultiBranchCustomer()
-    ? await processMultiBranchSoa({ ctx, customerData, params })
-    : await processSingleBranchSoa({ ctx, customerData, params });
+  const hasDocuments = await processBranchSoa({ ctx, customerData, params });
 
   if (hasDocuments) {
     const dateNow = new Date(params.processingDate);

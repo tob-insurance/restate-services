@@ -11,13 +11,16 @@ import {
   generateLetterNumber,
 } from "../../document-generation";
 import { createReminder } from "../../reminder";
-import { processBranch } from "../process-branch";
+import { generateSoa } from "../generate";
+import { multiBranchCodes } from "../types";
 
 export type ProcessSoaParams = {
   ctx: WorkflowContext;
   customerData: IAccount;
   params: ISoaItem;
 };
+
+type BranchInfo = { officeCode: string; name: string };
 
 async function generateSoaDocuments(
   soaData: IStatementOfAccountModel[],
@@ -44,82 +47,57 @@ async function generateSoaDocuments(
   });
 }
 
-export async function processSingleBranchSoa({
+export async function processBranchSoa({
   ctx,
   customerData,
   params,
 }: ProcessSoaParams): Promise<boolean> {
-  const singleResult = await processBranch(
-    ctx,
-    params.branch,
-    customerData,
-    params
-  );
+  const isMultiBranch = multiBranchCodes.includes(customerData.actingCode);
 
-  if (singleResult.soaData && singleResult.soaData.length > 0) {
-    await ctx.run("generate-and-upload-pdf", async () => {
-      await generateSoaDocuments(
-        singleResult.soaData as IStatementOfAccountModel[],
-        customerData,
-        params,
-        params.branch
-      );
-    });
+  const branches: BranchInfo[] = isMultiBranch
+    ? await ctx.run("get-branches", async () => await getAllBranches())
+    : [{ officeCode: params.branch, name: params.branch }];
 
-    await createReminder({
-      customer: customerData,
-      timePeriod: params.timePeriod,
-      branchCode: params.branch,
-      soaList: singleResult.soaData as IStatementOfAccountModel[],
-      ctx,
-    });
-
-    return true;
+  if (isMultiBranch) {
+    ctx.console.log(`Processing ${branches.length} branches`);
   }
-
-  return false;
-}
-
-export async function processMultiBranchSoa({
-  ctx,
-  customerData,
-  params,
-}: ProcessSoaParams): Promise<boolean> {
-  const branches = await ctx.run(
-    "get-branches",
-    async () => await getAllBranches()
-  );
-
-  ctx.console.log(`Processing ${branches.length} branches`);
 
   let hasDocuments = false;
 
-  for (const branchItem of branches) {
-    const branchResult = await processBranch(
-      ctx,
-      branchItem.officeCode,
-      customerData,
-      params
+  for (const branch of branches) {
+    const dateNow = new Date(params.processingDate);
+
+    ctx.console.log(
+      `Processing branch ${branch.officeCode} for customer ${customerData.code}`
     );
 
-    if (branchResult.soaData && branchResult.soaData.length > 0) {
-      await ctx.run(
-        `generate-and-upload-pdf-${branchItem.officeCode}`,
-        async () => {
-          await generateSoaDocuments(
-            branchResult.soaData as IStatementOfAccountModel[],
-            customerData,
-            params,
-            branchItem.name
-          );
-        }
+    const soaData = await generateSoa({
+      ctx,
+      branchCode: branch.officeCode,
+      customer: customerData,
+      classOfBusiness: params.classOfBusiness,
+      processingType: params.processingType,
+      dateNow,
+    });
+
+    if (soaData && soaData.length > 0) {
+      ctx.console.log(
+        `SOA generated for ${customerData.code} branch ${branch.officeCode}: ${soaData.length} records`
       );
+
+      const stepName = isMultiBranch
+        ? `generate-and-upload-pdf-${branch.officeCode}`
+        : "generate-and-upload-pdf";
+
+      await ctx.run(stepName, async () => {
+        await generateSoaDocuments(soaData, customerData, params, branch.name);
+      });
 
       await createReminder({
         customer: customerData,
         timePeriod: params.timePeriod,
-        branchCode: branchItem.officeCode,
-        soaList: branchResult.soaData as IStatementOfAccountModel[],
+        branchCode: branch.officeCode,
+        soaList: soaData,
         ctx,
       });
 

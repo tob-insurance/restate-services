@@ -80,14 +80,14 @@ function sortSoaData(
   return [...soaData].sort((a, b) => {
     // Sort by PolicyNo
     if (a.policyNo !== b.policyNo) {
-      return a.policyNo.localeCompare(b.policyNo);
+      return (a.policyNo || "").localeCompare(b.policyNo || "");
     }
     // Then by PolicyEndNo
     if (a.policyEndNo !== b.policyEndNo) {
-      return a.policyEndNo.localeCompare(b.policyEndNo);
+      return (a.policyEndNo || "").localeCompare(b.policyEndNo || "");
     }
     // Finally by Installment
-    return a.installment.localeCompare(b.installment);
+    return (a.installment || "").localeCompare(b.installment || "");
   });
 }
 

@@ -24,6 +24,7 @@ export const getAccountById = async (
   const query = `
     SELECT 
       CM_CODE AS "code", 
+      CM_NAME AS "name",
       CM_FULLNAME AS "fullName", 
       ACTING_CODE AS "actingCode", 
       EMAIL AS "email",

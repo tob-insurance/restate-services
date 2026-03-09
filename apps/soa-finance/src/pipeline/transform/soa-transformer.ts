@@ -57,7 +57,7 @@ export function transformSoaRow(
     origAmount: parseNumber(row[column.ORIG_AMOUNT]),
     dcNoteNo: parseString(row[column.DC_NOTE]),
     classOfBusiness: parseString(row[column.LOB]),
-    customerCode: parseString(row[column.DISTRIBUTION_NAME]),
+    customerCode: parseString(row[column.DISTRIBUTION_CODE]),
     officeCode: parseString(row[column.BRANCH]),
     distributionCode: parseString(row[column.DISTRIBUTION_CODE]),
   };

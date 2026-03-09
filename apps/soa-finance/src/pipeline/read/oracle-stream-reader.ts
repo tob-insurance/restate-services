@@ -1,5 +1,5 @@
 import oracledb from "oracledb";
-import { initOracleClient } from "../../infrastructure/database/index.js";
+import { getOracleClient } from "../../infrastructure/database/database.js";
 import type { IOracleStreamOptions } from "../types";
 
 type OracleBinds = {
@@ -11,8 +11,8 @@ type OracleBinds = {
 export async function* streamFromOracle(
   options: IOracleStreamOptions
 ): AsyncGenerator<unknown[], void, unknown> {
-  await initOracleClient();
-  const connection = await oracledb.getConnection();
+  const client = getOracleClient();
+  const connection = await client.getConnection();
 
   try {
     const result = await connection.execute(

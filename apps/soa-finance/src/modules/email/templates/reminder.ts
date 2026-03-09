@@ -34,13 +34,13 @@ export async function generateReminderEmailHtml(
   const template = loadTemplate(templateName);
   const now = new Date();
 
-  let dayDeadline = "18";
+  let dayDeadline = "19";
   if (type === "1") {
-    dayDeadline = "18";
+    dayDeadline = "19";
   } else if (type === "2") {
-    dayDeadline = "24";
+    dayDeadline = "25";
   } else if (type === "3") {
-    dayDeadline = "28";
+    dayDeadline = "29";
   }
 
   const deadlineDateId = `${dayDeadline} ${formatDateIndonesian(now).split(" ").slice(1).join(" ")}`;

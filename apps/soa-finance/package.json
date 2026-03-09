@@ -29,6 +29,7 @@
     "@restatedev/restate-sdk-zod": "^1.9.1",
     "apache-arrow": "^21.1.0",
     "liquidjs": "^10.24.0",
+    "luxon": "^3.7.2",
     "oracledb": "^6.10.0",
     "parquet-wasm": "^0.7.1",
     "uuid": "^13.0.0",
@@ -38,6 +39,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.14.2",
+    "@types/luxon": "^3.7.1",
     "@types/oracledb": "^6.10.1",
     "esbuild": "^0.25.4",
     "tsx": "^4.19.2",

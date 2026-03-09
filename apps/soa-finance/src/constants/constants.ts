@@ -1,5 +1,7 @@
 import type { IExcelColumn } from "../utils/generators/types";
 
+export const TIMEZONE = "Asia/Jakarta";
+
 // Fallback email when customer has no email
 export const FALLBACK_EMAIL = "collection@tob-ins.com";
 

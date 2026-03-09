@@ -1,4 +1,4 @@
-import type { WorkflowContext } from "@restatedev/restate-sdk";
+import type { Context } from "@restatedev/restate-sdk";
 import { getAllBranches } from "../../../infrastructure/database/index.js";
 import type {
   IAccount,
@@ -15,7 +15,7 @@ import { generateSoa } from "../generate";
 import { multiBranchCodes } from "../types";
 
 export type ProcessSoaParams = {
-  ctx: WorkflowContext;
+  ctx: Context;
   customerData: IAccount;
   params: ISoaItem;
 };

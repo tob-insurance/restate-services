@@ -1,4 +1,4 @@
-import type { WorkflowContext } from "@restatedev/restate-sdk";
+import type { Context } from "@restatedev/restate-sdk";
 import {
   insertReminder,
   insertReminderDetailsBulk,
@@ -10,7 +10,7 @@ export type CreateReminderParams = {
   timePeriod: string;
   branchCode: string;
   soaList: IStatementOfAccountModel[];
-  ctx: WorkflowContext;
+  ctx: Context;
 };
 
 export const createReminder = async (

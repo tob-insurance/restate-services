@@ -1,4 +1,4 @@
-import type { WorkflowContext } from "@restatedev/restate-sdk";
+import type { Context } from "@restatedev/restate-sdk";
 import { downloadSoaFiles } from "../../infrastructure/azure";
 import {
   getAccountEmails,
@@ -17,7 +17,7 @@ import { reconcilePayment } from "../payment/reconcile-payment";
 import type { IGenerateReminderResult, ISoaReminder } from "./types";
 
 type GenerateReminderLetterParams = {
-  ctx: WorkflowContext;
+  ctx: Context;
   customer: IAccount;
   reminder: ISoaReminder;
   item: ISoaItem;
@@ -26,7 +26,7 @@ type GenerateReminderLetterParams = {
 type LatestLetter = Awaited<ReturnType<typeof getLatestLetter>>;
 
 const validateReminderType = (
-  ctx: WorkflowContext,
+  ctx: Context,
   customer: IAccount,
   item: ISoaItem,
   latestLetter: LatestLetter
@@ -66,7 +66,7 @@ const validateReminderType = (
 };
 
 const getUnpaidSoaData = async (
-  ctx: WorkflowContext,
+  ctx: Context,
   customer: IAccount,
   reminder: ISoaReminder
 ): Promise<{
@@ -114,7 +114,7 @@ const getUnpaidSoaData = async (
 };
 
 type CreateAndSendReminderParams = {
-  ctx: WorkflowContext;
+  ctx: Context;
   customer: IAccount;
   reminder: ISoaReminder;
   item: ISoaItem;
@@ -235,6 +235,13 @@ export const generateReminderLetter = async (
     getAccountEmails(customer.code, branchCode)
   );
   const toEmail = emails.join(",");
+
+  if (!toEmail) {
+    ctx.console.log(
+      `[Reminder] Skipping ${customer.code}: no email addresses found`
+    );
+    return null;
+  }
 
   const unpaidData = await getUnpaidSoaData(ctx, customer, reminder);
   if (!unpaidData) {

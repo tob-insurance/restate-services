@@ -1,10 +1,10 @@
-import type { WorkflowContext } from "@restatedev/restate-sdk";
+import type { Context } from "@restatedev/restate-sdk";
 import type { IAccount, ISoaItem } from "../../../types";
 import { sendWithAttachments } from "../../email";
 import { processBranchSoa } from "./process-branches";
 
 type newSoaParams = {
-  ctx: WorkflowContext;
+  ctx: Context;
   customerData: IAccount;
   params: ISoaItem;
 };

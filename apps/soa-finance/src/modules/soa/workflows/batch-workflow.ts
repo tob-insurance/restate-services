@@ -1,14 +1,15 @@
 import type { WorkflowContext } from "@restatedev/restate-sdk";
 import {
   RestatePromise,
+  rpc,
   TerminalError,
   workflow,
 } from "@restatedev/restate-sdk";
 import { getAllAccounts } from "../../../infrastructure/database/index.js";
 import type { IAccount, SoaType } from "../../../types";
 import { formatDateToUnixTimestamp, formatTimePeriod } from "../../../utils";
-import type { soaSchema } from "../types";
-import { type SoaWorkflow, soaWorkflow } from "./soa-workflow";
+import { soaSchema } from "../types";
+import { type SoaService, soaService } from "./soa-workflow";
 
 const MAX_WORKERS = 5;
 const PROGRESS_LOG_INTERVAL = 10;
@@ -41,7 +42,7 @@ type IBatchWorkflowResult = {
  *
  * Related functions:
  * - Calls `getAllAccounts` from queries to fetch customer data
- * - Delegates per-customer processing to `soaWorkflow` as child workflow
+ * - Delegates per-customer processing to `soaService` as a durable service call
  *
  * Process flow:
  * 1. Initialize date parameters (timePeriod, toDate, processingDate) used across services
@@ -57,6 +58,14 @@ export const batchWorkflow = workflow({
       ctx: WorkflowContext,
       soaRequest: soaSchema
     ): Promise<IBatchWorkflowResult> => {
+      // Validate input
+      const parseResult = soaSchema.safeParse(soaRequest);
+      if (!parseResult.success) {
+        throw new TerminalError(
+          `Invalid SOA request: ${parseResult.error.message}`
+        );
+      }
+
       // STEP 1: Initialize Date Parameters
       const processingDates = await ctx.run("initialize-dates", () => {
         const currentDate = new Date();
@@ -67,7 +76,7 @@ export const batchWorkflow = workflow({
         };
       });
 
-      const soaProcessingType = soaRequest.type as SoaType;
+      const soaProcessingType = parseResult.data.type as SoaType;
       const soaOptions = {
         classOfBusiness: "ALL",
         branch: "ALL",
@@ -98,29 +107,33 @@ export const batchWorkflow = workflow({
        * Start SOA processing for a single customer account.
        *
        * Purpose:
-       * - Create a workflow client for the customer based on accountId
-       * - Call soaWorkflow.run() with complete parameters
+       * - Create a service client for the customer
+       * - Call soaService.process() with complete parameters and idempotency key
        * - Register the promise in worker pool for tracking
        *
        * Related functions:
        * - Called by main loop whenever a worker slot is available
-       * - Uses `soaWorkflow` as child workflow for detailed processing
+       * - Uses `soaService` for durable per-customer processing
        * - The created promise will be raced to detect completion
        */
       const startAccountProcessing = (account: IAccount): void => {
         const accountId = account.code;
+        const idempotencyKey = `${accountId}:${processingDates.timePeriod}:${soaProcessingType}`;
 
         const workerPromise = ctx
-          .workflowClient<SoaWorkflow>(soaWorkflow, accountId)
-          .run({
-            customerId: accountId,
-            timePeriod: processingDates.timePeriod,
-            processingDate: processingDates.processingDate,
-            classOfBusiness: soaOptions.classOfBusiness,
-            branch: soaOptions.branch,
-            toDate: processingDates.toDate,
-            processingType: soaProcessingType,
-          })
+          .serviceClient<SoaService>(soaService)
+          .process(
+            {
+              customerId: accountId,
+              timePeriod: processingDates.timePeriod,
+              processingDate: processingDates.processingDate,
+              classOfBusiness: soaOptions.classOfBusiness,
+              branch: soaOptions.branch,
+              toDate: processingDates.toDate,
+              processingType: soaProcessingType,
+            },
+            rpc.opts({ idempotencyKey })
+          )
           .map((_value, failure): WorkerResult => {
             if (failure) {
               return { accountId, failed: true, error: failure.message };

@@ -1,5 +1,5 @@
-import type { WorkflowContext } from "@restatedev/restate-sdk";
-import { TerminalError, workflow } from "@restatedev/restate-sdk";
+import type { Context } from "@restatedev/restate-sdk";
+import { service, TerminalError } from "@restatedev/restate-sdk";
 
 import {
   getAccountById,
@@ -9,13 +9,13 @@ import type { ISoaItem } from "../../../types";
 import { processReminderLetter } from "../../reminder";
 import { newSoa } from "../services";
 
-type ISoaWorkflowResult = {
+type ISoaServiceResult = {
   customerId: string;
   status: "completed" | "failed";
 };
 
-export const soaWorkflow = workflow({
-  name: "SoaWorkflow",
+export const soaService = service({
+  name: "SoaService",
   options: {
     retryPolicy: {
       initialInterval: { seconds: 1 },
@@ -24,10 +24,10 @@ export const soaWorkflow = workflow({
     },
   },
   handlers: {
-    run: async (
-      ctx: WorkflowContext,
+    process: async (
+      ctx: Context,
       soaParams: ISoaItem
-    ): Promise<ISoaWorkflowResult> => {
+    ): Promise<ISoaServiceResult> => {
       const { customerId, timePeriod, processingType } = soaParams;
 
       ctx.console.log(`Starting SOA for customer: ${customerId}`);
@@ -74,4 +74,4 @@ export const soaWorkflow = workflow({
   },
 });
 
-export type SoaWorkflow = typeof soaWorkflow;
+export type SoaService = typeof soaService;

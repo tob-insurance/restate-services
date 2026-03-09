@@ -1,8 +1,8 @@
 import "varlock/auto-load";
 import { serve } from "@restatedev/restate-sdk";
 import { initOracleClient } from "./infrastructure/database/database.js";
-import { batchWorkflow, soaWorkflow } from "./modules/soa/workflows/index.js";
-import { pipelineScheduler } from "./pipeline/scheduler.js";
+import { batchWorkflow } from "./modules/soa/workflows/batch-workflow.js";
+import { soaService } from "./modules/soa/workflows/soa-workflow.js";
 
 const PORT = 9080;
 
@@ -11,7 +11,7 @@ async function main() {
   await initOracleClient();
   console.log("[App] Oracle connection successful");
 
-  const services = [soaWorkflow, batchWorkflow];
+  const services = [soaService, batchWorkflow];
 
   await serve({
     services,
@@ -23,9 +23,6 @@ async function main() {
   for (const service of services) {
     console.log(`[App]   - ${service.name}`);
   }
-
-  await pipelineScheduler();
-  console.log("[App] Pipeline scheduler started");
 }
 
 main().catch((err) => {

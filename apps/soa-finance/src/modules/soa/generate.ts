@@ -1,13 +1,10 @@
-import type { WorkflowContext } from "@restatedev/restate-sdk";
-import { uploadFile } from "../../infrastructure/azure";
+import type { Context } from "@restatedev/restate-sdk";
 import { getDcNoteIdsByCustomer } from "../../infrastructure/database/index.js";
 import { readSoaParquet } from "../../pipeline/lib";
 import type { IAccount, IStatementOfAccountModel } from "../../types";
-import { excelSoaName } from "../../utils/formatter";
-import { generateExcel } from "../document-generation/excel.generator";
 
 type GenerateSoaOptions = {
-  ctx: WorkflowContext;
+  ctx: Context;
   branchCode: string;
   customer: IAccount;
   classOfBusiness: string;
@@ -85,25 +82,6 @@ export const generateSoa = async (
   soaList = newSoaList;
   ctx.console.log(
     `SOA data ready for ${customer.code}: ${soaList.length} records`
-  );
-
-  // ========== Generate & Upload Files ==========
-
-  // Excel: Generate and Upload in one durable step to avoid binary serialization issues
-  await ctx.run("generate-and-upload-excel", async () => {
-    console.log(`Generating Excel for ${customer.code}`);
-    const excelFile = generateExcel({
-      soaData: soaList,
-      customerId: customer.code,
-    });
-    excelFile.fileName = excelSoaName(customer.code, options.dateNow);
-
-    console.log(`Uploading Excel for ${customer.code}`);
-    await uploadFile(excelFile, customer.code, "excel");
-  });
-
-  ctx.console.log(
-    `Files generated and uploaded successfully for ${customer.code}`
   );
 
   return soaList;

@@ -1,11 +1,19 @@
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getS3PathPrefix } from "../constants";
 
+function getRequiredEnv(key: string): string {
+  const value = process.env[key];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${key}`);
+  }
+  return value;
+}
+
 export const storageServiceConfig = {
-  bucketName: process.env.S3_BUCKET_NAME,
-  region: process.env.AWS_REGION,
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  bucketName: getRequiredEnv("S3_BUCKET_NAME"),
+  region: getRequiredEnv("AWS_REGION"),
+  accessKeyId: getRequiredEnv("AWS_ACCESS_KEY_ID"),
+  secretAccessKey: getRequiredEnv("AWS_SECRET_ACCESS_KEY"),
 };
 
 let storageServiceClient: S3Client | null = null;

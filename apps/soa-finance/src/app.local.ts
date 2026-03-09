@@ -3,6 +3,7 @@ import { serve } from "@restatedev/restate-sdk";
 import { initOracleClient } from "./infrastructure/database/database.js";
 import { batchWorkflow } from "./modules/soa/workflows/batch-workflow.js";
 import { soaService } from "./modules/soa/workflows/soa-workflow.js";
+import { SoaScheduler } from "./pipeline/scheduler.js";
 
 const PORT = 9080;
 
@@ -11,7 +12,7 @@ async function main() {
   await initOracleClient();
   console.log("[App] Oracle connection successful");
 
-  const services = [soaService, batchWorkflow];
+  const services = [soaService, batchWorkflow, SoaScheduler];
 
   await serve({
     services,

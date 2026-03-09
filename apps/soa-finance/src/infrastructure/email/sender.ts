@@ -11,12 +11,19 @@ function formatRecipients(emails: string[]) {
 
 function formatAttachments(attachments?: IEmailAttachment[]) {
   return (
-    attachments?.map((att) => ({
-      "@odata.type": "#microsoft.graph.fileAttachment",
-      name: att.name,
-      contentType: att.contentType,
-      contentBytes: att.contentBytes,
-    })) ?? []
+    attachments?.map((att) => {
+      const attachment: Record<string, unknown> = {
+        "@odata.type": "#microsoft.graph.fileAttachment",
+        name: att.name,
+        contentType: att.contentType,
+        contentBytes: att.contentBytes,
+      };
+      if (att.isInline) {
+        attachment.isInline = true;
+        attachment.contentId = att.contentId;
+      }
+      return attachment;
+    }) ?? []
   );
 }
 
@@ -37,7 +44,7 @@ export async function sendEmail(message: IEmailMessage): Promise<boolean> {
       ccRecipients: message.cc ? formatRecipients(message.cc) : [],
       attachments: formatAttachments(message.attachments),
     },
-    saveToSentItems: true,
+    saveToSentItems: false,
   };
 
   try {

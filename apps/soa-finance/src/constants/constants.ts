@@ -1,7 +1,7 @@
 import type { IExcelColumn } from "../utils/generators/types";
 
-// CC recipients for SOA and Reminder emails
-export const CC_EMAILS = ["finance@tob-ins.com"] as const;
+// Fallback email when customer has no email
+export const FALLBACK_EMAIL = "collection@tob-ins.com";
 
 export const ROMAN_MONTHS = [
   "I",

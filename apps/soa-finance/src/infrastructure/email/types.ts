@@ -2,6 +2,8 @@ export type IEmailAttachment = {
   name: string;
   contentType: string;
   contentBytes: string;
+  isInline?: boolean;
+  contentId?: string;
 };
 
 export type IEmailMessage = {

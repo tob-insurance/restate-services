@@ -3,7 +3,11 @@ import { sendEmail } from "../../infrastructure/email";
 import type { IEmailMessage } from "../../infrastructure/email/types";
 import type { IAccount, IFileData } from "../../types";
 import { formatDateDDMMYYYY } from "../../utils";
-import { buildEmailAttachments, DEFAULT_CC_RECIPIENTS } from "./attachments";
+import {
+  buildEmailAttachments,
+  getCcRecipients,
+  resolveRecipientEmail,
+} from "./attachments";
 import { generateSoaEmailHtml } from "./templates";
 
 type SendSoaEmailOptions = {
@@ -28,11 +32,13 @@ export const sendSoaEmail = async (
 
   const recipientEmail = isDevelopment()
     ? getTestEmailRecipient()
-    : customer.email || toEmail;
+    : resolveRecipientEmail(customer.email || toEmail);
 
   const message: IEmailMessage = {
     to: [recipientEmail],
-    cc: DEFAULT_CC_RECIPIENTS,
+    cc: isDevelopment()
+      ? [getTestEmailRecipient()]
+      : getCcRecipients(customer.actingCode),
     subject: `SOA OUTSTANDING ${customer.fullName} as ${formatDateDDMMYYYY(asAtDate)}`,
     body: emailHtml,
     attachments: buildEmailAttachments(excelFile, pdfFile),

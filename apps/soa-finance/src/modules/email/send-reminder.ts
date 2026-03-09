@@ -2,7 +2,11 @@ import { getTestEmailRecipient, isDevelopment } from "../../constants";
 import { sendEmail } from "../../infrastructure/email";
 import type { IAccount } from "../../types";
 import type { IReminderEmailData } from "../reminder/types";
-import { buildEmailAttachments, DEFAULT_CC_RECIPIENTS } from "./attachments";
+import {
+  buildEmailAttachments,
+  getCcRecipients,
+  resolveRecipientEmail,
+} from "./attachments";
 import {
   generateReminderEmailHtml,
   getReminderEmailSubject,
@@ -63,14 +67,25 @@ export const sendReminderEmail = async (
     templateName
   );
   const subject = getReminderEmailSubject(reminderType, customer.fullName);
-  const recipient = isDevelopment() ? getTestEmailRecipient() : toEmail;
+  const recipient = isDevelopment()
+    ? getTestEmailRecipient()
+    : resolveRecipientEmail(toEmail);
   const recipients = recipient.split(",").map((r) => r.trim());
-  await sendEmail({
+  const result = await sendEmail({
     to: recipients,
-    cc: DEFAULT_CC_RECIPIENTS,
+    cc: isDevelopment()
+      ? [getTestEmailRecipient()]
+      : getCcRecipients(customer.actingCode),
     subject,
     body: htmlContent,
     attachments: buildEmailAttachments(excelFile, pdfFile),
   });
-  return true;
+
+  if (!result) {
+    console.error(
+      `[Email] Reminder email failed for ${customer.code} to: ${recipient}`
+    );
+  }
+
+  return result;
 };

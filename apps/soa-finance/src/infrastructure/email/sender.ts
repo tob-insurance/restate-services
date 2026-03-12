@@ -27,19 +27,17 @@ function formatAttachments(attachments?: IEmailAttachment[]) {
   );
 }
 
-function getSenderEmail(): string {
-  return process.env.SENDER_EMAIL || "gerardus.david@tob-ins.com";
-}
+const SHARED_MAILBOX = "collection@tob-ins.com";
+const INITIATOR_EMAIL = "rasmi.asih@tob-ins.com";
 
 export async function sendEmail(message: IEmailMessage): Promise<boolean> {
   const client = getGraphClient();
-  const senderEmail = getSenderEmail();
 
   const mailBody = {
     message: {
       subject: message.subject,
       body: { contentType: "HTML", content: message.body },
-      from: { emailAddress: { address: senderEmail } },
+      from: { emailAddress: { address: SHARED_MAILBOX } },
       toRecipients: formatRecipients(message.to),
       ccRecipients: message.cc ? formatRecipients(message.cc) : [],
       attachments: formatAttachments(message.attachments),
@@ -48,7 +46,7 @@ export async function sendEmail(message: IEmailMessage): Promise<boolean> {
   };
 
   try {
-    await client.api(`/users/${senderEmail}/sendMail`).post(mailBody);
+    await client.api(`/users/${INITIATOR_EMAIL}/sendMail`).post(mailBody);
     console.log(
       `[Email] Sent to: ${message.to.join(", ")}, subject: ${message.subject}`
     );

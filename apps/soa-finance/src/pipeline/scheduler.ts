@@ -36,7 +36,7 @@ export const SoaScheduler = object({
         `Triggering ${schedule.type} (day ${currentDay}): pipeline + batch`
       );
 
-      // Phase 1: Run data pipeline (Oracle → Parquet → S3)
+      // Phase 1: Run data pipeline (Oracle → Parquet → Azure Blob)
       const pipelineResult = await ctx.run(
         "run-pipeline",
         async () => await generateSoaPipeline(now.toJSDate())

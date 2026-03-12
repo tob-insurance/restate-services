@@ -4,7 +4,7 @@ import { transformSoaStream } from "./transform";
 import type { ISoaPipelineResult } from "./types";
 import { writeToParquet } from "./write";
 
-// Run complete SOA pipeline: Oracle → Transform → Parquet by account code → upload to S3
+// Run complete SOA pipeline: Oracle → Transform → Parquet by account code → upload to Azure Blob
 
 export async function generateSoaPipeline(
   asAtDate: Date

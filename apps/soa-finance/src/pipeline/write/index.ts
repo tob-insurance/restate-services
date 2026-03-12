@@ -1,4 +1,4 @@
-import { uploadParquetToS3 } from "../../infrastructure/s3";
+import { uploadParquetToStorage } from "../../infrastructure/pipeline-storage";
 import type { IStatementOfAccountModel } from "../../types";
 import { writeSoaParquetToBuffer } from "../lib";
 
@@ -22,7 +22,7 @@ export async function writeToParquet(
 
     const buffer = writeSoaParquetToBuffer(rows);
 
-    const result = await uploadParquetToS3(fileName, buffer);
+    const result = await uploadParquetToStorage(fileName, buffer);
 
     if (!result.success) {
       throw new Error(`Failed to upload ${fileName}`);

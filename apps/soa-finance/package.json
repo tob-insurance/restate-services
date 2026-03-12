@@ -20,7 +20,6 @@
     "postbundle:lambda": "cd dist-lambda && mkdir -p node_modules && cp -rL ../../../packages/oracle/node_modules/oracledb node_modules/ && zip -r lambda.zip app.js* node_modules"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.982.0",
     "@azure/identity": "^4.13.0",
     "@azure/storage-blob": "^12.30.0",
     "@microsoft/microsoft-graph-client": "^3.0.7",

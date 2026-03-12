@@ -12,8 +12,9 @@ export function isDevelopment(): boolean {
   return getAppEnvironment() === "development";
 }
 
-export function getS3PathPrefix(): string {
-  return getAppEnvironment();
+export function getPipelinePathPrefix(): string {
+  const prefix = process.env.AZURE_STORAGE_PIPELINE_PREFIX || "parquet";
+  return `${prefix}/${getAppEnvironment()}`;
 }
 
 export function getTestEmailRecipient(): string {

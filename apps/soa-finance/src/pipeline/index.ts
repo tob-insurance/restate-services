@@ -1,4 +1,4 @@
-import { formatDuration } from "../utils";
+import type { IStatementOfAccountModel } from "../types";
 import { streamSoaData } from "./read";
 import { transformSoaStream } from "./transform";
 import type { ISoaPipelineResult } from "./types";
@@ -9,7 +9,6 @@ import { writeToParquet } from "./write";
 export async function generateSoaPipeline(
   asAtDate: Date
 ): Promise<ISoaPipelineResult> {
-  const startTime = Date.now();
   console.log("[Pipeline] Starting SOA pipeline");
 
   // Create pipeline: Reader → Transformer
@@ -17,15 +16,36 @@ export async function generateSoaPipeline(
   const transformedStream = transformSoaStream(oracleStream);
 
   // Write to Parquet
-  await writeToParquet(transformedStream);
+  await writeToParquet(transformedStream, asAtDate);
 
-  const endTime = Date.now();
-  const duration = formatDuration(endTime - startTime);
-
-  console.log(`[Pipeline] Completed in ${duration}`);
+  console.log("[Pipeline] Completed");
 
   return {
     success: true,
-    duration,
   };
+}
+
+export async function collectPipelineData(
+  asAtDate: Date
+): Promise<Map<string, IStatementOfAccountModel[]>> {
+  console.log("[Pipeline] Collecting data from Oracle");
+
+  const oracleStream = streamSoaData(asAtDate);
+  const transformedStream = transformSoaStream(oracleStream);
+
+  const datasAccount = new Map<string, IStatementOfAccountModel[]>();
+
+  for await (const row of transformedStream) {
+    const accountCode = row.distributionCode;
+
+    if (!datasAccount.has(accountCode)) {
+      datasAccount.set(accountCode, []);
+    }
+
+    datasAccount.get(accountCode)?.push(row);
+  }
+
+  console.log(`[Pipeline] Collected ${datasAccount.size} accounts`);
+
+  return datasAccount;
 }

@@ -6,21 +6,45 @@ type UploadResult = {
   success: boolean;
 };
 
-function generatePipelineBlobPath(fileName: string): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
+function getMonthPartition(referenceDate: Date): string {
+  const year = referenceDate.getUTCFullYear();
+  const month = String(referenceDate.getUTCMonth() + 1).padStart(2, "0");
+
+  return `${year}-${month}`;
+}
+
+function getPreviousMonth(referenceDate: Date): Date {
+  return new Date(
+    Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth() - 1, 1)
+  );
+}
+
+export function buildUploadBlobPath(
+  fileName: string,
+  referenceDate: Date
+): string {
   const prefix = getPipelinePathPrefix();
 
-  return `${prefix}/${year}-${month}/${fileName}`;
+  return `${prefix}/${getMonthPartition(referenceDate)}/${fileName}`;
+}
+
+export function buildDownloadBlobPath(
+  accountCode: string,
+  referenceDate: Date
+): string {
+  const prefix = getPipelinePathPrefix();
+  const targetMonth = getPreviousMonth(referenceDate);
+
+  return `${prefix}/${getMonthPartition(targetMonth)}/soa_${accountCode}.parquet`;
 }
 
 export async function uploadParquetToStorage(
   fileName: string,
-  buffer: Buffer
+  buffer: Buffer,
+  referenceDate: Date
 ): Promise<UploadResult> {
   const container = getContainerClient();
-  const blobPath = generatePipelineBlobPath(fileName);
+  const blobPath = buildUploadBlobPath(fileName, referenceDate);
   const blockBlobClient = container.getBlockBlobClient(blobPath);
 
   try {
@@ -38,16 +62,11 @@ export async function uploadParquetToStorage(
 
 export async function downloadParquetFromStorage(
   accountCode: string,
-  _branchCode: string
+  _branchCode: string,
+  referenceDate: Date
 ): Promise<Buffer | null> {
   const container = getContainerClient();
-  const now = new Date();
-  now.setMonth(now.getMonth() - 1);
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-
-  const prefix = getPipelinePathPrefix();
-  const blobPath = `${prefix}/${year}-${month}/soa_${accountCode}.parquet`;
+  const blobPath = buildDownloadBlobPath(accountCode, referenceDate);
 
   try {
     console.log(`[Azure Pipeline] Fetching parquet from: ${blobPath}`);

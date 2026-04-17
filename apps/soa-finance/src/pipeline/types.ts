@@ -5,7 +5,6 @@ export type IOracleStreamOptions = {
 
 export type ISoaPipelineResult = {
   success: boolean;
-  duration: string;
 };
 
 export type IDataPipelineResult = {

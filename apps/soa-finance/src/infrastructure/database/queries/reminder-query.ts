@@ -10,7 +10,7 @@ export const getReminderByCustomerAndPeriod = async (
   timePeriod: string
 ) => {
   const query =
-    'SELECT ID as "id", CM_CODE as "customerCode", TIME_PERIOD as "timePeriod", OFFICE_ID as "officeId" FROM SOA_REMINDER WHERE CM_CODE = :customerCode AND TIME_PERIOD = :timePeriod';
+    'SELECT RAWTOHEX(ID) as "id", CM_CODE as "customerCode", TIME_PERIOD as "timePeriod", OFFICE_ID as "officeId" FROM SOA_REMINDER WHERE CM_CODE = :customerCode AND TIME_PERIOD = :timePeriod';
 
   const result = await executeQuery(query, { customerCode, timePeriod });
   return result.rows ?? [];

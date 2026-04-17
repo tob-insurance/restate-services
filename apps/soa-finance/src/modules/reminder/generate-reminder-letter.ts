@@ -68,7 +68,8 @@ const validateReminderType = (
 const getUnpaidSoaData = async (
   ctx: Context,
   customer: IAccount,
-  reminder: ISoaReminder
+  reminder: ISoaReminder,
+  processingDate: Date
 ): Promise<{
   unpaidItems: IStatementOfAccountModel[];
   dcNotesPaid: string[];
@@ -76,7 +77,7 @@ const getUnpaidSoaData = async (
   const branchCode = reminder.officeId || "ALL";
 
   const soaList = await ctx.run("read-soa-parquet", () =>
-    readSoaParquet(customer.code, branchCode)
+    readSoaParquet(customer.code, branchCode, processingDate)
   );
 
   if (soaList.length === 0) {
@@ -221,6 +222,7 @@ export const generateReminderLetter = async (
   params: GenerateReminderLetterParams
 ): Promise<IGenerateReminderResult | null> => {
   const { ctx, customer, reminder, item } = params;
+  const processingDate = new Date(item.processingDate);
 
   const latestLetter = await ctx.run("get-latest-letter", () =>
     getLatestLetter(reminder.id)
@@ -243,7 +245,12 @@ export const generateReminderLetter = async (
     return null;
   }
 
-  const unpaidData = await getUnpaidSoaData(ctx, customer, reminder);
+  const unpaidData = await getUnpaidSoaData(
+    ctx,
+    customer,
+    reminder,
+    processingDate
+  );
   if (!unpaidData) {
     return null;
   }

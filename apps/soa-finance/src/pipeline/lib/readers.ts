@@ -12,9 +12,14 @@ import type { IStatementOfAccountModel } from "../../types";
  */
 export async function readSoaParquet(
   accountCode: string,
-  branchCode: string
+  branchCode: string,
+  referenceDate: Date
 ): Promise<IStatementOfAccountModel[]> {
-  const buffer = await downloadParquetFromStorage(accountCode, branchCode);
+  const buffer = await downloadParquetFromStorage(
+    accountCode,
+    branchCode,
+    referenceDate
+  );
 
   if (!buffer) {
     return [];

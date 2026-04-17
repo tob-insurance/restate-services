@@ -15,7 +15,7 @@ type GenerateSoaOptions = {
 export const generateSoa = async (
   options: GenerateSoaOptions
 ): Promise<IStatementOfAccountModel[] | null> => {
-  const { ctx, branchCode, customer, classOfBusiness } = options;
+  const { ctx, branchCode, customer, classOfBusiness, dateNow } = options;
 
   ctx.console.log(
     `GenerateSOA started for ${customer.code}, Branch: ${branchCode}, COB: ${classOfBusiness}`
@@ -24,7 +24,7 @@ export const generateSoa = async (
   // ========== Get SOA Data ==========
   let soaList = await ctx.run("read-parquet", async () => {
     console.log(`Getting SOA data for ${customer.code}`);
-    return await readSoaParquet(customer.code, branchCode);
+    return await readSoaParquet(customer.code, branchCode, dateNow);
   });
 
   // Filter Aging (Outstanding >= 60 Days)

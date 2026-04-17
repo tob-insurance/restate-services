@@ -1,42 +1,43 @@
-import { createOracleClient, type OracleClient } from "@restate-tob/oracle";
+import {
+  createOracleClientFromUrl,
+  type OracleClient,
+} from "@restate-tob/oracle";
 import type { BindParameters, ExecuteOptions } from "oracledb";
 
 let oracleClient: OracleClient | null = null;
 
-function parseOracleUrl() {
-  const connectionString = process.env.ORACLE_URL;
-  if (!connectionString) {
-    throw new Error("ORACLE_URL environment variable is required");
-  }
-  const url = new URL(connectionString);
-  return {
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    connectString: `${url.hostname}:${url.port || "1521"}${url.pathname}`,
-  };
+function getOracleInstantClientPath(): string | undefined {
+  return process.env.ORACLE_INSTANT_CLIENT_PATH ?? process.env.ORACLE_LIB_DIR;
 }
 
 export function getOracleClient(): OracleClient {
   if (!oracleClient) {
-    const config = parseOracleUrl();
-    oracleClient = createOracleClient({
-      ...config,
-      instantClientPath: process.env.ORACLE_LIB_DIR,
+    const connectionString = process.env.ORACLE_URL;
+    if (!connectionString) {
+      throw new Error("ORACLE_URL environment variable is required");
+    }
+
+    oracleClient = createOracleClientFromUrl({
+      connectionString,
+      instantClientPath: getOracleInstantClientPath(),
       poolMin: 10,
       poolMax: 50,
     });
   }
+
+  if (!oracleClient) {
+    throw new Error("Failed to initialize Oracle client");
+  }
+
   return oracleClient;
 }
 
-export function initOracleClient(): Promise<void> {
-  return getOracleClient()
-    .testConnection()
-    .then((success) => {
-      if (!success) {
-        throw new Error("Failed to connect to Oracle database");
-      }
-    });
+export function initOracleClient(): void {
+  getOracleClient();
+}
+
+export function testOracleConnection(): Promise<boolean> {
+  return getOracleClient().testConnection();
 }
 
 // Re-export convenience functions that use the singleton client

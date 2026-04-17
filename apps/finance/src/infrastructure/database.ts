@@ -1,4 +1,7 @@
-import { createOracleClient, type OracleClient } from "@restate-tob/oracle";
+import {
+  createOracleClientFromUrl,
+  type OracleClient,
+} from "@restate-tob/oracle";
 import {
   createPostgresClient,
   type PostgresClient,
@@ -6,6 +9,10 @@ import {
 
 let postgresClient: PostgresClient | null = null;
 let oracleClient: OracleClient | null = null;
+
+function getOracleInstantClientPath(): string | undefined {
+  return process.env.ORACLE_INSTANT_CLIENT_PATH ?? process.env.ORACLE_LIB_DIR;
+}
 
 export function getPostgresClient(): PostgresClient {
   if (!postgresClient) {
@@ -25,15 +32,16 @@ export function getOracleClient(): OracleClient {
       throw new Error("ORACLE_URL environment variable is required");
     }
 
-    // Parse oracle://user:password@host:port/service
-    const url = new URL(connectionString);
-    oracleClient = createOracleClient({
-      user: decodeURIComponent(url.username),
-      password: decodeURIComponent(url.password),
-      connectString: `${url.hostname}:${url.port || "1521"}${url.pathname}`,
-      instantClientPath: process.env.ORACLE_INSTANT_CLIENT_PATH,
+    oracleClient = createOracleClientFromUrl({
+      connectionString,
+      instantClientPath: getOracleInstantClientPath(),
     });
   }
+
+  if (!oracleClient) {
+    throw new Error("Failed to initialize Oracle client");
+  }
+
   return oracleClient;
 }
 

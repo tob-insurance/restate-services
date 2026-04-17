@@ -1,6 +1,7 @@
 export type { Connection } from "oracledb";
 export {
   createOracleClient,
+  createOracleClientFromUrl,
   withConnection,
   withConnectionGenerator,
 } from "./client.js";

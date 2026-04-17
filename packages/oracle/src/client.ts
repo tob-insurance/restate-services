@@ -54,6 +54,23 @@ export async function* withConnectionGenerator<T>(
   }
 }
 
+type OracleUrlConfig = Omit<
+  OracleConfig,
+  "user" | "password" | "connectString"
+> & {
+  connectionString: string;
+};
+
+function parseOracleConnectionString(connectionString: string) {
+  const url = new URL(connectionString);
+
+  return {
+    user: decodeURIComponent(url.username),
+    password: decodeURIComponent(url.password),
+    connectString: `${url.hostname}:${url.port || "1521"}${url.pathname}`,
+  };
+}
+
 const BIND_TYPE_MAP: Record<
   string,
   { type: oracledb.DbType; dir: number; maxSize?: number }
@@ -248,4 +265,15 @@ export function createOracleClient(config: OracleConfig): OracleClient {
       });
     },
   };
+}
+
+export function createOracleClientFromUrl(
+  config: OracleUrlConfig
+): OracleClient {
+  const { connectionString, ...clientConfig } = config;
+
+  return createOracleClient({
+    ...parseOracleConnectionString(connectionString),
+    ...clientConfig,
+  });
 }

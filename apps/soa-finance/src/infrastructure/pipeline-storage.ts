@@ -54,7 +54,7 @@ export async function uploadParquetToStorage(
 
     console.log(`[Azure Pipeline] Uploaded ${blobPath} successfully`);
     return { key: blobPath, success: true };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error(`[Azure Pipeline] Upload failed: ${error}`);
     throw error;
   }

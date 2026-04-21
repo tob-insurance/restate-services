@@ -28,7 +28,7 @@ export async function withConnection<T>(
     if (connection) {
       try {
         await connection.close();
-      } catch (err) {
+      } catch (err: unknown) {
         console.error("Error closing Oracle connection:", err);
       }
     }
@@ -47,7 +47,7 @@ export async function* withConnectionGenerator<T>(
     if (connection) {
       try {
         await connection.close();
-      } catch (err) {
+      } catch (err: unknown) {
         console.error("Error closing Oracle connection:", err);
       }
     }
@@ -125,7 +125,7 @@ function initThickMode(instantClientPath?: string): void {
         `✅ Oracle Thick mode enabled${instantClientPath ? `: ${instantClientPath}` : ""}`
       );
     }
-  } catch (error) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.warn(
       `⚠️  Oracle Thick mode failed: ${errorMessage}. Using Thin mode (requires Oracle 12.1+)`
@@ -184,7 +184,7 @@ export function createOracleClient(config: OracleConfig): OracleClient {
         const result = await connection.execute("SELECT SYSDATE FROM DUAL");
         console.log("✅ Oracle connected:", result.rows?.[0]);
         return true;
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("❌ Oracle connection failed:", error);
         return false;
       } finally {

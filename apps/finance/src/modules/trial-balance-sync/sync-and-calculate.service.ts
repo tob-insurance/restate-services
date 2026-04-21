@@ -54,7 +54,7 @@ export async function syncTrialBalanceFromGeniusAndCalculateMetrics(
       endTime: syncResult.endTime,
       duration: syncResult.duration,
     };
-  } catch (error) {
+  } catch (error: unknown) {
     const endTime = DateTime.now();
     const duration = endTime.diff(startTime, "seconds").seconds;
 

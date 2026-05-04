@@ -1,14 +1,21 @@
 import type { ObjectContext } from "@restatedev/restate-sdk";
-
-import { getReminderByCustomerAndPeriod } from "../../infrastructure/database/index.js";
 import { type IAccount, type ISoaItem, SoaType } from "../../types";
+import type { ReminderHeader } from "../soa/objects/state";
+import { stateKeys } from "../soa/objects/state";
 import { generateReminderLetter } from "./generate-reminder-letter";
-import type { IProcessReminder, ISoaReminder } from "./types";
+import type { IProcessReminder } from "./types";
 
 type ProcessReminderParams = {
   ctx: ObjectContext;
   customer: IAccount;
   item: ISoaItem;
+};
+
+type SoaReminder = {
+  id: string;
+  customerCode: string;
+  timePeriod: string;
+  officeId: string;
 };
 
 export const processReminderLetter = async (
@@ -22,13 +29,49 @@ export const processReminderLetter = async (
     }`
   );
 
-  const reminders = (await ctx.run("get-reminders-by-customer-period", () =>
-    getReminderByCustomerAndPeriod(customer.code, item.timePeriod)
-  )) as ISoaReminder[];
+  const dcNoteIndex = await ctx.get<Record<string, string>>(
+    stateKeys.dcNoteIndex
+  );
 
-  if (!reminders || reminders.length === 0) {
+  if (!dcNoteIndex) {
     ctx.console.log(
       `[Reminder] Skipping ${customer.code}: no previous reminder records`
+    );
+    return { processed: false, remindersSent: 0, dcNotesPaid: [] };
+  }
+
+  const reminderIdsForPeriod = new Set(
+    Object.values(dcNoteIndex).filter((id) =>
+      id.startsWith(`${item.timePeriod}:`)
+    )
+  );
+
+  if (reminderIdsForPeriod.size === 0) {
+    ctx.console.log(
+      `[Reminder] Skipping ${customer.code}: no reminders for period ${item.timePeriod}`
+    );
+    return { processed: false, remindersSent: 0, dcNotesPaid: [] };
+  }
+
+  const reminders: SoaReminder[] = [];
+  for (const reminderId of reminderIdsForPeriod) {
+    const [officeId] = reminderId.split(":").slice(1);
+    const header = await ctx.get<ReminderHeader>(
+      stateKeys.header(item.timePeriod, officeId)
+    );
+    if (header) {
+      reminders.push({
+        id: reminderId,
+        customerCode: header.customerCode,
+        timePeriod: header.timePeriod,
+        officeId: header.officeId,
+      });
+    }
+  }
+
+  if (reminders.length === 0) {
+    ctx.console.log(
+      `[Reminder] Skipping ${customer.code}: no reminder headers found`
     );
     return { processed: false, remindersSent: 0, dcNotesPaid: [] };
   }

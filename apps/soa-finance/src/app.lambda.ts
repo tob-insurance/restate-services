@@ -1,19 +1,9 @@
 import { createEndpointHandler } from "@restatedev/restate-sdk/lambda";
 import { initOracleClient } from "./infrastructure/database/database.js";
-import { letterCounter } from "./modules/soa/objects/letter-counter.js";
-import { soaCustomer } from "./modules/soa/objects/soa-customer.js";
-import { batchWorkflow } from "./modules/soa/workflows/batch-workflow.js";
-import { soaService } from "./modules/soa/workflows/soa-workflow.js";
-import { SoaScheduler } from "./pipeline/scheduler.js";
+import { sharedServices } from "./services.js";
 
 initOracleClient();
 
 export const handler = createEndpointHandler({
-  services: [
-    soaService,
-    batchWorkflow,
-    SoaScheduler,
-    soaCustomer,
-    letterCounter,
-  ],
+  services: sharedServices,
 });

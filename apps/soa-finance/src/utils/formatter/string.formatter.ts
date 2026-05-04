@@ -13,10 +13,3 @@ export function parseString(value: unknown): string {
 
   return value.toString().trim();
 }
-
-export function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^\w-]/g, "");
-}

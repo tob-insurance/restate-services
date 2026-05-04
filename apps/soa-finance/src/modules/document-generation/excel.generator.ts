@@ -1,12 +1,143 @@
-import { CONTENT_TYPES, excelColumns } from "../../constants";
+import { utils, write } from "xlsx";
+import { CONTENT_TYPES, NUMBER_FORMATS } from "../../constants";
 import type { IStatementOfAccountModel } from "../../types";
-import { excelGenerate } from "../../utils/generators/excel-generator";
-import type { ISoaFileResult } from "../../utils/generators/types";
+import { formatDateDDMMYYYY } from "../../utils/formatter";
 
-type GenerateSoaExcelParams = {
-  soaData: IStatementOfAccountModel[];
-  customerId: string;
+export type IExcelColumn = {
+  header: string;
+  key: string;
+  width?: number;
+  format?: "number" | "currency" | "date" | "text";
 };
+
+type IExcelSheetData = {
+  sheetName: string;
+  columns: IExcelColumn[];
+  rows: Record<string, unknown>[];
+};
+
+export type ISoaFileResult = {
+  fileName: string;
+  contentType: string;
+  bytes: Buffer;
+};
+
+export const excelColumns: IExcelColumn[] = [
+  { header: "DC Note", key: "debitAndCreditNoteNo", width: 18 },
+  { header: "Branch", key: "branch", width: 10 },
+  { header: "Policy No", key: "policyNo", width: 20 },
+  { header: "Policy End No", key: "policyEndNo", width: 15 },
+  { header: "Contract No", key: "contractNo", width: 15 },
+  { header: "Plat No", key: "plateNo", width: 12 },
+  { header: "Batch No", key: "coInFacRefNo", width: 15 },
+  {
+    header: "Fire Conjunction Policy",
+    key: "fireConjunctionPolicy",
+    width: 20,
+  },
+  { header: "LOB", key: "lob", width: 10 },
+  { header: "SOB", key: "sourceOfBusiness", width: 10 },
+  { header: "Account Name", key: "accountName", width: 30 },
+  { header: "Insured Name", key: "insuredName", width: 30 },
+  { header: "Distribution Name", key: "distributionName", width: 25 },
+  {
+    header: "Distribution Second Name",
+    key: "distributionNameSecond",
+    width: 25,
+  },
+  { header: "QQ Name", key: "qualitateQuaName", width: 20 },
+  { header: "Effective Date", key: "endEffDate", width: 12 },
+  { header: "Expired Date", key: "endExpDate", width: 12 },
+  { header: "Post Date", key: "postDate", width: 12 },
+  { header: "Aging", key: "aging", width: 10 },
+  { header: "Currency", key: "currency", width: 10 },
+  { header: "Exchange Rate", key: "exchangeRate", width: 12, format: "number" },
+  { header: "Endorsement Reason", key: "endReason", width: 20 },
+  { header: "Acting Code", key: "actingCode", width: 12 },
+  {
+    header: "Total Sum Insured",
+    key: "totalSumInsured",
+    width: 18,
+    format: "number",
+  },
+  { header: "Gross Premium", key: "grossPremium", width: 15, format: "number" },
+  { header: "Discount", key: "discount", width: 12, format: "number" },
+  { header: "Commission", key: "commission", width: 12, format: "number" },
+  { header: "PPN", key: "ppn", width: 12, format: "number" },
+  { header: "PPH 21", key: "pph21", width: 12, format: "number" },
+  { header: "PPH 23", key: "pph23", width: 12, format: "number" },
+  { header: "Cost", key: "cost", width: 12, format: "number" },
+  { header: "STMP", key: "stmp", width: 10, format: "number" },
+  { header: "Nett Premium", key: "netPremium", width: 15, format: "number" },
+  {
+    header: "Nett Premium (IDR)",
+    key: "netPremiumIdr",
+    width: 18,
+    format: "number",
+  },
+  { header: "Installment", key: "installment", width: 12, format: "number" },
+  { header: "Due Date", key: "dueDate", width: 12 },
+];
+
+type WorksheetType = ReturnType<typeof utils.aoa_to_sheet>;
+
+function applyNumberFormats(
+  worksheet: WorksheetType,
+  columns: IExcelColumn[],
+  rowCount: number
+): void {
+  for (let rowIdx = 1; rowIdx < rowCount; rowIdx += 1) {
+    for (let colIdx = 0; colIdx < columns.length; colIdx += 1) {
+      const col = columns[colIdx];
+      if (col.format && NUMBER_FORMATS[col.format]) {
+        const cellAddress = utils.encode_cell({ r: rowIdx, c: colIdx });
+        if (worksheet[cellAddress]) {
+          worksheet[cellAddress].z = NUMBER_FORMATS[col.format];
+        }
+      }
+    }
+  }
+}
+
+function createWorksheet(sheet: IExcelSheetData): WorksheetType {
+  const headers = sheet.columns.map((col) => col.header);
+  const dataRows = sheet.rows.map((row) =>
+    sheet.columns.map((col) => row[col.key] ?? "")
+  );
+
+  const worksheetData = [headers, ...dataRows];
+  const worksheet = utils.aoa_to_sheet(worksheetData);
+
+  applyNumberFormats(worksheet, sheet.columns, worksheetData.length);
+
+  worksheet["!cols"] = sheet.columns.map((col, colIdx) => {
+    if (col.width) {
+      return { wch: col.width };
+    }
+
+    const maxLen = worksheetData.reduce((prev, row) => {
+      const cellValue = row[colIdx];
+      const cellLen = cellValue ? cellValue.toString().length : 0;
+      return Math.max(prev, cellLen);
+    }, 0);
+
+    return { wch: maxLen + 2 };
+  });
+
+  return worksheet;
+}
+
+function excelGenerate(sheets: IExcelSheetData[]): Buffer {
+  const workbook = utils.book_new();
+
+  for (const sheet of sheets) {
+    const worksheet = createWorksheet(sheet);
+    utils.book_append_sheet(workbook, worksheet, sheet.sheetName);
+  }
+
+  const buffer = write(workbook, { type: "buffer", bookType: "xlsx" });
+  return Buffer.from(buffer);
+}
 
 function groupAndAggregateSoa(
   soaData: IStatementOfAccountModel[]
@@ -71,62 +202,30 @@ function groupAndAggregateSoa(
   return aggregatedData;
 }
 
-/**
- * Sorts SOA data by PolicyNo, PolicyEndNo, and Installment.
- */
 function sortSoaData(
   soaData: IStatementOfAccountModel[]
 ): IStatementOfAccountModel[] {
   return [...soaData].sort((a, b) => {
-    // Sort by PolicyNo
     if (a.policyNo !== b.policyNo) {
       return (a.policyNo || "").localeCompare(b.policyNo || "");
     }
-    // Then by PolicyEndNo
     if (a.policyEndNo !== b.policyEndNo) {
       return (a.policyEndNo || "").localeCompare(b.policyEndNo || "");
     }
-    // Finally by Installment
     return (a.installment || "").localeCompare(b.installment || "");
   });
 }
 
-/**
- * Converts timestamp (milliseconds or string) to DD/MM/YYYY format
- */
-export function formatTimestampToDate(value: string | number): string {
-  if (!value) {
-    return "";
-  }
-
-  // If it's a string that looks like a timestamp, convert to number
-  const timestamp =
-    typeof value === "string" ? Number.parseInt(value, 10) : value;
-
-  if (Number.isNaN(timestamp)) {
-    return value.toString();
-  }
-
-  const date = new Date(timestamp);
-  const day = date.getDate().toString().padStart(2, "0");
-  const month = (date.getMonth() + 1).toString().padStart(2, "0");
-  const year = date.getFullYear();
-
-  return `${day}/${month}/${year}`;
-}
-
-export function generateExcel(params: GenerateSoaExcelParams): ISoaFileResult {
+export function generateExcel(params: {
+  soaData: IStatementOfAccountModel[];
+  customerId: string;
+}): ISoaFileResult {
   const { soaData, customerId } = params;
 
   const fileName = `Outstanding-SOA--${customerId}.xlsx`;
 
-  // Step 1: Group and aggregate (for non-IB customers)
   let processedData = groupAndAggregateSoa(soaData);
-
-  // Step 2: Sort data
   processedData = sortSoaData(processedData);
-
-  // Step 3: Map to Excel rows
   const rows: Record<string, unknown>[] = processedData.map((soa) => ({
     debitAndCreditNoteNo: soa.debitAndCreditNoteNo,
     branch: soa.branch,
@@ -143,9 +242,9 @@ export function generateExcel(params: GenerateSoaExcelParams): ISoaFileResult {
     distributionName: soa.distributionName,
     distributionNameSecond: soa.distributionNameSecond,
     qualitateQuaName: soa.qualitateQuaName,
-    endEffDate: formatTimestampToDate(soa.endEffDate),
-    endExpDate: formatTimestampToDate(soa.endExpDate),
-    postDate: formatTimestampToDate(soa.postDate),
+    endEffDate: formatDateDDMMYYYY(soa.endEffDate),
+    endExpDate: formatDateDDMMYYYY(soa.endExpDate),
+    postDate: formatDateDDMMYYYY(soa.postDate),
     aging: soa.aging,
     currency: soa.currency,
     exchangeRate: soa.exchangeRate,
@@ -163,10 +262,9 @@ export function generateExcel(params: GenerateSoaExcelParams): ISoaFileResult {
     netPremium: soa.netPremium,
     netPremiumIdr: soa.netPremiumIdr,
     installment: soa.installment,
-    dueDate: formatTimestampToDate(soa.dueDate),
+    dueDate: formatDateDDMMYYYY(soa.dueDate),
   }));
 
-  // Step 4: Generate Excel buffer
   const buffer = excelGenerate([
     {
       sheetName: "Statement of Account",

@@ -43,7 +43,17 @@ export function formatDateIndonesian(date: Date): string {
   return `${date.getDate()} ${INDONESIAN_MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }
 
-export function formatDateDDMMYYYY(date: Date): string {
+export function formatDateDDMMYYYY(value: string | number | Date): string {
+  if (!value) {
+    return "";
+  }
+
+  const date = value instanceof Date ? value : new Date(Number(value));
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
   const day = date.getDate().toString().padStart(2, "0");
   const month = (date.getMonth() + 1).toString().padStart(2, "0");
   const year = date.getFullYear();
@@ -103,42 +113,4 @@ export function parseDate(value: unknown): string {
   const day = date.getDate();
 
   return `${month}/${day}/${year}`;
-}
-
-export function calculateWaitUntilDay(
-  targetDay: number,
-  targetHour = 7,
-  targetMinute = 0,
-  fromDate: Date = new Date()
-): number {
-  const now = fromDate;
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth();
-
-  // 1. Set target date in the current month
-  let targetDate = new Date(
-    currentYear,
-    currentMonth,
-    targetDay,
-    targetHour,
-    targetMinute,
-    0,
-    0
-  );
-
-  // 2. If current time has passed the target this month, schedule for next month
-  if (now.getTime() >= targetDate.getTime()) {
-    targetDate = new Date(
-      currentYear,
-      currentMonth + 1,
-      targetDay,
-      targetHour,
-      targetMinute,
-      0,
-      0
-    );
-  }
-
-  const waitTime = targetDate.getTime() - now.getTime();
-  return Math.max(0, waitTime);
 }

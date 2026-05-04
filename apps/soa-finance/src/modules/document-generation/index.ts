@@ -1,4 +1,4 @@
-export { formatTimestampToDate, generateExcel } from "./excel.generator";
+export { generateExcel } from "./excel.generator";
 export { generateAndUploadDocuments } from "./generate-and-upload";
 export { generateSoaPdfHandler } from "./generate-soa-pdf";
 

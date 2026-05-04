@@ -4,11 +4,7 @@ import {
   initOracleClient,
   testOracleConnection,
 } from "./infrastructure/database/database.js";
-import { letterCounter } from "./modules/soa/objects/letter-counter.js";
-import { soaCustomer } from "./modules/soa/objects/soa-customer.js";
-import { batchWorkflow } from "./modules/soa/workflows/batch-workflow.js";
-import { soaService } from "./modules/soa/workflows/soa-workflow.js";
-import { SoaScheduler } from "./pipeline/scheduler.js";
+import { sharedServices } from "./services.js";
 
 const PORT = 9080;
 
@@ -21,22 +17,14 @@ async function main() {
     console.error("⚠️  Oracle connection failed, but server will continue...");
   }
 
-  const services = [
-    soaService,
-    batchWorkflow,
-    SoaScheduler,
-    soaCustomer,
-    letterCounter,
-  ];
-
   await serve({
-    services,
+    services: sharedServices,
     port: PORT,
   });
 
   console.log(`[App] Server started on port ${PORT}`);
   console.log("[App] Registered services:");
-  for (const service of services) {
+  for (const service of sharedServices) {
     console.log(`[App]   - ${service.name}`);
   }
 }

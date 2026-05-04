@@ -7,10 +7,7 @@ import type {
   IStatementOfAccountModel,
 } from "../../../types";
 import { letterSoaPdfName } from "../../../utils/formatter";
-import {
-  generateAndUploadDocuments,
-  generateLetterNumber,
-} from "../../document-generation";
+import { generateAndUploadDocuments } from "../../document-generation";
 import { createReminder } from "../../reminder";
 import { generateSoa } from "../generate";
 import { multiBranchCodes } from "../types";
@@ -23,20 +20,54 @@ export type ProcessSoaParams = {
 
 type BranchInfo = { officeCode: string; name: string };
 
+async function getSoaLetterSequence(ctx: ObjectContext): Promise<number> {
+  const count = (await ctx.get<number>("soaLetterCount")) ?? 0;
+  ctx.set("soaLetterCount", count + 1);
+  return count + 1;
+}
+
+async function getLetterNo(
+  ctx: ObjectContext,
+  processingType: number,
+  toDateTimestamp: number
+): Promise<string> {
+  const isReminder = processingType > 1;
+  if (!isReminder) {
+    return "";
+  }
+
+  const reminderCount = (processingType - 1).toString();
+  const dateNow = new Date(toDateTimestamp * 1000);
+  const seqNo = await getSoaLetterSequence(ctx);
+  const padded = seqNo.toString().padStart(3, "0");
+  const roman = [
+    "I",
+    "II",
+    "III",
+    "IV",
+    "V",
+    "VI",
+    "VII",
+    "VIII",
+    "IX",
+    "X",
+    "XI",
+    "XII",
+  ];
+  const month = roman[dateNow.getMonth()];
+  const year = dateNow.getFullYear();
+
+  return `${padded}/FIN/SOA/RL${reminderCount}/${month}/${year}`;
+}
+
+// biome-ignore lint/nursery/useMaxParams: pre-existing signature
 async function generateSoaDocuments(
   soaData: IStatementOfAccountModel[],
   customerData: IAccount,
   params: ISoaItem,
-  branchName: string
+  branchName: string,
+  letterNo: string
 ): Promise<void> {
-  const isReminder = params.processingType > 1;
-  const toDate = new Date(params.toDate * 1000);
-  const reminderCount = (params.processingType - 1).toString();
-
-  const letterNo = isReminder
-    ? await generateLetterNumber(reminderCount, toDate)
-    : "";
-
   await generateAndUploadDocuments({
     soaData,
     customerData,
@@ -94,9 +125,20 @@ export async function processBranchSoa({
       const stepName = isMultiBranch
         ? `generate-and-upload-pdf-${branch.officeCode}`
         : "generate-and-upload-pdf";
+      const letterNo = await getLetterNo(
+        ctx,
+        params.processingType,
+        params.toDate
+      );
 
       await ctx.run(stepName, async () => {
-        await generateSoaDocuments(soaData, customerData, params, branch.name);
+        await generateSoaDocuments(
+          soaData,
+          customerData,
+          params,
+          branch.name,
+          letterNo
+        );
       });
 
       await createReminder({

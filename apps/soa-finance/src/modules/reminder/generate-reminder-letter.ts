@@ -1,20 +1,16 @@
 import type { ObjectContext } from "@restatedev/restate-sdk";
-import { isDevelopment } from "../../constants";
+import { isDevelopment, ROMAN_MONTHS } from "../../constants";
 import { downloadSoaFiles } from "../../infrastructure/azure";
-import {
-  getAccountEmails,
-  getLatestLetter,
-  insertReminderLetter,
-} from "../../infrastructure/database/index.js";
+import { getAccountEmails } from "../../infrastructure/database/index.js";
 import { readSoaParquet } from "../../pipeline/lib";
 import type { IAccount, ISoaItem, IStatementOfAccountModel } from "../../types";
 import { reminderPdfName } from "../../utils/formatter";
-import {
-  generateAndUploadDocuments,
-  generateLetterNumber,
-} from "../document-generation";
+import { generateAndUploadDocuments } from "../document-generation";
 import { sendReminderEmail } from "../email/send-reminder";
 import { reconcilePayment } from "../payment/reconcile-payment";
+import { letterCounter } from "../soa/objects/letter-counter";
+import type { LetterRecord } from "../soa/objects/state";
+import { stateKeys } from "../soa/objects/state";
 import type { IGenerateReminderResult, ISoaReminder } from "./types";
 
 type GenerateReminderLetterParams = {
@@ -24,7 +20,80 @@ type GenerateReminderLetterParams = {
   item: ISoaItem;
 };
 
-type LatestLetter = Awaited<ReturnType<typeof getLatestLetter>>;
+type StoredLetterRecord = Omit<LetterRecord, "status"> & {
+  status?: LetterRecord["status"];
+};
+
+type LatestLetter = {
+  type: string;
+  sentDate: Date;
+  letterNo: string;
+} | null;
+
+const getLetterStateKey = (reminder: ISoaReminder) =>
+  stateKeys.letters(reminder.timePeriod, reminder.officeId || "ALL");
+
+const getReminderLetters = async (
+  ctx: ObjectContext,
+  reminder: ISoaReminder
+): Promise<StoredLetterRecord[]> =>
+  (await ctx.get<StoredLetterRecord[]>(getLetterStateKey(reminder))) ?? [];
+
+const getLatestSentLetter = (letters: StoredLetterRecord[]): LatestLetter => {
+  const latest = letters
+    .filter((letter) => !letter.status || letter.status === "sent")
+    .reduce<StoredLetterRecord | null>((currentLatest, letter) => {
+      if (!currentLatest) {
+        return letter;
+      }
+
+      return new Date(letter.sentDate).getTime() >
+        new Date(currentLatest.sentDate).getTime()
+        ? letter
+        : currentLatest;
+    }, null);
+
+  return latest
+    ? {
+        type: latest.type,
+        sentDate: new Date(latest.sentDate),
+        letterNo: latest.letterNo,
+      }
+    : null;
+};
+
+const generateReminderLetterNumber = async (
+  ctx: ObjectContext,
+  type: string,
+  date: Date
+): Promise<string> => {
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const key = `${type}:${year}:${month}`;
+  const seqNo = await ctx.objectClient(letterCounter, key).getNext();
+  const paddedSeq = seqNo.toString().padStart(3, "0");
+  const romanMonth = ROMAN_MONTHS[month - 1];
+
+  return `${paddedSeq}/FIN/SOA/RL${type}/${romanMonth}/${year}`;
+};
+
+const upsertLetter = (
+  letters: StoredLetterRecord[],
+  letter: LetterRecord
+): StoredLetterRecord[] => {
+  const index = letters.findIndex(
+    (existing) =>
+      existing.type === letter.type && existing.letterNo === letter.letterNo
+  );
+
+  if (index === -1) {
+    return [...letters, letter];
+  }
+
+  const updatedLetters = [...letters];
+  updatedLetters[index] = letter;
+  return updatedLetters;
+};
 
 const validateReminderType = (
   ctx: ObjectContext,
@@ -86,8 +155,10 @@ const getUnpaidSoaData = async (
   }
 
   const currentParquetDcNotes = soaList.map((s) => s.debitAndCreditNoteNo);
-  const dcNotesPaid = await ctx.run("reconcile-payment", () =>
-    reconcilePayment(ctx, reminder.id, currentParquetDcNotes)
+  const dcNotesPaid = await reconcilePayment(
+    ctx,
+    reminder.id,
+    currentParquetDcNotes
   );
 
   const paidSet = new Set(dcNotesPaid.map((dc) => dc.toLowerCase()));
@@ -132,6 +203,7 @@ const createAndSendReminder = async (
   const {
     ctx,
     customer,
+    reminder,
     item,
     unpaidItems,
     latestLetter,
@@ -139,20 +211,28 @@ const createAndSendReminder = async (
     toEmail,
   } = params;
   const dateNow = new Date(item.processingDate);
-
-  const letterNo = await ctx.run("generate-letter-number", () =>
-    generateLetterNumber(reminderCount.toString(), dateNow)
+  const type = reminderCount.toString();
+  const letters = await getReminderLetters(ctx, reminder);
+  const pendingLetter = letters.find(
+    (letter) =>
+      letter.type === type &&
+      letter.status === "pending" &&
+      letter.referenceLetterNo === latestLetter?.letterNo
   );
 
-  await ctx.run("insert-reminder-letter", () =>
-    insertReminderLetter({
-      reminderId: params.reminder.id,
-      type: reminderCount.toString(),
-      letterNo,
-      referenceId: latestLetter ? latestLetter.id : null,
-      sentDate: dateNow,
-    })
-  );
+  const letterNo =
+    pendingLetter?.letterNo ??
+    (await generateReminderLetterNumber(ctx, type, dateNow));
+
+  const pendingRecord: LetterRecord = {
+    type,
+    letterNo,
+    referenceLetterNo: latestLetter?.letterNo,
+    sentDate: dateNow.toISOString(),
+    status: "pending",
+  };
+
+  ctx.set(getLetterStateKey(reminder), upsertLetter(letters, pendingRecord));
 
   const pdfFileName = reminderPdfName(reminderCount);
   const branchName = unpaidItems.length > 0 ? unpaidItems[0].branch : "";
@@ -193,7 +273,7 @@ const createAndSendReminder = async (
       return sendReminderEmail({
         customer,
         toEmail,
-        reminderType: reminderCount.toString(),
+        reminderType: type,
         letterNo,
         previousLetterNo: latestLetter?.letterNo,
         previousLetterDate: latestLetter?.sentDate,
@@ -216,6 +296,14 @@ const createAndSendReminder = async (
     }
   );
 
+  if (emailResult) {
+    const currentLetters = await getReminderLetters(ctx, reminder);
+    ctx.set(
+      getLetterStateKey(reminder),
+      upsertLetter(currentLetters, { ...pendingRecord, status: "sent" })
+    );
+  }
+
   return { sent: emailResult, dcNotesPaid: [], letterNo, reason: "SENT" };
 };
 
@@ -225,9 +313,8 @@ export const generateReminderLetter = async (
   const { ctx, customer, reminder, item } = params;
   const processingDate = new Date(item.processingDate);
 
-  const latestLetter = await ctx.run("get-latest-letter", () =>
-    getLatestLetter(reminder.id)
-  );
+  const letters = await getReminderLetters(ctx, reminder);
+  const latestLetter = getLatestSentLetter(letters);
   const reminderCount = validateReminderType(ctx, customer, item, latestLetter);
   if (reminderCount === null) {
     return null;

@@ -43,7 +43,9 @@ export function formatDateIndonesian(date: Date): string {
   return `${date.getDate()} ${INDONESIAN_MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }
 
-export function formatDateDDMMYYYY(value: string | number | Date): string {
+export function formatDateDDMMYYYY(
+  value: string | number | Date | undefined
+): string {
   if (!value) {
     return "";
   }
@@ -62,6 +64,10 @@ export function formatDateDDMMYYYY(value: string | number | Date): string {
 
 export function formatDateEnglish(date: Date): string {
   return `${date.getDate()} ${ENGLISH_MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+export function formatDateEnglishMonthFirst(date: Date): string {
+  return `${ENGLISH_MONTHS[date.getMonth()]} ${date.getDate()} ${date.getFullYear()}`;
 }
 
 export function formatMonthEnglish(date: Date): string {

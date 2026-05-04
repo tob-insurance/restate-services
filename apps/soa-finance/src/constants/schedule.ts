@@ -4,6 +4,7 @@ export type IScheduleConfig = {
   type: "SOA" | "RL1" | "RL2" | "WL";
   soaType: SoaType;
   sendDay: number;
+  graceDays: number;
 };
 
 function parseScheduleDays(): number[] {
@@ -24,8 +25,8 @@ function parseScheduleDays(): number[] {
 const [soaDay, rl1Day, rl2Day, wlDay] = parseScheduleDays();
 
 export const SCHEDULE_CONFIG: IScheduleConfig[] = [
-  { type: "SOA", soaType: 1, sendDay: soaDay },
-  { type: "RL1", soaType: 2, sendDay: rl1Day },
-  { type: "RL2", soaType: 3, sendDay: rl2Day },
-  { type: "WL", soaType: 4, sendDay: wlDay },
+  { type: "SOA", soaType: 1, sendDay: soaDay, graceDays: 0 },
+  { type: "RL1", soaType: 2, sendDay: rl1Day, graceDays: 7 },
+  { type: "RL2", soaType: 3, sendDay: rl2Day, graceDays: 5 },
+  { type: "WL", soaType: 4, sendDay: wlDay, graceDays: 3 },
 ];

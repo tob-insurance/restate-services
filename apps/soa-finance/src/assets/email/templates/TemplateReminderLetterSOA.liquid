@@ -44,9 +44,7 @@
 
                 <p>
                     Mengingat pertanggungan polis telah berjalan lebih dari 60 hari, maka kami mengharapkan pembayaran dapat dilakukan sebelum tanggal
-                    <strong>
-                        19 {{ OutstandingMonthId }}
-                    </strong>
+                    <strong>{{ DeadlineDateId }}</strong>
                 </p>
             {% when "2" %}
                 <p>
@@ -60,7 +58,7 @@
 
                 <p>
                     Mengingat pertanggungan polis telah berjalan lebih dari 60 hari, maka kami mengharapkan perhatian dan kerjasama Bp/Ibu agar pembayaran dapat dilakukan sebelum tanggal
-                    <strong>25 {{ OutstandingMonthId }}</strong>
+                    <strong>{{ DeadlineDateId }}</strong>
                 </p>
             {% when "3" %}
                 <p>
@@ -74,7 +72,7 @@
 
                 <p>
                     Mengingat pertanggungan polis telah berjalan lebih dari 60 hari, maka kami mengharapkan perhatian dan kerjasama Bp/Ibu agar pembayaran dapat dilakukan sebelum tanggal
-                    <strong>29 {{ OutstandingMonthId }}</strong>
+                    <strong>{{ DeadlineDateId }}</strong>
                 </p>
                 <p>
                     Apabila sampai dengan tanggal tersebut belum kami terima pembayarannya, maka dengan berat hati kami akan membatalkan pertanggungan atas polis tersebut secara prorate
@@ -188,7 +186,7 @@
 
                 <p>
                     We highly appreciate your attention & cooperation to inform the client to resolve the above outstandings immediately before
-                    <strong>19 {{ OutstandingMonthEn }}</strong>
+                    <strong>{{ DeadlineDateEn }}</strong>
                 </p>
             {% when "2" %}
                 <p>
@@ -202,7 +200,7 @@
 
                 <p>
                     We highly appreciate your attention & cooperation to inform the client to resolve the above outstandings immediately before
-                    <strong>25 {{ OutstandingMonthEn }}</strong>
+                    <strong>{{ DeadlineDateEn }}</strong>
                 </p>
             {% when "3" %}
                 <p>
@@ -216,7 +214,7 @@
 
                 <p>
                     We highly appreciate your attention & cooperation to inform the client to resolve the above outstandings immediately before
-                    <strong>29 {{ OutstandingMonthEn }}</strong>
+                    <strong>{{ DeadlineDateEn }}</strong>
                 </p>
                 <p>
                     Please be advised that if we do not receive the payment by the deadline, we regret to inform you that the claim process for 

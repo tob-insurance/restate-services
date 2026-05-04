@@ -1,6 +1,8 @@
+import { SCHEDULE_CONFIG } from "../../constants/schedule";
 import type { IAccount, IStatementOfAccountModel } from "../../types";
 import {
   formatDateEnglish,
+  formatDateEnglishMonthFirst,
   formatDateIndonesian,
   formatMonthEnglish,
   formatMonthIndonesian,
@@ -24,6 +26,24 @@ type BuildPdfTemplateDataParams = {
   latestLetter?: LatestLetterInfo;
 };
 
+function computeDeadline(
+  reminderCount: string,
+  asAtDate: Date
+): { deadlineId: string; deadlineEn: string } | null {
+  const soaType = Number(reminderCount) + 1;
+  const schedule = SCHEDULE_CONFIG.find((s) => s.soaType === soaType);
+  const graceDays = schedule?.graceDays ?? 0;
+  if (graceDays === 0) {
+    return null;
+  }
+  const deadline = new Date(asAtDate);
+  deadline.setDate(deadline.getDate() + graceDays);
+  return {
+    deadlineId: formatDateIndonesian(deadline),
+    deadlineEn: formatDateEnglishMonthFirst(deadline),
+  };
+}
+
 export async function buildPdfTemplateData(
   params: BuildPdfTemplateDataParams
 ): Promise<Record<string, unknown>> {
@@ -45,6 +65,8 @@ export async function buildPdfTemplateData(
       0
     );
 
+    const deadline = computeDeadline(reminderCount, toDate);
+
     return {
       AsAtDateId: formatDateIndonesian(toDate),
       AsAtDateEn: formatDateEnglish(toDate),
@@ -62,6 +84,8 @@ export async function buildPdfTemplateData(
       SentDateEn: latestLetter?.sentDate
         ? formatDateEnglish(latestLetter.sentDate)
         : null,
+      DeadlineDateId: deadline?.deadlineId ?? "",
+      DeadlineDateEn: deadline?.deadlineEn ?? "",
       VirtualNumber: customerData.virtualAccount,
       ImgSign: await getSignature(),
     };
@@ -71,6 +95,6 @@ export async function buildPdfTemplateData(
     asAtDate: formatDateIndonesian(toDate),
     customerName: customerData.fullName,
     virtualAccount: customerData.virtualAccount,
-    signature: await getSignature(),
+    ImgSign: await getSignature(),
   };
 }

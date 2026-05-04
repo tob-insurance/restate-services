@@ -15,8 +15,6 @@ import {
  *
  * This is a pure counter: it guarantees uniqueness, NOT gaplessness.
  * Starts from 0 on first call, so the first allocated number is 1.
- * The `backfill` handler is only needed when migrating from an existing
- * system — it sets the counter to the max existing sequence number.
  */
 export const letterCounter = object({
   name: "LetterCounter",
@@ -34,35 +32,6 @@ export const letterCounter = object({
 
       ctx.set("counter", next);
       return next;
-    },
-
-    /**
-     * Initialize counter from backfill data (max existing sequence number).
-     * Only needed for migration — fresh deployments can skip this.
-     * Safe to call multiple times — idempotent (max-based merge).
-     */
-    backfill: async (ctx: ObjectContext, data: unknown) => {
-      if (typeof data !== "object" || data === null || !("counter" in data)) {
-        throw new TerminalError(
-          `Invalid backfill payload. Expected { counter: number }, got ${typeof data}`
-        );
-      }
-      const payload = data as { counter: unknown };
-      if (
-        typeof payload.counter !== "number" ||
-        !Number.isSafeInteger(payload.counter) ||
-        payload.counter < 0
-      ) {
-        throw new TerminalError(
-          `Invalid backfill counter: ${payload.counter}. Must be a non-negative safe integer.`
-        );
-      }
-
-      const validatedCounter = payload.counter;
-      const current = (await ctx.get<number>("counter")) ?? 0;
-      if (validatedCounter > current) {
-        ctx.set("counter", validatedCounter);
-      }
     },
   },
 });

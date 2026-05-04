@@ -16,16 +16,6 @@ type SoaCustomerResult = {
   status: "completed" | "failed";
 };
 
-type SoaCustomerBackfillData = {
-  headers: Array<{ timePeriod: string; officeId: string; createdAt: string }>;
-  details: Record<string, Array<{ dcNoteId: string; isPaid: boolean }>>;
-  letters: Record<
-    string,
-    Array<{ type: string; letterNo: string; sentDate: string }>
-  >;
-  dcNoteIndex: Record<string, string>;
-};
-
 export const soaCustomer = object({
   name: "SoaCustomer",
   options: {
@@ -75,44 +65,6 @@ export const soaCustomer = object({
       return { customerId, status: "completed" };
     },
 
-    backfill: async (ctx: ObjectContext, data: SoaCustomerBackfillData) => {
-      for (const header of data.headers) {
-        ctx.set(stateKeys.header(header.timePeriod, header.officeId), {
-          customerCode: ctx.key,
-          ...header,
-        });
-      }
-
-      for (const [reminderId, detailList] of Object.entries(data.details)) {
-        const [timePeriod, officeId] = reminderId.split(":");
-        const detailsMap: Record<
-          string,
-          { dcNoteId: string; reminderId: string; isPaid: boolean }
-        > = {};
-
-        for (const detail of detailList) {
-          detailsMap[detail.dcNoteId] = {
-            dcNoteId: detail.dcNoteId,
-            reminderId,
-            isPaid: detail.isPaid,
-          };
-        }
-
-        ctx.set(stateKeys.details(timePeriod, officeId), detailsMap);
-      }
-
-      for (const [reminderId, letterList] of Object.entries(data.letters)) {
-        const [timePeriod, officeId] = reminderId.split(":");
-        ctx.set(stateKeys.letters(timePeriod, officeId), letterList);
-      }
-
-      const existingIndex =
-        (await ctx.get<Record<string, string>>(stateKeys.dcNoteIndex)) ?? {};
-      ctx.set(stateKeys.dcNoteIndex, {
-        ...existingIndex,
-        ...data.dcNoteIndex,
-      });
-    },
   },
 });
 

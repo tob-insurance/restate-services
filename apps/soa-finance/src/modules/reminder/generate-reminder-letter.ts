@@ -1,4 +1,5 @@
 import type { Context } from "@restatedev/restate-sdk";
+import { isDevelopment } from "../../constants";
 import { downloadSoaFiles } from "../../infrastructure/azure";
 import {
   getAccountEmails,
@@ -236,7 +237,10 @@ export const generateReminderLetter = async (
   const emails = await ctx.run("get-account-emails", () =>
     getAccountEmails(customer.code, branchCode)
   );
-  const toEmail = emails.join(",");
+  let toEmail = emails.join(",");
+  if (!toEmail && isDevelopment() && customer.email) {
+    toEmail = customer.email;
+  }
 
   if (!toEmail) {
     ctx.console.log(

@@ -2,10 +2,48 @@ import type { IStatementOfAccountModel } from "../../types";
 import { parseDate, parseNumber, parseString } from "../../utils";
 import { column } from "../types";
 
+export type TransformCounters = {
+  received: number;
+  emitted: number;
+  droppedShortRow: number;
+  droppedZeroPremium: number;
+  errored: number;
+};
+
+let schemaValidated = false;
+
+export const createTransformCounters = (): TransformCounters => ({
+  received: 0,
+  emitted: 0,
+  droppedShortRow: 0,
+  droppedZeroPremium: 0,
+  errored: 0,
+});
+
+const validateRowWidth = (row: unknown[]): void => {
+  if (schemaValidated) {
+    return;
+  }
+
+  schemaValidated = true;
+  const expectedColumnCount = Object.keys(column).length;
+
+  if (row.length !== expectedColumnCount) {
+    console.error(
+      `[SOA Transform] Column count mismatch: expected ${expectedColumnCount}, received ${row.length}`
+    );
+  }
+};
+
 export function transformSoaRow(
-  row: unknown[]
+  row: unknown[],
+  counters: TransformCounters
 ): IStatementOfAccountModel | null {
+  counters.received += 1;
+  validateRowWidth(row);
+
   if (!row || row.length < 37) {
+    counters.droppedShortRow += 1;
     return null;
   }
 
@@ -14,8 +52,11 @@ export function transformSoaRow(
   const aging = parseNumber(row[column.AGING]);
 
   if (netPremium === 0) {
+    counters.droppedZeroPremium += 1;
     return null;
   }
+
+  counters.emitted += 1;
 
   return {
     debitAndCreditNoteNo: parseString(row[column.DC_NOTE]),

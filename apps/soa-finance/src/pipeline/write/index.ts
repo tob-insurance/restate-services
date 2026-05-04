@@ -32,23 +32,58 @@ export async function writeToParquet(
     `[Pipeline] Writing ${totalRows} rows for ${datasAccount.size} accounts`
   );
 
+  const result = await uploadAccounts(datasAccount, referenceDate);
+
+  if (result.failed > 0 && result.uploaded === 0 && datasAccount.size > 0) {
+    throw new Error("Failed to upload Parquet files for all accounts");
+  }
+}
+
+async function uploadAccounts(
+  datasAccount: Map<string, IStatementOfAccountModel[]>,
+  referenceDate: Date
+): Promise<{ uploaded: number; failed: number; failedAccounts: string[] }> {
+  let uploaded = 0;
+  let failed = 0;
+  const failedAccounts: string[] = [];
+
   for (const [distributionCode, rows] of datasAccount) {
     const fileName = `soa_${distributionCode}.parquet`;
 
-    const buffer = writeSoaParquetToBuffer(rows);
+    try {
+      const buffer = writeSoaParquetToBuffer(rows);
 
-    const result = await uploadParquetToStorage(
-      fileName,
-      buffer,
-      referenceDate
-    );
+      const result = await uploadParquetToStorage(
+        fileName,
+        buffer,
+        referenceDate
+      );
 
-    if (!result.success) {
-      throw new Error(`Failed to upload ${fileName}`);
+      if (!result.success) {
+        throw new Error(`Failed to upload ${fileName}`);
+      }
+
+      uploaded += 1;
+      console.log(
+        `[Pipeline] Uploaded ${rows.length} rows for ${distributionCode} to ${result.key}`
+      );
+    } catch (error) {
+      failed += 1;
+      failedAccounts.push(distributionCode);
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(
+        `[Pipeline] Failed to upload account ${distributionCode}: ${message}`
+      );
     }
-
-    console.log(
-      `[Pipeline] Uploaded ${rows.length} rows for ${distributionCode} to ${result.key}`
-    );
   }
+
+  console.log(`[Pipeline] Uploaded: ${uploaded}, Failed: ${failed}`);
+
+  if (failed > 0) {
+    for (const accountCode of failedAccounts) {
+      console.error(`[Pipeline] Failed account: ${accountCode}`);
+    }
+  }
+
+  return { uploaded, failed, failedAccounts };
 }

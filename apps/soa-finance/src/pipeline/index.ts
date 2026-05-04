@@ -50,28 +50,3 @@ export async function generateSoaPipeline(
     success: true,
   };
 }
-
-export async function collectPipelineData(
-  asAtDate: Date
-): Promise<Map<string, IStatementOfAccountModel[]>> {
-  console.log("[Pipeline] Collecting data from Oracle");
-
-  const oracleStream = streamSoaData(asAtDate);
-  const transformedStream = transformSoaStream(oracleStream);
-
-  const datasAccount = new Map<string, IStatementOfAccountModel[]>();
-
-  for await (const row of transformedStream) {
-    const accountCode = row.distributionCode;
-
-    if (!datasAccount.has(accountCode)) {
-      datasAccount.set(accountCode, []);
-    }
-
-    datasAccount.get(accountCode)?.push(row);
-  }
-
-  console.log(`[Pipeline] Collected ${datasAccount.size} accounts`);
-
-  return datasAccount;
-}

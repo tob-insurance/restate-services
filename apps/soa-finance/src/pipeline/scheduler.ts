@@ -99,12 +99,12 @@ export const SoaScheduler = object({
         throw new TerminalError(`No schedule configured for ${reason}`);
       }
 
-      const result = await runPipelineAndBatch(ctx, now, schedule);
-
-      // Schedule next run
+      // Schedule next run BEFORE the pipeline and batch so that even if either
+      // fails, the chain is not broken. Restate ensures this journaled send is
+      // not duplicated on handler retry.
       await scheduleNextRun(ctx);
 
-      return result;
+      return runPipelineAndBatch(ctx, now, schedule);
     },
 
     manualTrigger: async (

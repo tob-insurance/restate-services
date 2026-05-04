@@ -3,17 +3,37 @@ import { join } from "node:path";
 import type { IEmailAttachment } from "../../infrastructure/email/types";
 import type { IFileData } from "../../types";
 
-const FALLBACK_EMAIL = "collection@tob-ins.com";
+export const FALLBACK_EMAIL =
+  process.env.SOA_FALLBACK_EMAIL || "collection@tob-ins.com";
 
-const CC_FINANCE = "finance@tob-ins.com";
-const CC_MKT_NONLEASING = "mkt.nonleasing@tob-ins.com";
-const CC_MKT_DIRECTGROUP = "mkt.directgroup@tob-ins.com";
+function parseEnvCcList(): string[] | null {
+  const raw = process.env.SOA_CC_RECIPIENTS;
+  if (!raw) {
+    return null;
+  }
+  const items = raw
+    .split(",")
+    .map((e) => e.trim())
+    .filter((e) => e.includes("@"));
+  return items.length > 0 ? items : null;
+}
+
+const GLOBAL_CC = parseEnvCcList();
+const DEFAULT_CC: Record<string, string[]> = {
+  DIP: ["finance@tob-ins.com", "mkt.nonleasing@tob-ins.com"],
+  DIG: [
+    "finance@tob-ins.com",
+    "mkt.nonleasing@tob-ins.com",
+    "mkt.directgroup@tob-ins.com",
+  ],
+  DEFAULT: ["finance@tob-ins.com"],
+};
 
 export function getCcRecipients(actingCode: string): string[] {
-  if (actingCode === "DIP" || actingCode === "DIG") {
-    return [CC_FINANCE, CC_MKT_NONLEASING, CC_MKT_DIRECTGROUP];
+  if (GLOBAL_CC) {
+    return GLOBAL_CC;
   }
-  return [CC_FINANCE, CC_MKT_NONLEASING];
+  return DEFAULT_CC[actingCode] || DEFAULT_CC.DEFAULT;
 }
 
 export function resolveRecipientEmail(email?: string): string {

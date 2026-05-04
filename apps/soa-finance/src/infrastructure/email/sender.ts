@@ -27,10 +27,15 @@ function formatAttachments(attachments?: IEmailAttachment[]) {
   );
 }
 
-const SHARED_MAILBOX = "collection@tob-ins.com";
-const INITIATOR_EMAIL = "rasmi.asih@tob-ins.com";
+const SHARED_MAILBOX =
+  process.env.AZURE_SHARED_MAILBOX || "collection@tob-ins.com";
 
 export async function sendEmail(message: IEmailMessage): Promise<boolean> {
+  const initiatorEmail = process.env.AZURE_INITIATOR_EMAIL;
+  if (!initiatorEmail) {
+    throw new Error("AZURE_INITIATOR_EMAIL environment variable is required");
+  }
+
   const client = getGraphClient();
 
   const mailBody = {
@@ -46,7 +51,7 @@ export async function sendEmail(message: IEmailMessage): Promise<boolean> {
   };
 
   try {
-    await client.api(`/users/${INITIATOR_EMAIL}/sendMail`).post(mailBody);
+    await client.api(`/users/${initiatorEmail}/sendMail`).post(mailBody);
     console.log(
       `[Email] Sent to: ${message.to.join(", ")}, subject: ${message.subject}`
     );

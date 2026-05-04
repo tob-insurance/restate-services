@@ -12,7 +12,28 @@ import { formatDateToUnixTimestamp, formatTimePeriod } from "../../../utils";
 import { soaCustomer } from "../objects/soa-customer";
 import { soaSchema } from "../types";
 
-const DEV_TEST_CUSTOMER_CODES = [
+function parseEnvInt(key: string, defaultVal: number): number {
+  const raw = process.env[key];
+  if (!raw) {
+    return defaultVal;
+  }
+  const val = Number(raw);
+  return Number.isFinite(val) && val > 0 ? val : defaultVal;
+}
+
+function parseEnvList(key: string): string[] | null {
+  const raw = process.env[key];
+  if (!raw) {
+    return null;
+  }
+  const items = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  return items.length > 0 ? items : null;
+}
+
+const DEV_TEST_CUSTOMER_CODES = parseEnvList("SOA_TEST_CUSTOMERS") ?? [
   "00004162",
   "00004829",
   "00005017",
@@ -21,7 +42,7 @@ const DEV_TEST_CUSTOMER_CODES = [
   "00002844",
 ];
 
-const MAX_WORKERS = 5;
+const MAX_WORKERS = parseEnvInt("SOA_MAX_WORKERS", 5);
 const PROGRESS_LOG_INTERVAL = 10;
 
 type WorkerResult = {
@@ -93,7 +114,7 @@ export const batchWorkflow = workflow({
       };
 
       // STEP 2: Fetch Customer Accounts
-      const accountsToProcess = await ctx.run(
+      const allAccounts = await ctx.run(
         "get-all-accounts",
         async (): Promise<IAccount[]> => {
           const accounts = await getAllAccounts();
@@ -101,18 +122,20 @@ export const batchWorkflow = workflow({
             throw new TerminalError("No customer accounts found");
           }
 
-          if (isDevelopment()) {
-            const testCodes = new Set(DEV_TEST_CUSTOMER_CODES);
-            const filtered = accounts.filter((a) => testCodes.has(a.code));
-            ctx.console.log(
-              `[Dev] Filtered ${accounts.length} accounts to ${filtered.length} test customers`
-            );
-            return filtered;
-          }
-
           return accounts;
         }
       );
+
+      let accountsToProcess: IAccount[];
+      if (isDevelopment()) {
+        const testCodes = new Set(DEV_TEST_CUSTOMER_CODES);
+        accountsToProcess = allAccounts.filter((a) => testCodes.has(a.code));
+        ctx.console.log(
+          `[Dev] Filtered ${allAccounts.length} accounts to ${accountsToProcess.length} test customers`
+        );
+      } else {
+        accountsToProcess = allAccounts;
+      }
 
       const totalAccounts = accountsToProcess.length;
 

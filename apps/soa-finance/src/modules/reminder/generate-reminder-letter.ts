@@ -2,9 +2,9 @@ import type { ObjectContext } from "@restatedev/restate-sdk";
 import { isDevelopment, ROMAN_MONTHS } from "../../constants";
 import { downloadSoaFiles } from "../../infrastructure/azure";
 import { getAccountEmails } from "../../infrastructure/database/index.js";
-import { readSoaParquet } from "../../pipeline/lib";
 import type { IAccount, ISoaItem, IStatementOfAccountModel } from "../../types";
 import { reminderPdfName } from "../../utils/formatter";
+import { readSoaParquet } from "../data-access/parquet-reader";
 import { generateAndUploadDocuments } from "../document-generation";
 import { sendReminderEmail } from "../email/send-reminder";
 import { reconcilePayment } from "../payment/reconcile-payment";
@@ -197,21 +197,14 @@ type CreateAndSendReminderParams = {
   toEmail: string;
 };
 
-const createAndSendReminder = async (
-  params: CreateAndSendReminderParams
-): Promise<IGenerateReminderResult> => {
-  const {
-    ctx,
-    customer,
-    reminder,
-    item,
-    unpaidItems,
-    latestLetter,
-    reminderCount,
-    toEmail,
-  } = params;
-  const dateNow = new Date(item.processingDate);
-  const type = reminderCount.toString();
+// biome-ignore lint/nursery/useMaxParams: extracted private helper — parameters are individually meaningful
+const assignLetterRecord = async (
+  ctx: ObjectContext,
+  reminder: ISoaReminder,
+  type: string,
+  dateNow: Date,
+  latestLetter: LatestLetter
+): Promise<LetterRecord> => {
   const letters = await getReminderLetters(ctx, reminder);
   const pendingLetter = letters.find(
     (letter) =>
@@ -233,78 +226,166 @@ const createAndSendReminder = async (
   };
 
   ctx.set(getLetterStateKey(reminder), upsertLetter(letters, pendingRecord));
+  return pendingRecord;
+};
 
+type GenerateUploadResult = { excelFileName: string; pdfFileName: string };
+
+// biome-ignore lint/nursery/useMaxParams: extracted private helper
+// biome-ignore lint/suspicious/useAwait: await is inside ctx.run callback
+const generateAndUploadForReminder = async (
+  ctx: ObjectContext,
+  unpaidItems: IStatementOfAccountModel[],
+  customer: IAccount,
+  item: ISoaItem,
+  reminderCount: number,
+  letterNo: string,
+  latestLetter: LatestLetter
+): Promise<GenerateUploadResult> => {
   const pdfFileName = reminderPdfName(reminderCount);
   const branchName = unpaidItems.length > 0 ? unpaidItems[0].branch : "";
 
-  const { excelFileName } = await ctx.run(
-    "generate-and-upload-documents",
-    async () => {
-      const result = await generateAndUploadDocuments({
-        soaData: unpaidItems,
-        customerData: customer,
-        params: item,
-        branchName,
-        letterNo,
-        latestLetter,
-        pdfFileName,
-      });
-      return {
-        excelFileName: result.excelFile.fileName,
-        pdfFileName: result.pdfFile.fileName,
-      };
-    }
-  );
+  return ctx.run("generate-and-upload-documents", async () => {
+    const result = await generateAndUploadDocuments({
+      soaData: unpaidItems,
+      customerData: customer,
+      params: item,
+      branchName,
+      letterNo,
+      latestLetter,
+      pdfFileName,
+    });
+    return {
+      excelFileName: result.excelFile.fileName,
+      pdfFileName: result.pdfFile.fileName,
+    };
+  });
+};
 
+// biome-ignore lint/nursery/useMaxParams: extracted private helper
+const downloadAndSendReminder = async (
+  ctx: ObjectContext,
+  customer: IAccount,
+  item: ISoaItem,
+  type: string,
+  letterNo: string,
+  latestLetter: LatestLetter,
+  fileNames: GenerateUploadResult,
+  branchName: string,
+  unpaidItems: IStatementOfAccountModel[],
+  toEmail: string
+): Promise<void> => {
+  const dateNow = new Date(item.processingDate);
   const totalPremium = unpaidItems.reduce(
     (sum, soaItem) => sum + (soaItem.netPremiumIdr || 0),
     0
   );
 
-  const emailResult = await ctx.run(
-    "download-and-send-reminder-email",
-    async () => {
-      const { excelBuffer, pdfBuffer } = await downloadSoaFiles(
-        customer.code,
-        excelFileName,
-        pdfFileName
-      );
+  await ctx.run("download-and-send-reminder-email", async () => {
+    const { excelBuffer, pdfBuffer } = await downloadSoaFiles(
+      customer.code,
+      fileNames.excelFileName,
+      fileNames.pdfFileName
+    );
 
-      return sendReminderEmail({
-        customer,
-        toEmail,
-        reminderType: type,
-        letterNo,
-        previousLetterNo: latestLetter?.letterNo,
-        previousLetterDate: latestLetter?.sentDate,
-        branch: branchName,
-        totalPremium,
-        excelFile: {
-          fileName: excelFileName,
-          bytes: excelBuffer,
-          contentType:
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        },
-        pdfFile: {
-          fileName: pdfFileName,
-          bytes: pdfBuffer,
-          contentType: "application/pdf",
-        },
-        isReminder: item.processingType > 1,
-        date: dateNow,
-      });
-    }
+    await sendReminderEmail({
+      customer,
+      toEmail,
+      reminderType: type,
+      letterNo,
+      previousLetterNo: latestLetter?.letterNo,
+      previousLetterDate: latestLetter?.sentDate,
+      branch: branchName,
+      totalPremium,
+      excelFile: {
+        fileName: fileNames.excelFileName,
+        bytes: excelBuffer,
+        contentType:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      },
+      pdfFile: {
+        fileName: fileNames.pdfFileName,
+        bytes: pdfBuffer,
+        contentType: "application/pdf",
+      },
+      isReminder: item.processingType > 1,
+      date: dateNow,
+    });
+  });
+};
+
+const finalizeLetterSent = async (
+  ctx: ObjectContext,
+  reminder: ISoaReminder,
+  pendingRecord: LetterRecord
+): Promise<void> => {
+  const currentLetters = await getReminderLetters(ctx, reminder);
+  ctx.set(
+    getLetterStateKey(reminder),
+    upsertLetter(currentLetters, { ...pendingRecord, status: "sent" })
+  );
+};
+
+const createAndSendReminder = async (
+  params: CreateAndSendReminderParams
+): Promise<IGenerateReminderResult> => {
+  const {
+    ctx,
+    customer,
+    reminder,
+    item,
+    unpaidItems,
+    latestLetter,
+    reminderCount,
+    toEmail,
+  } = params;
+  const dateNow = new Date(item.processingDate);
+  const type = reminderCount.toString();
+  const branchName = unpaidItems.length > 0 ? unpaidItems[0].branch : "";
+
+  // Phase 1: Assign letter record
+  const pendingRecord = await assignLetterRecord(
+    ctx,
+    reminder,
+    type,
+    dateNow,
+    latestLetter
   );
 
-  if (emailResult) {
-    const currentLetters = await getReminderLetters(ctx, reminder);
-    ctx.set(
-      getLetterStateKey(reminder),
-      upsertLetter(currentLetters, { ...pendingRecord, status: "sent" })
-    );
-  }
+  // Phase 2: Generate & upload documents
+  const fileNames = await generateAndUploadForReminder(
+    ctx,
+    unpaidItems,
+    customer,
+    item,
+    reminderCount,
+    pendingRecord.letterNo,
+    latestLetter
+  );
 
-  return { sent: emailResult, dcNotesPaid: [], letterNo, reason: "SENT" };
+  // Phase 3: Download & send email (failure throws -> Restate retry)
+  await downloadAndSendReminder(
+    ctx,
+    customer,
+    item,
+    type,
+    pendingRecord.letterNo,
+    latestLetter,
+    fileNames,
+    branchName,
+    unpaidItems,
+    toEmail
+  );
+
+  // Phase 4: Finalize state
+  await finalizeLetterSent(ctx, reminder, pendingRecord);
+
+  return {
+    sent: true,
+    dcNotesPaid: [],
+    letterNo: pendingRecord.letterNo,
+    reason: "SENT",
+  };
 };
 
 export const generateReminderLetter = async (

@@ -3,11 +3,31 @@ import {
   type OracleClient,
 } from "@restate-tob/oracle";
 import type { BindParameters, ExecuteOptions } from "oracledb";
+import { isDevelopment } from "../../constants";
 
 let oracleClient: OracleClient | null = null;
 
 function getOracleInstantClientPath(): string | undefined {
   return process.env.ORACLE_INSTANT_CLIENT_PATH ?? process.env.ORACLE_LIB_DIR;
+}
+
+function logDevModeWarning(connectionString: string): void {
+  if (!isDevelopment()) {
+    return;
+  }
+
+  try {
+    const url = new URL(connectionString);
+    console.warn(
+      `\n⚠️  [DEV MODE] Connecting to Oracle at ${url.hostname}:${url.port || "1521"}\n` +
+        "   Double-check this is NOT your production database before proceeding.\n"
+    );
+  } catch {
+    console.warn(
+      "\n⚠️  [DEV MODE] Connecting to Oracle (raw connection string)\n" +
+        "   Double-check this is NOT your production database before proceeding.\n"
+    );
+  }
 }
 
 export function getOracleClient(): OracleClient {
@@ -16,6 +36,8 @@ export function getOracleClient(): OracleClient {
     if (!connectionString) {
       throw new Error("ORACLE_URL environment variable is required");
     }
+
+    logDevModeWarning(connectionString);
 
     oracleClient = createOracleClientFromUrl({
       connectionString,

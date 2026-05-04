@@ -1,4 +1,5 @@
 import type { Context } from "@restatedev/restate-sdk";
+import { isDevelopment } from "../../../constants";
 import { getAllBranches } from "../../../infrastructure/database/index.js";
 import type {
   IAccount,
@@ -52,7 +53,8 @@ export async function processBranchSoa({
   customerData,
   params,
 }: ProcessSoaParams): Promise<boolean> {
-  const isMultiBranch = multiBranchCodes.includes(customerData.actingCode);
+  const isMultiBranch =
+    !isDevelopment() && multiBranchCodes.includes(customerData.actingCode);
 
   const branches: BranchInfo[] = isMultiBranch
     ? await ctx.run("get-branches", async () => await getAllBranches())
@@ -60,6 +62,10 @@ export async function processBranchSoa({
 
   if (isMultiBranch) {
     ctx.console.log(`Processing ${branches.length} branches`);
+  } else if (multiBranchCodes.includes(customerData.actingCode)) {
+    ctx.console.log(
+      `[Dev] Skipping multi-branch loop for ${customerData.code}, using branch ALL`
+    );
   }
 
   let hasDocuments = false;

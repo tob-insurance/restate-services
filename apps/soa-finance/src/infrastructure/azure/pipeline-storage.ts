@@ -1,5 +1,5 @@
-import { getPipelinePathPrefix } from "../constants";
-import { getContainerClient } from "./azure/blob-client";
+import { getPipelinePathPrefix } from "../../constants";
+import { getContainerClient } from "./blob-client";
 
 type UploadResult = {
   key: string;

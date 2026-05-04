@@ -1,4 +1,4 @@
-import { uploadParquetToStorage } from "../../infrastructure/pipeline-storage";
+import { uploadParquetToStorage } from "../../infrastructure/azure/pipeline-storage";
 import type { IStatementOfAccountModel } from "../../types";
 import { writeSoaParquetToBuffer } from "../lib";
 

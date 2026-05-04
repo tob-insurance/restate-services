@@ -29,7 +29,7 @@ type SendReminderEmailParams = {
 
 export const sendReminderEmail = async (
   params: SendReminderEmailParams
-): Promise<boolean> => {
+): Promise<void> => {
   const {
     customer,
     toEmail,
@@ -82,10 +82,8 @@ export const sendReminderEmail = async (
   });
 
   if (!result) {
-    console.error(
-      `[Email] Reminder email failed for ${customer.code} to: ${recipient}`
+    throw new Error(
+      `Reminder email failed for ${customer.code} to: ${recipient}`
     );
   }
-
-  return result;
 };

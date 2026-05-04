@@ -1,8 +1,7 @@
 import type { ObjectContext } from "@restatedev/restate-sdk";
-import { readSoaParquet } from "../../pipeline/lib";
 import type { IAccount, IStatementOfAccountModel } from "../../types";
-import type { DcNoteIndex } from "./objects/state";
-import { stateKeys } from "./objects/state";
+import { readSoaParquet } from "../data-access/parquet-reader";
+import { readDcNoteIndex } from "./objects/state";
 
 type GenerateSoaOptions = {
   ctx: ObjectContext;
@@ -63,11 +62,16 @@ async function filterAlreadyProcessedDcNotes(
   soaList: IStatementOfAccountModel[]
 ): Promise<IStatementOfAccountModel[] | null> {
   const dcNotesSet = new Set(
-    soaList.flatMap((soa) => soa.debitAndCreditNoteNo?.split(",") || [])
+    soaList.flatMap((soa) =>
+      (soa.debitAndCreditNoteNo || "")
+        .split(",")
+        .map((note) => note.trim())
+        .filter((note) => note.length > 0)
+    )
   );
   const dcNotes = Array.from(dcNotesSet);
 
-  const dcNoteIndex = await ctx.get<DcNoteIndex>(stateKeys.dcNoteIndex);
+  const dcNoteIndex = await readDcNoteIndex(ctx);
   const existingDcNotes = dcNoteIndex ? Object.keys(dcNoteIndex) : [];
   const existingSet = new Set(existingDcNotes.map((id) => id.toLowerCase()));
 
@@ -79,6 +83,11 @@ async function filterAlreadyProcessedDcNotes(
     return [];
   }
 
-  const processedSet = new Set(processedDcNotes);
-  return soaList.filter((soa) => processedSet.has(soa.debitAndCreditNoteNo));
+  const processedSet = new Set(processedDcNotes.map((d) => d.toLowerCase()));
+  return soaList.filter((soa) => {
+    const notes = (soa.debitAndCreditNoteNo || "")
+      .split(",")
+      .map((note) => note.trim());
+    return notes.some((note) => processedSet.has(note.toLowerCase()));
+  });
 }

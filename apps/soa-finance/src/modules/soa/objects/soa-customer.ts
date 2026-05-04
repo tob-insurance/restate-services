@@ -8,8 +8,7 @@ import { getAccountById } from "../../../infrastructure/database/index.js";
 import type { ISoaItem } from "../../../types";
 import { processReminderLetter } from "../../reminder";
 import { newSoa } from "../services";
-import type { DcNoteIndex } from "./state";
-import { stateKeys } from "./state";
+import { readDcNoteIndex } from "./state";
 
 type SoaCustomerResult = {
   customerId: string;
@@ -64,7 +63,6 @@ export const soaCustomer = object({
 
       return { customerId, status: "completed" };
     },
-
   },
 });
 
@@ -74,11 +72,7 @@ async function hasRemindersForPeriod(
   ctx: ObjectContext,
   timePeriod: string
 ): Promise<boolean> {
-  const dcNoteIndex = await ctx.get<DcNoteIndex>(stateKeys.dcNoteIndex);
-
-  if (!dcNoteIndex) {
-    return false;
-  }
+  const dcNoteIndex = await readDcNoteIndex(ctx, timePeriod);
 
   return Object.values(dcNoteIndex).some((reminderId) =>
     reminderId.startsWith(`${timePeriod}:`)

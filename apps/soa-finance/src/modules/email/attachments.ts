@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { IEmailAttachment } from "../../infrastructure/email/types";
 import type { IFileData } from "../../types";
+import { ASSETS_DIR } from "../../utils/paths";
 
 export const FALLBACK_EMAIL =
   process.env.SOA_FALLBACK_EMAIL || "collection@tob-ins.com";
@@ -42,7 +43,7 @@ export function resolveRecipientEmail(email?: string): string {
 
 function getSignatureAttachment(): IEmailAttachment | null {
   try {
-    const signaturePath = join(__dirname, "../../assets/sign.jpeg");
+    const signaturePath = join(ASSETS_DIR, "sign.jpeg");
     const bytes = readFileSync(signaturePath);
     return {
       name: "mgr-signature.jpeg",

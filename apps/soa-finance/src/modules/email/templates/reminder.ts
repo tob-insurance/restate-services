@@ -1,18 +1,12 @@
-import { join } from "node:path";
 import { SCHEDULE_CONFIG } from "../../../constants/schedule";
 import {
   formatDateEnglishMonthFirst,
   formatDateIndonesian,
 } from "../../../utils/formatter";
-import { renderTemplate } from "../../../utils/template";
-import {
-  formatEnDate,
-  loadEmailTemplate,
-} from "../../../utils/template/email-formatters";
-import { getSignature } from "../../document-generation/pdf-assets";
+import { formatEnDate } from "../../../utils/template/email-formatters";
+import type { EmailTemplateName } from "../../../utils/template/engine";
+import { renderEmail } from "../../../utils/template/engine";
 import type { IReminderEmailData } from "../../reminder/types";
-
-const TEMPLATES_DIR = join(__dirname, "../../../assets/email/templates");
 
 const currencyFormatter = new Intl.NumberFormat("id-ID", {
   minimumFractionDigits: 2,
@@ -40,17 +34,15 @@ function computeDeadline(
 export async function generateReminderEmailHtml(
   type: string,
   data: IReminderEmailData,
-  templateName = "TemplateReminderLetterSOA"
+  templateName: EmailTemplateName = "TemplateReminderLetterSOA"
 ): Promise<string> {
-  const template = loadEmailTemplate(TEMPLATES_DIR, templateName);
-
   const deadline = computeDeadline(type, data.asAtDate);
 
-  return await renderTemplate(template, {
+  return await renderEmail(templateName, {
     reminderType: type,
     customerName: data.customerName,
     letterNo: data.letterNo,
-    previousLetterNo: data.previousLetterNo,
+    previousLetterNo: data.previousLetterNo ?? "-",
     virtualAccount: data.virtualAccount,
     formattedDate: formatDateIndonesian(data.asAtDate),
     formattedDateEn: formatEnDate(data.asAtDate),
@@ -66,7 +58,6 @@ export async function generateReminderEmailHtml(
       : "0.00",
     deadlineDateId: deadline?.deadlineId ?? "",
     deadlineDateEn: deadline?.deadlineEn ?? "",
-    ImgSign: getSignature(),
   });
 }
 

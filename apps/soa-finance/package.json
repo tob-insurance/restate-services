@@ -17,7 +17,7 @@
     "postbundle": "cd dist && zip -r index.zip app.js*",
     "prebundle:lambda": "rm -rf dist-lambda",
     "bundle:lambda": "esbuild src/app.lambda.ts --bundle --minify --sourcemap --platform=node --target=es2020 --external:oracledb --outfile=dist-lambda/app.js",
-    "postbundle:lambda": "cd dist-lambda && mkdir -p node_modules src && cp -rL ../node_modules/oracledb node_modules/ && cp -r ../src/assets src/assets && zip -r lambda.zip app.js* node_modules",
+    "postbundle:lambda": "cd dist-lambda && mkdir -p node_modules assets && cp -rL ../node_modules/oracledb node_modules/ && cp -r ../src/assets/* assets/ && zip -r lambda.zip app.js* node_modules assets",
     "build:layer": "bun run --filter @restate-tob/lambda-layers build:oracle"
   },
   "dependencies": {
@@ -29,6 +29,7 @@
     "@restatedev/restate-sdk-zod": "^1.9.1",
     "apache-arrow": "^21.1.0",
     "hucre": "^0.4.0",
+    "juice": "^11.1.1",
     "liquidjs": "^10.24.0",
     "luxon": "^3.7.2",
     "oracledb": "^6.10.0",

@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { ASSETS_DIR } from "../../utils/paths";
 import { renderTemplate } from "../../utils/template";
 import { getSignature } from "./pdf-assets";
 
-const TEMPLATES_DIR = join(__dirname, "../../assets/email/templates");
+const TEMPLATES_DIR = join(ASSETS_DIR, "email/templates");
 const templateCache = new Map<string, string>();
 
 function loadTemplate(templateName: string): string {

@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-
-const ASSETS_DIR = join(__dirname, "../../assets");
+import { ASSETS_DIR } from "../../utils/paths";
 
 let cachedSignature: string | null = null;
 let cachedHeader: string | null = null;

@@ -41,8 +41,20 @@ export const stateKeys = {
     `details:${timePeriod}:${officeId}` as const,
   letters: (timePeriod: string, officeId: string) =>
     `letters:${timePeriod}:${officeId}` as const,
-  dcNoteIndex: "dcNoteIndex" as const,
+  dcNoteIndex: (timePeriod: string) => `dcNoteIndex:${timePeriod}` as const,
 } as const;
+
+export async function readDcNoteIndex(
+  ctx: ObjectContext | ObjectSharedContext,
+  currentTimePeriod?: string
+): Promise<DcNoteIndex> {
+  if (!currentTimePeriod) {
+    return {};
+  }
+  return (
+    (await ctx.get<DcNoteIndex>(stateKeys.dcNoteIndex(currentTimePeriod))) ?? {}
+  );
+}
 
 // ── Context type alias for SoaCustomer handlers ─────────────────
 

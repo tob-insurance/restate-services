@@ -8,6 +8,7 @@ export type CreateReminderParams = {
   customer: IAccount;
   timePeriod: string;
   branchCode: string;
+  processingDate: string;
   soaList: IStatementOfAccountModel[];
 };
 
@@ -25,7 +26,7 @@ export const createReminder = async (
     customerCode: customer.code,
     timePeriod,
     officeId: branchCode,
-    createdAt: new Date().toISOString(),
+    createdAt: params.processingDate,
   };
   ctx.set(stateKeys.header(timePeriod, branchCode), header);
 
@@ -33,21 +34,24 @@ export const createReminder = async (
   const newIndexEntries: Record<string, string> = {};
 
   for (const soa of soaList) {
-    const dcNoteId = soa.debitAndCreditNoteNo;
-    detailsMap[dcNoteId] = {
-      dcNoteId,
-      reminderId,
-      isPaid: false,
-    };
-    newIndexEntries[dcNoteId] = reminderId;
+    const dcNoteIds = (soa.debitAndCreditNoteNo || "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter((id) => id.length > 0);
+    for (const dcNoteId of dcNoteIds) {
+      detailsMap[dcNoteId] = { dcNoteId, reminderId, isPaid: false };
+      newIndexEntries[dcNoteId] = reminderId;
+    }
   }
 
   const existingIndex =
-    (await ctx.get<Record<string, string>>(stateKeys.dcNoteIndex)) ?? {};
+    (await ctx.get<Record<string, string>>(
+      stateKeys.dcNoteIndex(timePeriod)
+    )) ?? {};
   const mergedIndex = { ...existingIndex, ...newIndexEntries };
 
   ctx.set(stateKeys.details(timePeriod, branchCode), detailsMap);
-  ctx.set(stateKeys.dcNoteIndex, mergedIndex);
+  ctx.set(stateKeys.dcNoteIndex(timePeriod), mergedIndex);
 
   ctx.console.log(
     `[Reminder] Created reminder ${reminderId} with ${soaList.length} details for ${customer.code}`

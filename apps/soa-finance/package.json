@@ -11,13 +11,14 @@
     "lint:fix": "ultracite fix",
     "start": "node ./dist/app.local.js",
     "dev": "tsx watch ./src/app.local.ts",
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist dist-lambda",
     "prebundle": "rm -rf dist",
     "bundle": "esbuild src/app.local.ts --bundle --minify --sourcemap --platform=node --target=es2020 --outfile=dist/app.js",
     "postbundle": "cd dist && zip -r index.zip app.js*",
     "prebundle:lambda": "rm -rf dist-lambda",
     "bundle:lambda": "esbuild src/app.lambda.ts --bundle --minify --sourcemap --platform=node --target=es2020 --external:oracledb --outfile=dist-lambda/app.js",
-    "postbundle:lambda": "cd dist-lambda && mkdir -p node_modules && cp -rL ../../../packages/oracle/node_modules/oracledb node_modules/ && zip -r lambda.zip app.js* node_modules"
+    "postbundle:lambda": "cd dist-lambda && mkdir -p node_modules && cp -rL ../node_modules/oracledb node_modules/ && zip -r lambda.zip app.js* node_modules",
+    "build:layer": "bun run --filter @restate-tob/lambda-layers build:oracle"
   },
   "dependencies": {
     "@azure/identity": "^4.13.0",

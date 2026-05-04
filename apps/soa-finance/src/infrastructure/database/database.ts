@@ -39,11 +39,11 @@ export function getOracleClient(): OracleClient {
 
     logDevModeWarning(connectionString);
 
+    const isLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
     oracleClient = createOracleClientFromUrl({
       connectionString,
       instantClientPath: getOracleInstantClientPath(),
-      poolMin: 10,
-      poolMax: 50,
+      ...(isLambda ? { poolMin: 0, poolMax: 1 } : { poolMin: 2, poolMax: 10 }),
     });
   }
 
@@ -77,12 +77,13 @@ export async function executeQuery<T = Record<string, unknown>>(
   };
 }
 
-export function executeMany(
+export async function executeMany(
   sql: string,
   binds: BindParameters[],
   options?: ExecuteOptions
 ) {
-  return getOracleClient().executeMany(sql, binds, options);
+  const result = await getOracleClient().executeMany(sql, binds, options);
+  return { rowsAffected: result.rowsAffected, batchErrors: result.batchErrors };
 }
 
 // Keep the SOA-specific procedure for backward compatibility

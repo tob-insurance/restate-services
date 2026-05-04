@@ -27,12 +27,12 @@ src/
 │   ├── email/                # Email sending service (Microsoft Graph)
 │   └── gotenberg/            # PDF generation client
 ├── modules/
-│   ├── document-generation/  # Shared PDF, Excel, letter number generation
-│   ├── email/                # Email sending and templates
-│   ├── job/                  # Job tracking
-│   ├── payment/              # Payment reconciliation
-│   ├── reminder/             # Reminder letter processing
-│   └── soa/                  # SOA workflows and services
+│   ├── data-access/           # Shared Parquet reader (used by both modules and pipeline)
+│   ├── document-generation/   # Shared PDF, Excel, letter number generation
+│   ├── email/                 # Email sending and templates
+│   ├── payment/               # Payment reconciliation
+│   ├── reminder/              # Reminder letter processing
+│   └── soa/                   # SOA workflows, services, and virtual objects
 └── pipeline/                 # Data pipeline for Parquet processing
 ```
 
@@ -44,8 +44,8 @@ src/
 
 ### Workflows
 
-- **BatchWorkflow** (`batch-workflow.ts`): Orchestrates batch SOA processing with a bounded worker pool (max 5 concurrent child workflows). Uses `RestatePromise.race` for worker completion detection.
-- **SoaWorkflow** (`soa-workflow.ts`): Per-customer SOA processing. Decides between new SOA generation or reminder letter processing based on existing reminders.
+- **BatchWorkflow** (`batch-workflow.ts`): Orchestrates batch SOA processing with a bounded worker pool (max 5 concurrent child virtual objects). Uses `RestatePromise.race` for worker completion detection.
+- **SoaCustomer** (`soa-customer.ts`): Per-customer Virtual Object processing. Decides between new SOA generation or reminder letter processing based on existing reminders.
 
 ### Key Restate Patterns in This App
 
@@ -77,6 +77,8 @@ AZURE_CLIENT_SECRET=your-client-secret
 
 # Email sender (optional, has fallback)
 SENDER_EMAIL=sender@example.com
+
+# AWS Lambda detection (auto-detected via AWS_LAMBDA_FUNCTION_NAME)
 
 # Azure Storage
 AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=https;AccountName=...

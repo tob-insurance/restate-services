@@ -1,7 +1,7 @@
 import type { ObjectContext } from "@restatedev/restate-sdk";
 import { type IAccount, type ISoaItem, SoaType } from "../../types";
 import type { ReminderHeader } from "../soa/objects/state";
-import { stateKeys } from "../soa/objects/state";
+import { readDcNoteIndex, stateKeys } from "../soa/objects/state";
 import { generateReminderLetter } from "./generate-reminder-letter";
 import type { IProcessReminder } from "./types";
 
@@ -29,11 +29,9 @@ export const processReminderLetter = async (
     }`
   );
 
-  const dcNoteIndex = await ctx.get<Record<string, string>>(
-    stateKeys.dcNoteIndex
-  );
+  const dcNoteIndex = await readDcNoteIndex(ctx, item.timePeriod);
 
-  if (!dcNoteIndex) {
+  if (Object.keys(dcNoteIndex).length === 0) {
     ctx.console.log(
       `[Reminder] Skipping ${customer.code}: no previous reminder records`
     );

@@ -1,29 +1,28 @@
 # SOA Finance Service
 
-This service is a **Restate** application designed to handle the Statement of Account (SOA) and Reminder Letter generation pipeline. It uses **Durable Execution** to ensure reliability across complex distributed processes involving Oracle databases, data streaming, Parquet file processing, and external services like Azure Blob Storage and SendGrid.
+This service is a **Restate** application designed to handle the Statement of Account (SOA) and Reminder Letter generation pipeline. It uses **Durable Execution** to ensure reliability across complex distributed processes involving Oracle databases, data streaming, Parquet file processing, and external services like Azure Blob Storage and Microsoft Graph.
 
 ## Project Structure
 
 The project follows a domain-driven structure to separate concerns:
 
-- **`src/data-pipeline/`**:
+- **`src/pipeline/`**:
   - Handles high-performance data processing using **Apache Arrow** and **Parquet**.
   - Responsible for reading and processing large datasets efficiently.
 
 - **`src/infrastructure/`**: External adapters and technical implementations.
   - `azure/`: Azure Blob Storage integration for uploading generated reports.
   - `database/`: Database queries and connection management (Oracle).
-  - `email/`: Email sending service (SendGrid) and template management.
+  - `email/`: Email sending service (Microsoft Graph) and template management.
   - `gotenberg/`: Client for generating PDFs from HTML using Gotenberg.
-  - `browser/`: Utilities for browser-based tasks (if applicable).
 
-- **`src/module/`**: Core business logic.
-  - **`workflows/`**: Orchestration logic defining the durable execution flows.
-    - `BatchWorkflow`: Manages the high-level batch processing of all customers.
-    - `SoaWorkflow`: Handles the end-to-end process for a single customer (Data extraction -> Generation -> Email).
-  - **`services/`**: focused business logic and rules (e.g., `createReminder`, `generateSoa`).
-  - **`handlers/`**: Atomic activities called by workflows (e.g., `generateSoaPdfHandler`).
-  - **`utils/`**: Shared utilities for formatting, template rendering, and types.
+- **`src/modules/`**: Core business logic.
+  - **`soa/`**: Workflows, virtual objects, and services for SOA and reminder processing.
+  - **`reminder/`**: Reminder letter creation, processing, and generation.
+  - **`document-generation/`**: Excel, PDF generation, and Liquid template rendering.
+  - **`email/`**: Email composition and sending with templates.
+  - **`data-access/`**: Shared Parquet reading used by modules and pipeline layers.
+  - **`types/`**: Shared TypeScript type definitions.
 
 ## Prerequisites
 
@@ -92,7 +91,7 @@ Processes an individual customer:
 2. **Filter**: Applies aging and payment reconciliation filters.
 3. **Generate**: Creates Excel and PDF reports (using Gotenberg).
 4. **Upload**: Uploads files to Azure Blob Storage.
-5. **Send**: Sends the SOA/Reminder email via SendGrid.
+5. **Send**: Sends the SOA/Reminder email via Microsoft Graph.
 
 ---
 

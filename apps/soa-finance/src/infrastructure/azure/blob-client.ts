@@ -1,4 +1,5 @@
 import { BlobServiceClient, type ContainerClient } from "@azure/storage-blob";
+import { TerminalError } from "@restatedev/restate-sdk";
 import { isDevelopment } from "../../constants";
 
 let containerClient: ContainerClient | null = null;
@@ -23,7 +24,7 @@ export function getContainerClient(): ContainerClient {
   const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME;
 
   if (!(connectionString && containerName)) {
-    throw new Error(
+    throw new TerminalError(
       "Missing Azure Storage connection string or container name"
     );
   }

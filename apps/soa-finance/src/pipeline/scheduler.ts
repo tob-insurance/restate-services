@@ -10,6 +10,7 @@ import {
   TIMEZONE,
 } from "../constants/index.js";
 import { batchWorkflow } from "../modules/soa/workflows/batch-workflow.js";
+import type { SoaType } from "../types/index.js";
 import { formatDuration } from "../utils/index.js";
 import { generateSoaPipeline } from "./index.js";
 
@@ -80,14 +81,22 @@ export const SoaScheduler = object({
       await scheduleNextRun(ctx);
     },
 
-    trigger: async (ctx: ObjectContext): Promise<ScheduleTriggerResult> => {
+    trigger: async (
+      ctx: ObjectContext,
+      scheduled?: { soaType: SoaType; scheduleName: string }
+    ): Promise<ScheduleTriggerResult> => {
       const now = DateTime.fromMillis(await ctx.date.now()).setZone(TIMEZONE);
       const currentDay = now.day;
 
-      const schedule = SCHEDULE_CONFIG.find((s) => s.sendDay === currentDay);
+      const schedule = scheduled
+        ? SCHEDULE_CONFIG.find((s) => s.soaType === scheduled.soaType)
+        : SCHEDULE_CONFIG.find((s) => s.sendDay === currentDay);
 
       if (!schedule) {
-        throw new TerminalError(`No schedule configured for day ${currentDay}`);
+        const reason = scheduled
+          ? `soaType ${scheduled.soaType} (${scheduled.scheduleName})`
+          : `day ${currentDay}`;
+        throw new TerminalError(`No schedule configured for ${reason}`);
       }
 
       const result = await runPipelineAndBatch(ctx, now, schedule);
@@ -136,10 +145,7 @@ async function runPipelineAndBatch(
 
   ctx.console.log(`Pipeline completed in ${pipelineDuration}, starting batch`);
 
-  const workflowId = await ctx.run(
-    "start-batch",
-    () => `${schedule.type}-${now.toFormat("yyyy-MM-dd")}`
-  );
+  const workflowId = `${schedule.type}-${now.toFormat("yyyy-MM-dd")}`;
 
   ctx
     .workflowSendClient(batchWorkflow, workflowId)
@@ -165,7 +171,10 @@ async function scheduleNextRun(ctx: ObjectContext) {
 
   ctx
     .objectSendClient(SoaScheduler, "main", { delay: nextRun.delayMs })
-    .trigger();
+    .trigger({
+      soaType: nextRun.schedule.soaType,
+      scheduleName: nextRun.schedule.type,
+    });
 }
 
 export type SoaSchedulerType = typeof SoaScheduler;

@@ -9,8 +9,8 @@ import { isDevelopment } from "../../../constants";
 import { getAllAccounts } from "../../../infrastructure/database/index.js";
 import type { IAccount, SoaType } from "../../../types";
 import { formatDateToUnixTimestamp, formatTimePeriod } from "../../../utils";
+import { soaCustomer } from "../objects/soa-customer";
 import { soaSchema } from "../types";
-import { type SoaService, soaService } from "./soa-workflow";
 
 const DEV_TEST_CUSTOMER_CODES = [
   "00004162",
@@ -52,7 +52,7 @@ type IBatchWorkflowResult = {
  *
  * Related functions:
  * - Calls `getAllAccounts` from queries to fetch customer data
- * - Delegates per-customer processing to `soaService` as a durable service call
+ * - Delegates per-customer processing to `SoaCustomer` virtual objects
  *
  * Process flow:
  * 1. Initialize date parameters (timePeriod, toDate, processingDate) used across services
@@ -127,13 +127,13 @@ export const batchWorkflow = workflow({
        * Start SOA processing for a single customer account.
        *
        * Purpose:
-       * - Create a service client for the customer
-       * - Call soaService.process() with complete parameters and idempotency key
+       * - Create an object client keyed by the customer account ID
+       * - Call soaCustomer.process() with complete parameters and idempotency key
        * - Register the promise in worker pool for tracking
        *
        * Related functions:
        * - Called by main loop whenever a worker slot is available
-       * - Uses `soaService` for durable per-customer processing
+       * - Uses `soaCustomer` for durable per-customer processing
        * - The created promise will be raced to detect completion
        */
       const startAccountProcessing = (account: IAccount): void => {
@@ -141,7 +141,7 @@ export const batchWorkflow = workflow({
         const idempotencyKey = `${accountId}:${processingDates.timePeriod}:${soaProcessingType}`;
 
         const workerPromise = ctx
-          .serviceClient<SoaService>(soaService)
+          .objectClient(soaCustomer, accountId)
           .process(
             {
               customerId: accountId,

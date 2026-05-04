@@ -4,6 +4,8 @@ import {
   initOracleClient,
   testOracleConnection,
 } from "./infrastructure/database/database.js";
+import { letterCounter } from "./modules/soa/objects/letter-counter.js";
+import { soaCustomer } from "./modules/soa/objects/soa-customer.js";
 import { batchWorkflow } from "./modules/soa/workflows/batch-workflow.js";
 import { soaService } from "./modules/soa/workflows/soa-workflow.js";
 import { SoaScheduler } from "./pipeline/scheduler.js";
@@ -19,7 +21,13 @@ async function main() {
     console.error("⚠️  Oracle connection failed, but server will continue...");
   }
 
-  const services = [soaService, batchWorkflow, SoaScheduler];
+  const services = [
+    soaService,
+    batchWorkflow,
+    SoaScheduler,
+    soaCustomer,
+    letterCounter,
+  ];
 
   await serve({
     services,

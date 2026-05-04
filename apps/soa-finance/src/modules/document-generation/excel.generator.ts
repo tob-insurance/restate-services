@@ -1,4 +1,5 @@
-import { utils, write } from "xlsx";
+const hucrePromise = import("hucre/xlsx");
+
 import { CONTENT_TYPES, NUMBER_FORMATS, toExcelDate } from "../../constants";
 import type { IStatementOfAccountModel } from "../../types";
 
@@ -10,12 +11,6 @@ export type IExcelColumn = {
 };
 
 type ExcelColumnKey = keyof IStatementOfAccountModel;
-
-type IExcelSheetData = {
-  sheetName: string;
-  columns: IExcelColumn[];
-  rows: Record<string, unknown>[];
-};
 
 export type ISoaFileResult = {
   fileName: string;
@@ -79,80 +74,6 @@ export const excelColumns: IExcelColumn[] = [
   { header: "Installment", key: "installment", width: 12, format: "number" },
   { header: "Due Date", key: "dueDate", width: 12, format: "date" },
 ];
-
-type WorksheetType = ReturnType<typeof utils.aoa_to_sheet>;
-
-function applyNumberFormats(
-  worksheet: WorksheetType,
-  columns: IExcelColumn[],
-  rowCount: number
-): void {
-  for (let rowIdx = 1; rowIdx < rowCount; rowIdx += 1) {
-    for (let colIdx = 0; colIdx < columns.length; colIdx += 1) {
-      const col = columns[colIdx];
-      if (col.format && NUMBER_FORMATS[col.format]) {
-        const cellAddress = utils.encode_cell({ r: rowIdx, c: colIdx });
-        if (worksheet[cellAddress]) {
-          worksheet[cellAddress].z = NUMBER_FORMATS[col.format];
-        }
-      }
-    }
-  }
-}
-
-function createWorksheet(sheet: IExcelSheetData): WorksheetType {
-  const headers = sheet.columns.map((col) => col.header);
-  const dataRows = sheet.rows.map((row) =>
-    sheet.columns.map((col) => {
-      const value = row[col.key];
-      if (col.format === "date") {
-        return value ?? null;
-      }
-      return value ?? "";
-    })
-  );
-
-  const worksheetData = [headers, ...dataRows];
-  const worksheet = utils.aoa_to_sheet(worksheetData);
-
-  applyNumberFormats(worksheet, sheet.columns, worksheetData.length);
-
-  const lastCol = utils.encode_col(sheet.columns.length - 1);
-  const lastRow = worksheetData.length;
-  worksheet["!autofilter"] = { ref: `A1:${lastCol}${lastRow}` };
-
-  worksheet["!cols"] = sheet.columns.map((col, colIdx) => {
-    if (col.width) {
-      return { wch: col.width };
-    }
-
-    const maxLen = worksheetData.reduce((prev, row) => {
-      const cellValue = row[colIdx];
-      const cellLen = cellValue ? cellValue.toString().length : 0;
-      return Math.max(prev, cellLen);
-    }, 0);
-
-    return { wch: maxLen + 2 };
-  });
-
-  return worksheet;
-}
-
-function excelGenerate(sheets: IExcelSheetData[]): Buffer {
-  const workbook = utils.book_new();
-
-  for (const sheet of sheets) {
-    const worksheet = createWorksheet(sheet);
-    utils.book_append_sheet(workbook, worksheet, sheet.sheetName);
-  }
-
-  const buffer = write(workbook, {
-    type: "buffer",
-    bookType: "xlsx",
-    cellDates: true,
-  });
-  return Buffer.from(buffer);
-}
 
 function groupAndAggregateSoa(
   soaData: IStatementOfAccountModel[]
@@ -231,40 +152,108 @@ function sortSoaData(
   });
 }
 
-export function generateExcel(params: {
+type CellValue = string | number | boolean | Date | null;
+
+function colToLetter(col: number): string {
+  const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  let result = "";
+  let n = col;
+  do {
+    result = CHARS[n % 26] + result;
+    n = Math.floor(n / 26) - 1;
+  } while (n >= 0);
+  return result;
+}
+
+export async function generateExcel(params: {
   soaData: IStatementOfAccountModel[];
   customerId: string;
-}): ISoaFileResult {
+}): Promise<ISoaFileResult> {
   const { soaData, customerId } = params;
+  const { writeXlsx } = await hucrePromise;
 
   const fileName = `Outstanding-SOA--${customerId}.xlsx`;
 
   let processedData = groupAndAggregateSoa(soaData);
   processedData = sortSoaData(processedData);
-  const rows: Record<string, unknown>[] = processedData.map((soa) => {
-    const row: Record<string, unknown> = {};
+  const rows: Record<string, CellValue>[] = processedData.map((soa) => {
+    const row: Record<string, CellValue> = {};
     for (const col of excelColumns) {
       const rawValue = soa[col.key];
       if (col.format === "date") {
         row[col.key] = toExcelDate(rawValue);
       } else {
-        row[col.key] = rawValue ?? "";
+        row[col.key] = (rawValue ?? "") as CellValue;
       }
     }
     return row;
   });
 
-  const buffer = excelGenerate([
-    {
-      sheetName: "Statement of Account",
-      columns: excelColumns,
-      rows,
-    },
+  const lastCol = colToLetter(excelColumns.length - 1);
+  const lastRow = rows.length + 1;
+  const tableRange = `A1:${lastCol}${lastRow}`;
+
+  const numberFormats = new Set(["number", "currency"]);
+  const sumColumns = new Set<ExcelColumnKey>([
+    "totalSumInsured",
+    "grossPremium",
+    "discount",
+    "commission",
+    "ppn",
+    "pph21",
+    "pph23",
+    "cost",
+    "stmp",
+    "netPremium",
+    "netPremiumIdr",
   ]);
+
+  const buffer = await writeXlsx({
+    defaultFont: { name: "Calibri", size: 11 },
+    sheets: [
+      {
+        name: "Statement of Account",
+        columns: excelColumns.map((col) => ({
+          header: col.header,
+          key: col.key,
+          width: col.width,
+          numFmt: col.format ? NUMBER_FORMATS[col.format] : undefined,
+          style:
+            col.format && numberFormats.has(col.format)
+              ? { alignment: { horizontal: "right" } }
+              : undefined,
+        })),
+        data: rows,
+        freezePane: { rows: 1 },
+        pageSetup: {
+          paperSize: "a4",
+          orientation: "landscape",
+          fitToPage: true,
+          fitToWidth: 1,
+          fitToHeight: 0,
+          printTitlesRow: "$1:$1",
+        },
+        tables: [
+          {
+            name: "SOA_Table",
+            columns: excelColumns.map((col) => ({
+              name: col.header,
+              totalFunction: sumColumns.has(col.key) ? "sum" : undefined,
+            })),
+            range: tableRange,
+            style: "TableStyleMedium2",
+            showRowStripes: true,
+            showAutoFilter: true,
+            showTotalRow: true,
+          },
+        ],
+      },
+    ],
+  });
 
   return {
     fileName,
     contentType: CONTENT_TYPES.XLSX,
-    bytes: buffer,
+    bytes: Buffer.from(buffer),
   };
 }

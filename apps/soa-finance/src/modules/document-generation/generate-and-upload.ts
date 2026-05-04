@@ -44,7 +44,7 @@ export async function generateAndUploadDocuments(
   const reminderCount = (params.processingType - 1).toString();
   const dateNow = new Date(params.processingDate);
 
-  const excelFile = generateExcel({
+  const excelFile = await generateExcel({
     soaData,
     customerId: customerData.code,
   });

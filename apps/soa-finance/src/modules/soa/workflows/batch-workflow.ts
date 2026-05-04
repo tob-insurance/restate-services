@@ -43,7 +43,6 @@ const DEV_TEST_CUSTOMER_CODES = parseEnvList("SOA_TEST_CUSTOMERS") ?? [
 ];
 
 const MAX_WORKERS = parseEnvInt("SOA_MAX_WORKERS", 5);
-const PROGRESS_LOG_INTERVAL = 10;
 
 type WorkerResult = {
   accountId: string;
@@ -51,35 +50,25 @@ type WorkerResult = {
   error?: string;
 };
 
-type ActiveWorkerSlot = {
-  accountId: string;
-  promise: RestatePromise<WorkerResult>;
-};
-
 type IBatchWorkflowResult = {
   message: string;
   totalAccounts: number;
+  failedAccountCount: number;
   status: "Completed";
 };
 
 /**
  * BatchWorkflow - Main workflow for processing Statement of Account (SOA) in batch.
  *
- * Purpose:
- * - Fetch all customer accounts from database
- * - Process each customer in parallel with max worker limit (5 concurrent)
- * - Manage customer queue using worker pool
- * - Return batch status after all customers are processed
- *
- * Related functions:
- * - Calls `getAllAccounts` from queries to fetch customer data
- * - Delegates per-customer processing to `SoaCustomer` virtual objects
+ * Fetches all customer accounts, then processes them in bounded chunks
+ * (default 5 concurrent) using RestatePromise.all. Individual account
+ * failures are isolated via .map() so one failure does not kill the batch.
  *
  * Process flow:
- * 1. Initialize date parameters (timePeriod, toDate, processingDate) used across services
- * 2. Fetch all customer accounts from database
- * 3. Process customers using worker pool (max 5 concurrent)
- * 4. Return batch result
+ * 1. Initialize date parameters
+ * 2. Fetch all customer accounts from Oracle
+ * 3. Process accounts in chunks of MAX_WORKERS
+ * 4. Return batch result with success/failure counts
  */
 
 export const batchWorkflow = workflow({
@@ -141,94 +130,56 @@ export const batchWorkflow = workflow({
 
       ctx.console.log(`Starting batch with ${totalAccounts} accounts`);
 
-      // STEP 3: Process with Worker Pool
-      const workerPool: Map<string, ActiveWorkerSlot> = new Map();
-      let nextAccountIndex = 0;
+      // STEP 3: Process with bounded concurrency
+      // Process accounts in chunks of MAX_WORKERS. Errors from individual
+      // accounts are isolated via .map() so one failure does not kill the batch.
+      let failedAccountCount = 0;
       let processedAccountCount = 0;
 
-      /**
-       * Start SOA processing for a single customer account.
-       *
-       * Purpose:
-       * - Create an object client keyed by the customer account ID
-       * - Call soaCustomer.process() with complete parameters and idempotency key
-       * - Register the promise in worker pool for tracking
-       *
-       * Related functions:
-       * - Called by main loop whenever a worker slot is available
-       * - Uses `soaCustomer` for durable per-customer processing
-       * - The created promise will be raced to detect completion
-       */
-      const startAccountProcessing = (account: IAccount): void => {
-        const accountId = account.code;
-        const idempotencyKey = `${accountId}:${processingDates.timePeriod}:${soaProcessingType}`;
+      for (let i = 0; i < accountsToProcess.length; i += MAX_WORKERS) {
+        const chunk = accountsToProcess.slice(i, i + MAX_WORKERS);
 
-        const workerPromise = ctx
-          .objectClient(soaCustomer, accountId)
-          .process(
-            {
-              customerId: accountId,
-              timePeriod: processingDates.timePeriod,
-              processingDate: processingDates.processingDate,
-              classOfBusiness: soaOptions.classOfBusiness,
-              branch: soaOptions.branch,
-              toDate: processingDates.toDate,
-              processingType: soaProcessingType,
-            },
-            rpc.opts({ idempotencyKey })
-          )
-          .map((_value, failure): WorkerResult => {
-            if (failure) {
-              return { accountId, failed: true, error: failure.message };
-            }
-            return { accountId, failed: false };
-          });
+        const chunkPromises = chunk.map((account) => {
+          const accountId = account.code;
+          const idempotencyKey = `${accountId}:${processingDates.timePeriod}:${soaProcessingType}`;
 
-        workerPool.set(accountId, {
-          accountId,
-          promise: workerPromise,
+          return ctx
+            .objectClient(soaCustomer, accountId)
+            .process(
+              {
+                customerId: accountId,
+                timePeriod: processingDates.timePeriod,
+                processingDate: processingDates.processingDate,
+                classOfBusiness: soaOptions.classOfBusiness,
+                branch: soaOptions.branch,
+                toDate: processingDates.toDate,
+                processingType: soaProcessingType,
+              },
+              rpc.opts({ idempotencyKey })
+            )
+            .map((_value, failure): WorkerResult => {
+              if (failure) {
+                return { accountId, failed: true, error: failure.message };
+              }
+              return { accountId, failed: false };
+            });
         });
-      };
 
-      // Fill worker pool until full or all accounts have been started
-      while (
-        workerPool.size < MAX_WORKERS &&
-        nextAccountIndex < totalAccounts
-      ) {
-        startAccountProcessing(accountsToProcess[nextAccountIndex]);
-        nextAccountIndex += 1;
-      }
+        const results = await RestatePromise.all(chunkPromises);
 
-      // Process until all accounts are complete
-      let failedAccountCount = 0;
+        for (const result of results) {
+          processedAccountCount += 1;
+          if (result.failed) {
+            failedAccountCount += 1;
+            ctx.console.log(
+              `[Batch] Worker failed for ${result.accountId}: ${result.error}`
+            );
+          }
+        }
 
-      while (workerPool.size > 0) {
-        const result = await RestatePromise.race(
-          Array.from(workerPool.values()).map((slot) => slot.promise)
+        ctx.console.log(
+          `[Batch] Progress: ${processedAccountCount}/${totalAccounts}`
         );
-
-        workerPool.delete(result.accountId);
-        processedAccountCount += 1;
-
-        if (result.failed) {
-          failedAccountCount += 1;
-          ctx.console.log(
-            `[Batch] Worker failed for ${result.accountId}: ${result.error}`
-          );
-        }
-
-        // Log progress every N accounts
-        if (processedAccountCount % PROGRESS_LOG_INTERVAL === 0) {
-          ctx.console.log(
-            `[Batch] Progress: ${processedAccountCount}/${totalAccounts}`
-          );
-        }
-
-        // Start processing next account if available
-        if (nextAccountIndex < totalAccounts) {
-          startAccountProcessing(accountsToProcess[nextAccountIndex]);
-          nextAccountIndex += 1;
-        }
       }
 
       ctx.console.log(
@@ -238,6 +189,7 @@ export const batchWorkflow = workflow({
       return {
         message: "SOA batch processing completed successfully",
         totalAccounts,
+        failedAccountCount,
         status: "Completed",
       };
     },

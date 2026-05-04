@@ -234,12 +234,15 @@ export const generateReminderLetter = async (
   }
 
   const branchCode = reminder.officeId || "ALL";
-  const emails = await ctx.run("get-account-emails", () =>
-    getAccountEmails(customer.code, branchCode)
-  );
-  let toEmail = emails.join(",");
-  if (!toEmail && isDevelopment() && customer.email) {
-    toEmail = customer.email;
+
+  let toEmail: string;
+  if (isDevelopment()) {
+    toEmail = customer.email || "dev-test@tob-ins.com";
+  } else {
+    const emails = await ctx.run("get-account-emails", () =>
+      getAccountEmails(customer.code, branchCode)
+    );
+    toEmail = emails.join(",");
   }
 
   if (!toEmail) {

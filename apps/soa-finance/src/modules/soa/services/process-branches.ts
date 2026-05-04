@@ -1,4 +1,4 @@
-import type { Context } from "@restatedev/restate-sdk";
+import type { ObjectContext } from "@restatedev/restate-sdk";
 import { isDevelopment } from "../../../constants";
 import { getAllBranches } from "../../../infrastructure/database/index.js";
 import type {
@@ -16,7 +16,7 @@ import { generateSoa } from "../generate";
 import { multiBranchCodes } from "../types";
 
 export type ProcessSoaParams = {
-  ctx: Context;
+  ctx: ObjectContext;
   customerData: IAccount;
   params: ISoaItem;
 };

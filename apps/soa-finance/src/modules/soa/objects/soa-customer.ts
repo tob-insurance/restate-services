@@ -61,15 +61,13 @@ export const soaCustomer = object({
       const hasExistingReminder = await hasRemindersForPeriod(ctx, timePeriod);
 
       if (processingType !== 1 || hasExistingReminder) {
-        // biome-ignore lint/suspicious/noExplicitAny: temporary until helpers accept ObjectContext (Task 4)
         await processReminderLetter({
-          ctx: ctx as any,
+          ctx,
           customer: customerData,
           item: soaParams,
         });
       } else {
-        // biome-ignore lint/suspicious/noExplicitAny: temporary until helpers accept ObjectContext (Task 4)
-        await newSoa({ ctx: ctx as any, customerData, params: soaParams });
+        await newSoa({ ctx, customerData, params: soaParams });
       }
 
       ctx.console.log(`[SoaCustomer] Completed for customer: ${customerId}`);

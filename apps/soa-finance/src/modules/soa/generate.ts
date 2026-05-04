@@ -1,10 +1,11 @@
-import type { Context } from "@restatedev/restate-sdk";
-import { getDcNoteIdsByCustomer } from "../../infrastructure/database/index.js";
+import type { ObjectContext } from "@restatedev/restate-sdk";
 import { readSoaParquet } from "../../pipeline/lib";
 import type { IAccount, IStatementOfAccountModel } from "../../types";
+import type { DcNoteIndex } from "./objects/state";
+import { stateKeys } from "./objects/state";
 
 type GenerateSoaOptions = {
-  ctx: Context;
+  ctx: ObjectContext;
   branchCode: string;
   customer: IAccount;
   classOfBusiness: string;
@@ -18,71 +19,66 @@ export const generateSoa = async (
   const { ctx, branchCode, customer, classOfBusiness, dateNow } = options;
 
   ctx.console.log(
-    `GenerateSOA started for ${customer.code}, Branch: ${branchCode}, COB: ${classOfBusiness}`
+    `[GenerateSOA] Started for ${customer.code}, Branch: ${branchCode}, COB: ${classOfBusiness}`
   );
 
-  // ========== Get SOA Data ==========
-  let soaList = await ctx.run("read-parquet", async () => {
-    console.log(`Getting SOA data for ${customer.code}`);
-    return await readSoaParquet(customer.code, branchCode, dateNow);
-  });
-
-  // Filter Aging (Outstanding >= 60 Days)
-  soaList = await ctx.run("filter-aging", () => {
-    const filtered = soaList.filter((soa) => soa.aging >= 60);
-    console.log(
-      `[AgingFilter] ${customer.code}: Filtered ${soaList.length} down to ${filtered.length} SOA records (aging >= 60 days)`
-    );
-    return filtered;
-  });
+  // ========== Get SOA Data (Parquet — unchanged, in ctx.run) ==========
+  let soaList = await ctx.run(
+    "read-parquet",
+    async () => await readSoaParquet(customer.code, branchCode, dateNow)
+  );
 
   if (soaList.length === 0) {
     ctx.console.log(`Skipping ${customer.code}: No SOA records found`);
     return null;
   }
 
-  // Extract unique DC notes and filter already-processed ones
-  const newSoaList = await ctx.run("filter-dc-notes", async () => {
-    const dcNotesSet = new Set(
-      soaList.flatMap((soa) => soa.debitAndCreditNoteNo?.split(",") || [])
-    );
-    const dcNotes = Array.from(dcNotesSet);
-    console.log(`Extracted ${dcNotes.length} unique DC notes`);
+  // Filter Aging (pure logic — no ctx.run needed)
+  soaList = soaList.filter((soa) => soa.aging >= 60);
 
-    const existingDcNotes = await getDcNoteIdsByCustomer(customer.code);
-    console.log(
-      `Found ${existingDcNotes.length} DC notes in previous reminders`
-    );
+  if (soaList.length === 0) {
+    ctx.console.log(`Skipping ${customer.code}: No aging records found`);
+    return null;
+  }
 
-    const existingSet = new Set(existingDcNotes.map((id) => id.toLowerCase()));
+  // Filter already-processed DC notes using state
+  const newSoaList = await filterAlreadyProcessedDcNotes(ctx, soaList);
 
-    const processedDcNotes = dcNotes.filter(
-      (note) => !existingSet.has(note.toLowerCase())
-    );
-
-    if (processedDcNotes.length === 0) {
-      console.log(`Skipping ${customer.code}: All DC notes already processed`);
-      return [];
-    }
-    console.log(
-      `Processing ${processedDcNotes.length} new DC notes (filtered)`
-    );
-
-    const processedSet = new Set(processedDcNotes);
-    return soaList.filter((soa) => processedSet.has(soa.debitAndCreditNoteNo));
-  });
-
-  if (newSoaList.length === 0) {
+  if (!newSoaList || newSoaList.length === 0) {
     ctx.console.log(
-      `Skipping ${customer.code}: No matching SOA records after filter`
+      `Skipping ${customer.code}: All DC notes already processed`
     );
     return null;
   }
 
-  soaList = newSoaList;
   ctx.console.log(
-    `SOA data ready for ${customer.code}: ${soaList.length} records`
+    `[GenerateSOA] Data ready for ${customer.code}: ${newSoaList.length} records`
   );
 
-  return soaList;
+  return newSoaList;
 };
+
+async function filterAlreadyProcessedDcNotes(
+  ctx: ObjectContext,
+  soaList: IStatementOfAccountModel[]
+): Promise<IStatementOfAccountModel[] | null> {
+  const dcNotesSet = new Set(
+    soaList.flatMap((soa) => soa.debitAndCreditNoteNo?.split(",") || [])
+  );
+  const dcNotes = Array.from(dcNotesSet);
+
+  const dcNoteIndex = await ctx.get<DcNoteIndex>(stateKeys.dcNoteIndex);
+  const existingDcNotes = dcNoteIndex ? Object.keys(dcNoteIndex) : [];
+  const existingSet = new Set(existingDcNotes.map((id) => id.toLowerCase()));
+
+  const processedDcNotes = dcNotes.filter(
+    (note) => !existingSet.has(note.toLowerCase())
+  );
+
+  if (processedDcNotes.length === 0) {
+    return [];
+  }
+
+  const processedSet = new Set(processedDcNotes);
+  return soaList.filter((soa) => processedSet.has(soa.debitAndCreditNoteNo));
+}

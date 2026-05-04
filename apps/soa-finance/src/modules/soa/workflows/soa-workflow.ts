@@ -1,4 +1,4 @@
-import type { Context } from "@restatedev/restate-sdk";
+import type { Context, ObjectContext } from "@restatedev/restate-sdk";
 import { service, TerminalError } from "@restatedev/restate-sdk";
 
 import {
@@ -52,13 +52,13 @@ export const soaService = service({
 
       if (shouldFollowReminderPath) {
         await processReminderLetter({
-          ctx,
+          ctx: ctx as unknown as ObjectContext,
           customer: customerData,
           item: soaParams,
         });
       } else {
         await newSoa({
-          ctx,
+          ctx: ctx as unknown as ObjectContext,
           customerData,
           params: soaParams,
         });

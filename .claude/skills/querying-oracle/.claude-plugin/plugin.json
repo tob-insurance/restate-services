@@ -1,0 +1,5 @@
+{
+  "name": "querying-oracle",
+  "description": "Execute Oracle SQL queries via sqlplus with pre-configured connection",
+  "version": "1.0.0"
+}

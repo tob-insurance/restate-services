@@ -1,10 +1,10 @@
-import type { Context } from "@restatedev/restate-sdk";
+import type { ObjectContext } from "@restatedev/restate-sdk";
 import type { IAccount, ISoaItem } from "../../../types";
 import { sendWithAttachments } from "../../email";
 import { processBranchSoa } from "./process-branches";
 
 type newSoaParams = {
-  ctx: Context;
+  ctx: ObjectContext;
   customerData: IAccount;
   params: ISoaItem;
 };

@@ -1,16 +1,14 @@
-import type { Context } from "@restatedev/restate-sdk";
-import {
-  insertReminder,
-  insertReminderDetailsBulk,
-} from "../../infrastructure/database/index.js";
+import type { ObjectContext } from "@restatedev/restate-sdk";
 import type { IAccount, IStatementOfAccountModel } from "../../types";
+import type { ReminderDetail, ReminderHeader } from "../soa/objects/state";
+import { stateKeys } from "../soa/objects/state";
 
 export type CreateReminderParams = {
+  ctx: ObjectContext;
   customer: IAccount;
   timePeriod: string;
   branchCode: string;
   soaList: IStatementOfAccountModel[];
-  ctx: Context;
 };
 
 export const createReminder = async (
@@ -21,32 +19,35 @@ export const createReminder = async (
     `[Reminder] Creating SOA reminder for ${customer.code}, branch: ${branchCode}`
   );
 
-  // 1. Insert reminder and get ID (Always deterministic since reminderId is generated inside)
-  const reminderId = await ctx.run(
-    "insert-reminder-header",
-    async () => await insertReminder(customer.code, timePeriod, branchCode)
-  );
+  const reminderId = `${timePeriod}:${branchCode}`;
 
-  // 2. Insert details in chunks using bulk insert (Batch of 5000 is safe and fast)
-  const chunkSize = 5000;
-  for (let i = 0; i < soaList.length; i += chunkSize) {
-    const chunk = soaList.slice(i, i + chunkSize);
-    const chunkNo = Math.floor(i / chunkSize) + 1;
+  const header: ReminderHeader = {
+    customerCode: customer.code,
+    timePeriod,
+    officeId: branchCode,
+    createdAt: new Date().toISOString(),
+  };
+  ctx.set(stateKeys.header(timePeriod, branchCode), header);
 
-    ctx.console.log(
-      `[Reminder] Inserting details chunk ${chunkNo} (${chunk.length} items)`
-    );
+  const detailsMap: Record<string, ReminderDetail> = {};
+  const newIndexEntries: Record<string, string> = {};
 
-    const details = chunk.map((soa) => ({
-      dcNoteId: soa.debitAndCreditNoteNo,
+  for (const soa of soaList) {
+    const dcNoteId = soa.debitAndCreditNoteNo;
+    detailsMap[dcNoteId] = {
+      dcNoteId,
       reminderId,
-    }));
-
-    await ctx.run(
-      `insert-reminder-details-chunk-${chunkNo}`,
-      async () => await insertReminderDetailsBulk(details)
-    );
+      isPaid: false,
+    };
+    newIndexEntries[dcNoteId] = reminderId;
   }
+
+  const existingIndex =
+    (await ctx.get<Record<string, string>>(stateKeys.dcNoteIndex)) ?? {};
+  const mergedIndex = { ...existingIndex, ...newIndexEntries };
+
+  ctx.set(stateKeys.details(timePeriod, branchCode), detailsMap);
+  ctx.set(stateKeys.dcNoteIndex, mergedIndex);
 
   ctx.console.log(
     `[Reminder] Created reminder ${reminderId} with ${soaList.length} details for ${customer.code}`

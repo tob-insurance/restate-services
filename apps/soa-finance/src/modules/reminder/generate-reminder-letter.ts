@@ -1,4 +1,4 @@
-import type { Context } from "@restatedev/restate-sdk";
+import type { ObjectContext } from "@restatedev/restate-sdk";
 import { isDevelopment } from "../../constants";
 import { downloadSoaFiles } from "../../infrastructure/azure";
 import {
@@ -18,7 +18,7 @@ import { reconcilePayment } from "../payment/reconcile-payment";
 import type { IGenerateReminderResult, ISoaReminder } from "./types";
 
 type GenerateReminderLetterParams = {
-  ctx: Context;
+  ctx: ObjectContext;
   customer: IAccount;
   reminder: ISoaReminder;
   item: ISoaItem;
@@ -27,7 +27,7 @@ type GenerateReminderLetterParams = {
 type LatestLetter = Awaited<ReturnType<typeof getLatestLetter>>;
 
 const validateReminderType = (
-  ctx: Context,
+  ctx: ObjectContext,
   customer: IAccount,
   item: ISoaItem,
   latestLetter: LatestLetter
@@ -67,7 +67,7 @@ const validateReminderType = (
 };
 
 const getUnpaidSoaData = async (
-  ctx: Context,
+  ctx: ObjectContext,
   customer: IAccount,
   reminder: ISoaReminder,
   processingDate: Date
@@ -87,7 +87,7 @@ const getUnpaidSoaData = async (
 
   const currentParquetDcNotes = soaList.map((s) => s.debitAndCreditNoteNo);
   const dcNotesPaid = await ctx.run("reconcile-payment", () =>
-    reconcilePayment(reminder.id, currentParquetDcNotes)
+    reconcilePayment(ctx, reminder.id, currentParquetDcNotes)
   );
 
   const paidSet = new Set(dcNotesPaid.map((dc) => dc.toLowerCase()));
@@ -116,7 +116,7 @@ const getUnpaidSoaData = async (
 };
 
 type CreateAndSendReminderParams = {
-  ctx: Context;
+  ctx: ObjectContext;
   customer: IAccount;
   reminder: ISoaReminder;
   item: ISoaItem;

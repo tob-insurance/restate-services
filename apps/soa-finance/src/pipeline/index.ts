@@ -14,7 +14,7 @@ function generateDevData(): IStatementOfAccountModel[] {
     overrides: Partial<IStatementOfAccountModel>
   ): IStatementOfAccountModel => ({
     debitAndCreditNoteNo: "DC-000",
-    branch: "JAKARTA",
+    branch: "01",
     policyNo: "POL-00000",
     policyEndNo: "000",
     contractNo: "CN-000",
@@ -59,7 +59,7 @@ function generateDevData(): IStatementOfAccountModel[] {
     // == Customer A (00004162): DIC multi-branch, MOTOR, 2 installments ==
     row({
       debitAndCreditNoteNo: "DC-2025-001",
-      branch: "JAKARTA",
+      branch: "01",
       policyNo: "MTR-2024-001",
       contractNo: "CN-A001",
       plateNo: "B 1234 XYZ",
@@ -86,7 +86,7 @@ function generateDevData(): IStatementOfAccountModel[] {
     }),
     row({
       debitAndCreditNoteNo: "DC-2025-002",
-      branch: "JAKARTA",
+      branch: "01",
       policyNo: "MTR-2024-001",
       contractNo: "CN-A001",
       plateNo: "B 1234 XYZ",
@@ -115,7 +115,7 @@ function generateDevData(): IStatementOfAccountModel[] {
     // == Customer A: additional policy (branch JAKARTA PUSAT) ==
     row({
       debitAndCreditNoteNo: "DC-2025-003",
-      branch: "JAKARTA PUSAT",
+      branch: "22",
       policyNo: "MTR-2024-005",
       contractNo: "CN-A002",
       plateNo: "B 5678 WXY",
@@ -144,7 +144,7 @@ function generateDevData(): IStatementOfAccountModel[] {
     // == Customer B (00004829): DIP multi-branch, PROPERTY + MARINE ==
     row({
       debitAndCreditNoteNo: "DC-2025-004",
-      branch: "BANDUNG",
+      branch: "03",
       policyNo: "PRO-2023-001",
       contractNo: "CN-B001",
       plateNo: "-",
@@ -174,7 +174,7 @@ function generateDevData(): IStatementOfAccountModel[] {
     }),
     row({
       debitAndCreditNoteNo: "DC-2025-005",
-      branch: "BANDUNG",
+      branch: "03",
       policyNo: "PRO-2023-001",
       contractNo: "CN-B001",
       plateNo: "-",
@@ -203,7 +203,7 @@ function generateDevData(): IStatementOfAccountModel[] {
     }),
     row({
       debitAndCreditNoteNo: "DC-2025-006",
-      branch: "BANDUNG",
+      branch: "03",
       policyNo: "PRO-2023-001",
       contractNo: "CN-B001",
       plateNo: "-",
@@ -234,7 +234,7 @@ function generateDevData(): IStatementOfAccountModel[] {
     // == Customer C (00005017): DIG multi-branch, FLEET ==
     row({
       debitAndCreditNoteNo: "DC-2025-007",
-      branch: "SURABAYA",
+      branch: "08",
       policyNo: "FLT-2024-010",
       contractNo: "CN-C001",
       plateNo: "L 9012 PQR",
@@ -265,7 +265,7 @@ function generateDevData(): IStatementOfAccountModel[] {
     }),
     row({
       debitAndCreditNoteNo: "DC-2025-008",
-      branch: "SURABAYA",
+      branch: "08",
       policyNo: "FLT-2024-010",
       contractNo: "CN-C001",
       plateNo: "L 9012 PQR",
@@ -298,7 +298,7 @@ function generateDevData(): IStatementOfAccountModel[] {
     // == Customer D (00003758): DID multi-branch, ENGINEERING ==
     row({
       debitAndCreditNoteNo: "DC-2025-009",
-      branch: "MEDAN",
+      branch: "10",
       policyNo: "ENG-2024-020",
       contractNo: "CN-D001",
       plateNo: "-",
@@ -329,7 +329,7 @@ function generateDevData(): IStatementOfAccountModel[] {
     // == Customer E (00003390): Regular, MARINE CARGO (USD) ==
     row({
       debitAndCreditNoteNo: "DC-2025-010",
-      branch: "MAKASSAR",
+      branch: "14",
       policyNo: "MAR-2025-001",
       contractNo: "CN-E001",
       plateNo: "-",
@@ -363,7 +363,7 @@ function generateDevData(): IStatementOfAccountModel[] {
     // == Customer F (00002844): Regular, HEALTH (under 60 aging, will be filtered) ==
     row({
       debitAndCreditNoteNo: "DC-2025-011",
-      branch: "DENPASAR",
+      branch: "20",
       policyNo: "HLT-2025-005",
       contractNo: "CN-F001",
       plateNo: "-",

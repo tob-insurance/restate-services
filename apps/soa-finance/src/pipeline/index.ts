@@ -402,17 +402,19 @@ export async function generateSoaPipeline(
   if (isDevelopment()) {
     console.log("[Pipeline] DEV MODE: using synthetic test data");
     const testData = generateDevData();
-    const testStream = {
+    const testStream: AsyncIterable<IStatementOfAccountModel> = {
       [Symbol.asyncIterator]() {
         let i = -1;
         return {
           next: () =>
-            Promise.resolve().then(() => {
-              i += 1;
-              return i < testData.length
-                ? { value: testData[i], done: false }
-                : { value: undefined, done: true };
-            }),
+            Promise.resolve().then(
+              (): IteratorResult<IStatementOfAccountModel> => {
+                i += 1;
+                return i < testData.length
+                  ? { value: testData[i], done: false as const }
+                  : { value: undefined, done: true as const };
+              }
+            ),
         };
       },
     };

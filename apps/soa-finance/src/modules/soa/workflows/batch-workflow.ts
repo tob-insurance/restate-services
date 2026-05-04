@@ -5,11 +5,21 @@ import {
   TerminalError,
   workflow,
 } from "@restatedev/restate-sdk";
+import { isDevelopment } from "../../../constants";
 import { getAllAccounts } from "../../../infrastructure/database/index.js";
 import type { IAccount, SoaType } from "../../../types";
 import { formatDateToUnixTimestamp, formatTimePeriod } from "../../../utils";
 import { soaSchema } from "../types";
 import { type SoaService, soaService } from "./soa-workflow";
+
+const DEV_TEST_CUSTOMER_CODES = [
+  "00004162",
+  "00004829",
+  "00005017",
+  "00003758",
+  "00003390",
+  "00002844",
+];
 
 const MAX_WORKERS = 5;
 const PROGRESS_LOG_INTERVAL = 10;
@@ -90,6 +100,16 @@ export const batchWorkflow = workflow({
           if (!accounts || accounts.length === 0) {
             throw new TerminalError("No customer accounts found");
           }
+
+          if (isDevelopment()) {
+            const testCodes = new Set(DEV_TEST_CUSTOMER_CODES);
+            const filtered = accounts.filter((a) => testCodes.has(a.code));
+            ctx.console.log(
+              `[Dev] Filtered ${accounts.length} accounts to ${filtered.length} test customers`
+            );
+            return filtered;
+          }
+
           return accounts;
         }
       );

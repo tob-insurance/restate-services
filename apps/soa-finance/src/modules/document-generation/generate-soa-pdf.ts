@@ -1,3 +1,4 @@
+import { CONTENT_TYPES } from "../../constants";
 import { generatePdfWithHeaderFooter } from "../../infrastructure/gotenberg/gotenberg-client";
 import { createFooter } from "./html/footer";
 import { createHeader } from "./html/header";
@@ -8,7 +9,7 @@ export async function generateSoaPdfHandler(params: {
   templateName: string;
   data: Record<string, unknown>;
   filename: string;
-}): Promise<{ fileName: string; bytes: string; contentType: string }> {
+}): Promise<{ fileName: string; bytes: Buffer; contentType: string }> {
   // 1. Render body HTML from template
   const html = await renderLiquidToHtml(params.templateName, params.data);
 
@@ -22,10 +23,13 @@ export async function generateSoaPdfHandler(params: {
     headerHtml,
     footerHtml
   );
+  const fileName = params.filename.endsWith(".pdf")
+    ? params.filename
+    : `${params.filename}.pdf`;
 
   return {
-    fileName: `${params.filename}.pdf`,
-    bytes: pdfBuffer.toString("base64"),
-    contentType: "application/pdf",
+    fileName,
+    bytes: pdfBuffer,
+    contentType: CONTENT_TYPES.PDF,
   };
 }

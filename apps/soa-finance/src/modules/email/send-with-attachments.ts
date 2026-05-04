@@ -1,4 +1,8 @@
-import { getTestEmailRecipient, isDevelopment } from "../../constants";
+import {
+  CONTENT_TYPES,
+  getTestEmailRecipient,
+  isDevelopment,
+} from "../../constants";
 import { downloadSoaFiles } from "../../infrastructure/azure";
 import type { ISendEmailResult } from "../../infrastructure/email/types";
 import type { IAccount } from "../../types";
@@ -28,14 +32,13 @@ export async function sendWithAttachments(
   const excelFile = {
     fileName: excelFileName,
     bytes: excelBuffer,
-    contentType:
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    contentType: CONTENT_TYPES.XLSX,
   };
 
   const pdfFile = {
     fileName: pdfFileName,
     bytes: pdfBuffer,
-    contentType: "application/pdf",
+    contentType: CONTENT_TYPES.PDF,
   };
 
   const customerEmail = isDevelopment()

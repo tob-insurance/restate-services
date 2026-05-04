@@ -3,6 +3,10 @@ import { join } from "node:path";
 
 const ASSETS_DIR = join(__dirname, "../../assets");
 
+let cachedSignature: string | null = null;
+let cachedHeader: string | null = null;
+let cachedFooter: string | null = null;
+
 function getAssetAsBase64(filename: string): string {
   const filePath = join(ASSETS_DIR, filename);
   const buffer = readFileSync(filePath);
@@ -13,13 +17,25 @@ function getAssetAsBase64(filename: string): string {
 }
 
 export function getSignature(): string {
-  return getAssetAsBase64("sign.jpeg");
+  if (cachedSignature === null) {
+    cachedSignature = getAssetAsBase64("sign.jpeg");
+  }
+
+  return cachedSignature;
 }
 
 export function getHeader(): string {
-  return getAssetAsBase64("header-letter.png");
+  if (cachedHeader === null) {
+    cachedHeader = getAssetAsBase64("header-letter.png");
+  }
+
+  return cachedHeader;
 }
 
 export function getFooter(): string {
-  return getAssetAsBase64("bottom-letter.png");
+  if (cachedFooter === null) {
+    cachedFooter = getAssetAsBase64("bottom-letter.png");
+  }
+
+  return cachedFooter;
 }

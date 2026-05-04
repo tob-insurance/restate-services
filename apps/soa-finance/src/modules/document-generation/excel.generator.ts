@@ -1,14 +1,15 @@
 import { utils, write } from "xlsx";
-import { CONTENT_TYPES, NUMBER_FORMATS } from "../../constants";
+import { CONTENT_TYPES, NUMBER_FORMATS, toExcelDate } from "../../constants";
 import type { IStatementOfAccountModel } from "../../types";
-import { formatDateDDMMYYYY } from "../../utils/formatter";
 
 export type IExcelColumn = {
   header: string;
-  key: string;
+  key: ExcelColumnKey;
   width?: number;
   format?: "number" | "currency" | "date" | "text";
 };
+
+type ExcelColumnKey = keyof IStatementOfAccountModel;
 
 type IExcelSheetData = {
   sheetName: string;
@@ -46,9 +47,9 @@ export const excelColumns: IExcelColumn[] = [
     width: 25,
   },
   { header: "QQ Name", key: "qualitateQuaName", width: 20 },
-  { header: "Effective Date", key: "endEffDate", width: 12 },
-  { header: "Expired Date", key: "endExpDate", width: 12 },
-  { header: "Post Date", key: "postDate", width: 12 },
+  { header: "Effective Date", key: "endEffDate", width: 12, format: "date" },
+  { header: "Expired Date", key: "endExpDate", width: 12, format: "date" },
+  { header: "Post Date", key: "postDate", width: 12, format: "date" },
   { header: "Aging", key: "aging", width: 10 },
   { header: "Currency", key: "currency", width: 10 },
   { header: "Exchange Rate", key: "exchangeRate", width: 12, format: "number" },
@@ -76,7 +77,7 @@ export const excelColumns: IExcelColumn[] = [
     format: "number",
   },
   { header: "Installment", key: "installment", width: 12, format: "number" },
-  { header: "Due Date", key: "dueDate", width: 12 },
+  { header: "Due Date", key: "dueDate", width: 12, format: "date" },
 ];
 
 type WorksheetType = ReturnType<typeof utils.aoa_to_sheet>;
@@ -102,13 +103,23 @@ function applyNumberFormats(
 function createWorksheet(sheet: IExcelSheetData): WorksheetType {
   const headers = sheet.columns.map((col) => col.header);
   const dataRows = sheet.rows.map((row) =>
-    sheet.columns.map((col) => row[col.key] ?? "")
+    sheet.columns.map((col) => {
+      const value = row[col.key];
+      if (col.format === "date") {
+        return value ?? null;
+      }
+      return value ?? "";
+    })
   );
 
   const worksheetData = [headers, ...dataRows];
   const worksheet = utils.aoa_to_sheet(worksheetData);
 
   applyNumberFormats(worksheet, sheet.columns, worksheetData.length);
+
+  const lastCol = utils.encode_col(sheet.columns.length - 1);
+  const lastRow = worksheetData.length;
+  worksheet["!autofilter"] = { ref: `A1:${lastCol}${lastRow}` };
 
   worksheet["!cols"] = sheet.columns.map((col, colIdx) => {
     if (col.width) {
@@ -135,7 +146,11 @@ function excelGenerate(sheets: IExcelSheetData[]): Buffer {
     utils.book_append_sheet(workbook, worksheet, sheet.sheetName);
   }
 
-  const buffer = write(workbook, { type: "buffer", bookType: "xlsx" });
+  const buffer = write(workbook, {
+    type: "buffer",
+    bookType: "xlsx",
+    cellDates: true,
+  });
   return Buffer.from(buffer);
 }
 
@@ -226,44 +241,18 @@ export function generateExcel(params: {
 
   let processedData = groupAndAggregateSoa(soaData);
   processedData = sortSoaData(processedData);
-  const rows: Record<string, unknown>[] = processedData.map((soa) => ({
-    debitAndCreditNoteNo: soa.debitAndCreditNoteNo,
-    branch: soa.branch,
-    policyNo: soa.policyNo,
-    policyEndNo: soa.policyEndNo,
-    contractNo: soa.contractNo,
-    plateNo: soa.plateNo,
-    coInFacRefNo: soa.coInFacRefNo,
-    fireConjunctionPolicy: soa.fireConjunctionPolicy,
-    lob: soa.lob,
-    sourceOfBusiness: soa.sourceOfBusiness,
-    accountName: soa.accountName,
-    insuredName: soa.insuredName,
-    distributionName: soa.distributionName,
-    distributionNameSecond: soa.distributionNameSecond,
-    qualitateQuaName: soa.qualitateQuaName,
-    endEffDate: formatDateDDMMYYYY(soa.endEffDate),
-    endExpDate: formatDateDDMMYYYY(soa.endExpDate),
-    postDate: formatDateDDMMYYYY(soa.postDate),
-    aging: soa.aging,
-    currency: soa.currency,
-    exchangeRate: soa.exchangeRate,
-    endReason: soa.endReason,
-    actingCode: soa.actingCode,
-    totalSumInsured: soa.totalSumInsured,
-    grossPremium: soa.grossPremium,
-    discount: soa.discount,
-    commission: soa.commission,
-    ppn: soa.ppn,
-    pph21: soa.pph21,
-    pph23: soa.pph23,
-    cost: soa.cost,
-    stmp: soa.stmp,
-    netPremium: soa.netPremium,
-    netPremiumIdr: soa.netPremiumIdr,
-    installment: soa.installment,
-    dueDate: formatDateDDMMYYYY(soa.dueDate),
-  }));
+  const rows: Record<string, unknown>[] = processedData.map((soa) => {
+    const row: Record<string, unknown> = {};
+    for (const col of excelColumns) {
+      const rawValue = soa[col.key];
+      if (col.format === "date") {
+        row[col.key] = toExcelDate(rawValue);
+      } else {
+        row[col.key] = rawValue ?? "";
+      }
+    }
+    return row;
+  });
 
   const buffer = excelGenerate([
     {

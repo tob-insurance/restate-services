@@ -1,3 +1,4 @@
+import { CONTENT_TYPES } from "../../constants";
 import { uploadFile } from "../../infrastructure/azure";
 import type {
   IAccount,
@@ -9,8 +10,6 @@ import { excelSoaName } from "../../utils/formatter";
 import { generateExcel } from "./excel.generator";
 import { generateSoaPdfHandler } from "./generate-soa-pdf";
 import { buildPdfTemplateData } from "./pdf-template";
-
-const PDF_EXTENSION_REGEX = /\.pdf$/;
 
 type GenerateAndUploadParams = {
   soaData: IStatementOfAccountModel[];
@@ -67,24 +66,16 @@ export async function generateAndUploadDocuments(
     latestLetter,
   });
 
-  const pdfFileNameWithoutExt = pdfFileName.replace(PDF_EXTENSION_REGEX, "");
-  const pdfResult = await generateSoaPdfHandler({
+  const pdfFile: IFileData = await generateSoaPdfHandler({
     templateName,
     data: templateData,
-    filename: pdfFileNameWithoutExt,
+    filename: pdfFileName,
   });
-
-  const pdfFile: IFileData = {
-    fileName: pdfFileName,
-    bytes: Buffer.from(pdfResult.bytes as string, "base64"),
-    contentType: "application/pdf",
-  };
 
   await uploadFile(
     {
       ...excelFile,
-      contentType:
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      contentType: CONTENT_TYPES.XLSX,
     },
     customerData.code,
     "excel"

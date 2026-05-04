@@ -1,5 +1,5 @@
 import type { ObjectContext } from "@restatedev/restate-sdk";
-import { isDevelopment, ROMAN_MONTHS } from "../../constants";
+import { CONTENT_TYPES, isDevelopment, ROMAN_MONTHS } from "../../constants";
 import { downloadSoaFiles } from "../../infrastructure/azure";
 import { getAccountEmails } from "../../infrastructure/database/index.js";
 import type { IAccount, ISoaItem, IStatementOfAccountModel } from "../../types";
@@ -300,13 +300,12 @@ const downloadAndSendReminder = async (
       excelFile: {
         fileName: fileNames.excelFileName,
         bytes: excelBuffer,
-        contentType:
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        contentType: CONTENT_TYPES.XLSX,
       },
       pdfFile: {
         fileName: fileNames.pdfFileName,
         bytes: pdfBuffer,
-        contentType: "application/pdf",
+        contentType: CONTENT_TYPES.PDF,
       },
       isReminder: item.processingType > 1,
       date: dateNow,

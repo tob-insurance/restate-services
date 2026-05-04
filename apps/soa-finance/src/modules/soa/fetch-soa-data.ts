@@ -41,9 +41,9 @@ export const generateSoa = async (
   }
 
   // Filter already-processed DC notes using state
-  const newSoaList = await filterAlreadyProcessedDcNotes(ctx, soaList);
+  const filteredSoaList = await filterAlreadyProcessedDcNotes(ctx, soaList);
 
-  if (!newSoaList || newSoaList.length === 0) {
+  if (!filteredSoaList || filteredSoaList.length === 0) {
     ctx.console.log(
       `Skipping ${customer.code}: All DC notes already processed`
     );
@@ -51,10 +51,10 @@ export const generateSoa = async (
   }
 
   ctx.console.log(
-    `[GenerateSOA] Data ready for ${customer.code}: ${newSoaList.length} records`
+    `[GenerateSOA] Data ready for ${customer.code}: ${filteredSoaList.length} records`
   );
 
-  return newSoaList;
+  return filteredSoaList;
 };
 
 async function filterAlreadyProcessedDcNotes(

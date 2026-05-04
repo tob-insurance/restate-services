@@ -9,7 +9,7 @@ import type {
 import { letterSoaPdfName } from "../../../utils/formatter";
 import { generateAndUploadDocuments } from "../../document-generation";
 import { createReminder } from "../../reminder";
-import { generateSoa } from "../generate";
+import { generateSoa } from "../fetch-soa-data";
 import { letterCounter } from "../objects/letter-counter";
 import { multiBranchCodes } from "../types";
 

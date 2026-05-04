@@ -6,8 +6,9 @@ import {
 
 import { getAccountById } from "../../../infrastructure/database/index.js";
 import type { ISoaItem } from "../../../types";
+import { sendWithAttachments } from "../../email";
 import { processReminderLetter } from "../../reminder";
-import { newSoa } from "../services";
+import { processBranchSoa } from "../services/process-branches";
 import { readDcNoteIndex } from "./state";
 
 type SoaCustomerResult = {
@@ -56,7 +57,28 @@ export const soaCustomer = object({
           item: soaParams,
         });
       } else {
-        await newSoa({ ctx, customerData, params: soaParams });
+        const dateNow = new Date(soaParams.processingDate);
+        const hasDocuments = await processBranchSoa({
+          ctx,
+          customerData,
+          params: soaParams,
+        });
+
+        if (hasDocuments) {
+          await ctx.run(
+            "send-email",
+            async () =>
+              await sendWithAttachments({
+                customerId: soaParams.customerId,
+                customerData,
+                date: dateNow,
+              })
+          );
+        } else {
+          ctx.console.log(
+            `Skipping email for ${soaParams.customerId}: no documents generated`
+          );
+        }
       }
 
       ctx.console.log(`[SoaCustomer] Completed for customer: ${customerId}`);

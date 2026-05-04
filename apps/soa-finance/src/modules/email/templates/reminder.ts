@@ -1,5 +1,9 @@
 import { join } from "node:path";
-import { formatDateIndonesian } from "../../../utils/formatter";
+import { SCHEDULE_CONFIG } from "../../../constants/schedule";
+import {
+  formatDateEnglishMonthFirst,
+  formatDateIndonesian,
+} from "../../../utils/formatter";
 import { renderTemplate } from "../../../utils/template";
 import {
   formatEnDate,
@@ -15,25 +19,32 @@ const currencyFormatter = new Intl.NumberFormat("id-ID", {
   maximumFractionDigits: 2,
 });
 
+function computeDeadline(
+  type: string,
+  processingDate: Date
+): { deadlineId: string; deadlineEn: string } | null {
+  const soaType = Number(type) + 1;
+  const schedule = SCHEDULE_CONFIG.find((s) => s.soaType === soaType);
+  const graceDays = schedule?.graceDays ?? 0;
+  if (graceDays === 0) {
+    return null;
+  }
+  const deadline = new Date(processingDate);
+  deadline.setDate(deadline.getDate() + graceDays);
+  return {
+    deadlineId: formatDateIndonesian(deadline),
+    deadlineEn: formatDateEnglishMonthFirst(deadline),
+  };
+}
+
 export async function generateReminderEmailHtml(
   type: string,
   data: IReminderEmailData,
   templateName = "TemplateReminderLetterSOA"
 ): Promise<string> {
   const template = loadEmailTemplate(TEMPLATES_DIR, templateName);
-  const now = new Date();
 
-  let dayDeadline = "19";
-  if (type === "1") {
-    dayDeadline = "19";
-  } else if (type === "2") {
-    dayDeadline = "25";
-  } else if (type === "3") {
-    dayDeadline = "29";
-  }
-
-  const deadlineDateId = `${dayDeadline} ${formatDateIndonesian(now).split(" ").slice(1).join(" ")}`;
-  const deadlineDateEn = `${dayDeadline} ${formatEnDate(now).split(" ").slice(1).join(" ")}`;
+  const deadline = computeDeadline(type, data.asAtDate);
 
   return await renderTemplate(template, {
     reminderType: type,
@@ -53,8 +64,8 @@ export async function generateReminderEmailHtml(
     formattedTotalPremium: data.totalPremium
       ? currencyFormatter.format(data.totalPremium)
       : "0.00",
-    deadlineDateId,
-    deadlineDateEn,
+    deadlineDateId: deadline?.deadlineId ?? "",
+    deadlineDateEn: deadline?.deadlineEn ?? "",
     ImgSign: getSignature(),
   });
 }

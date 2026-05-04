@@ -1,5 +1,7 @@
 type AppEnvironment = "development" | "production";
 
+const TRAILING_SLASHES = /\/+$/;
+
 export function getAppEnvironment(): AppEnvironment {
   const env = process.env.APP_ENV;
   if (env === "development") {
@@ -13,7 +15,8 @@ export function isDevelopment(): boolean {
 }
 
 export function getPipelinePathPrefix(): string {
-  const prefix = process.env.AZURE_STORAGE_PIPELINE_PREFIX || "parquet";
+  const raw = process.env.AZURE_STORAGE_PIPELINE_PREFIX || "parquet";
+  const prefix = raw.replace(TRAILING_SLASHES, "");
   return `${prefix}/${getAppEnvironment()}`;
 }
 

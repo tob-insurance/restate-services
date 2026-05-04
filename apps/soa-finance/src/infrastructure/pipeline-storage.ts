@@ -13,12 +13,6 @@ function getMonthPartition(referenceDate: Date): string {
   return `${year}-${month}`;
 }
 
-function getPreviousMonth(referenceDate: Date): Date {
-  return new Date(
-    Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth() - 1, 1)
-  );
-}
-
 export function buildUploadBlobPath(
   fileName: string,
   referenceDate: Date
@@ -33,9 +27,8 @@ export function buildDownloadBlobPath(
   referenceDate: Date
 ): string {
   const prefix = getPipelinePathPrefix();
-  const targetMonth = getPreviousMonth(referenceDate);
 
-  return `${prefix}/${getMonthPartition(targetMonth)}/soa_${accountCode}.parquet`;
+  return `${prefix}/${getMonthPartition(referenceDate)}/soa_${accountCode}.parquet`;
 }
 
 export async function uploadParquetToStorage(

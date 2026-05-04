@@ -1,8 +1,5 @@
 export const TIMEZONE = "Asia/Jakarta";
 
-// Fallback email when customer has no email
-export const FALLBACK_EMAIL = "collection@tob-ins.com";
-
 export const ROMAN_MONTHS = [
   "I",
   "II",
@@ -17,6 +14,26 @@ export const ROMAN_MONTHS = [
   "XI",
   "XII",
 ] as const;
+
+export const INFRASTRUCTURE_TIMEOUTS = {
+  AZURE_UPLOAD_MS: 10 * 60 * 1000,
+  GOTENBERG_PDF_MS: 60_000,
+} as const;
+
+export const AZURE_UPLOAD = {
+  LARGE_FILE_THRESHOLD: 50 * 1024 * 1024,
+  BLOCK_SIZE: 4 * 1024 * 1024,
+  MAX_CONCURRENCY: 4,
+  UPLOAD_TIMEOUT_MS: INFRASTRUCTURE_TIMEOUTS.AZURE_UPLOAD_MS,
+} as const;
+
+export const ORACLE_STREAM = {
+  FETCH_ARRAY_SIZE: 500,
+} as const;
+
+export const PIPELINE = {
+  LARGE_DATASET_WARN_THRESHOLD: 100_000,
+} as const;
 
 export const CONTENT_TYPES = {
   PDF: "application/pdf",

@@ -1,5 +1,7 @@
 import { withConnectionGenerator } from "@restate-tob/oracle";
+import { TerminalError } from "@restatedev/restate-sdk";
 import oracledb from "oracledb";
+import { ORACLE_STREAM } from "../../constants";
 import { getOracleClient } from "../../infrastructure/database/database.js";
 import type { IOracleStreamOptions } from "../types";
 
@@ -40,18 +42,18 @@ export async function* streamFromOracle(
     const outBinds = result.outBinds as OracleBinds;
 
     if (outBinds.p_status !== "1") {
-      throw new Error(`Procedure error: ${outBinds.p_error_message}`);
+      throw new TerminalError(`Procedure error: ${outBinds.p_error_message}`);
     }
 
     const cursor = outBinds.p_cursor;
     try {
-      let rows = await cursor.getRows(500);
+      let rows = await cursor.getRows(ORACLE_STREAM.FETCH_ARRAY_SIZE);
 
       while (rows.length > 0) {
         for (const row of rows) {
           yield row;
         }
-        rows = await cursor.getRows(500);
+        rows = await cursor.getRows(ORACLE_STREAM.FETCH_ARRAY_SIZE);
       }
     } finally {
       await cursor.close();
@@ -72,24 +74,24 @@ export async function* streamQueryFromOracle(
       binds as oracledb.BindParameters,
       {
         resultSet: true,
-        fetchArraySize: 500,
+        fetchArraySize: ORACLE_STREAM.FETCH_ARRAY_SIZE,
       }
     );
 
     const resultSet = result.resultSet;
 
     if (!resultSet) {
-      throw new Error("No result set returned from query");
+      throw new TerminalError("No result set returned from query");
     }
 
     try {
-      let rows = await resultSet.getRows(500);
+      let rows = await resultSet.getRows(ORACLE_STREAM.FETCH_ARRAY_SIZE);
 
       while (rows.length > 0) {
         for (const row of rows) {
           yield row;
         }
-        rows = await resultSet.getRows(500);
+        rows = await resultSet.getRows(ORACLE_STREAM.FETCH_ARRAY_SIZE);
       }
     } finally {
       await resultSet.close();

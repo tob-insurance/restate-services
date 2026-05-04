@@ -1,37 +1,26 @@
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { formatDateIndonesian } from "../../../utils/formatter";
 import { renderTemplate } from "../../../utils/template";
+import {
+  formatEnDate,
+  loadEmailTemplate,
+} from "../../../utils/template/email-formatters";
 import { getSignature } from "../../document-generation/pdf-assets";
 import type { IReminderEmailData } from "../../reminder/types";
 
 const TEMPLATES_DIR = join(__dirname, "../../../assets/email/templates");
-
-function loadTemplate(name: string): string {
-  return readFileSync(join(TEMPLATES_DIR, `${name}.html`), "utf-8");
-}
 
 const currencyFormatter = new Intl.NumberFormat("id-ID", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 
-const enDateFormatter = new Intl.DateTimeFormat("en-US", {
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-});
-
-function formatEnDate(date: Date): string {
-  return enDateFormatter.format(date);
-}
-
 export async function generateReminderEmailHtml(
   type: string,
   data: IReminderEmailData,
   templateName = "TemplateReminderLetterSOA"
 ): Promise<string> {
-  const template = loadTemplate(templateName);
+  const template = loadEmailTemplate(TEMPLATES_DIR, templateName);
   const now = new Date();
 
   let dayDeadline = "19";

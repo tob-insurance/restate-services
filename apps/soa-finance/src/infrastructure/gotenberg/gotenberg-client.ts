@@ -1,3 +1,5 @@
+import { INFRASTRUCTURE_TIMEOUTS } from "../../constants";
+
 type PdfOptions = {
   marginTop?: number;
   marginBottom?: number;
@@ -75,6 +77,7 @@ export async function generatePdfWithHeaderFooter(
       {
         method: "POST",
         body: formData,
+        signal: AbortSignal.timeout(INFRASTRUCTURE_TIMEOUTS.GOTENBERG_PDF_MS),
       }
     );
 
@@ -86,6 +89,11 @@ export async function generatePdfWithHeaderFooter(
     const arrayBuffer = await response.arrayBuffer();
     return Buffer.from(arrayBuffer);
   } catch (error: unknown) {
+    if (error instanceof DOMException && error.name === "TimeoutError") {
+      console.error("[Gotenberg] PDF generation timed out after 60s");
+      throw new Error("PDF generation timed out after 60 seconds");
+    }
+
     console.error("[Gotenberg] PDF generation failed:", error);
     throw new Error(
       `Failed to generate PDF: ${error instanceof Error ? error.message : String(error)}`

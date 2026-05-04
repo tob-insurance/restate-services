@@ -1,20 +1,12 @@
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
-
-const TEMPLATES_DIR = join(__dirname, "../../../assets/email/templates");
-
 import { formatDateIndonesian } from "../../../utils/formatter";
 import { renderTemplate } from "../../../utils/template";
+import {
+  formatEnDate,
+  loadEmailTemplate,
+} from "../../../utils/template/email-formatters";
 
-const enDateFormatter = new Intl.DateTimeFormat("en-US", {
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-});
-
-function formatEnDate(date: Date): string {
-  return enDateFormatter.format(date);
-}
+const TEMPLATES_DIR = join(__dirname, "../../../assets/email/templates");
 
 export type SoaEmailData = {
   customerName: string;
@@ -22,14 +14,13 @@ export type SoaEmailData = {
   virtualAccount: string;
 };
 
-function loadTemplate(name: string): string {
-  return readFileSync(join(TEMPLATES_DIR, `${name}.html`), "utf-8");
-}
-
 export async function generateSoaEmailHtml(
   data: SoaEmailData
 ): Promise<string> {
-  const template = loadTemplate("TemplateOutstandingStatementOfAccount");
+  const template = loadEmailTemplate(
+    TEMPLATES_DIR,
+    "TemplateOutstandingStatementOfAccount"
+  );
   return await renderTemplate(template, {
     customerName: data.customerName,
     virtualAccount: data.virtualAccount,

@@ -1,4 +1,6 @@
 import { Readable } from "node:stream";
+import { RestError } from "@azure/storage-blob";
+import { AZURE_UPLOAD } from "../../constants";
 import { getContainerClient } from "./blob-client";
 
 type StorageFileData = {
@@ -12,11 +14,6 @@ type UploadResult = {
   blobName: string;
   success: boolean;
 };
-
-const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024; // 50MB
-const BLOCK_SIZE = 4 * 1024 * 1024; // 4MB
-const MAX_CONCURRENCY = 4;
-const UPLOAD_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
 function generateBlobPath(
   customerCode: string,
@@ -40,7 +37,7 @@ export async function uploadFile(
   const blockBlobClient = container.getBlockBlobClient(blobName);
 
   const fileSize = fileData.bytes.length;
-  const isLargeFile = fileSize > LARGE_FILE_THRESHOLD;
+  const isLargeFile = fileSize > AZURE_UPLOAD.LARGE_FILE_THRESHOLD;
 
   try {
     if (isLargeFile) {
@@ -49,18 +46,25 @@ export async function uploadFile(
       );
       const stream = Readable.from(fileData.bytes);
 
-      await blockBlobClient.uploadStream(stream, BLOCK_SIZE, MAX_CONCURRENCY, {
-        blobHTTPHeaders: { blobContentType: fileData.contentType },
-        abortSignal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
-        onProgress: (progress) => {
-          const percent = ((progress.loadedBytes / fileSize) * 100).toFixed(1);
-          console.log(`[Azure] Upload progress: ${percent}%`);
-        },
-      });
+      await blockBlobClient.uploadStream(
+        stream,
+        AZURE_UPLOAD.BLOCK_SIZE,
+        AZURE_UPLOAD.MAX_CONCURRENCY,
+        {
+          blobHTTPHeaders: { blobContentType: fileData.contentType },
+          abortSignal: AbortSignal.timeout(AZURE_UPLOAD.UPLOAD_TIMEOUT_MS),
+          onProgress: (progress) => {
+            const percent = ((progress.loadedBytes / fileSize) * 100).toFixed(
+              1
+            );
+            console.log(`[Azure] Upload progress: ${percent}%`);
+          },
+        }
+      );
     } else {
       await blockBlobClient.uploadData(fileData.bytes, {
         blobHTTPHeaders: { blobContentType: fileData.contentType },
-        abortSignal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+        abortSignal: AbortSignal.timeout(AZURE_UPLOAD.UPLOAD_TIMEOUT_MS),
       });
     }
 
@@ -74,20 +78,27 @@ export async function uploadFile(
   }
 }
 
-export async function downloadFile(blobName: string): Promise<Buffer> {
+export async function downloadFile(blobName: string): Promise<Buffer | null> {
   const container = getContainerClient();
   const blockBlobClient = container.getBlockBlobClient(blobName);
-  const response = await blockBlobClient.download(0);
-
-  const chunks: Buffer[] = [];
-  const streamBody = response.readableStreamBody;
-  if (streamBody) {
-    for await (const chunk of streamBody) {
-      chunks.push(Buffer.from(chunk));
+  try {
+    const response = await blockBlobClient.download(0);
+    const chunks: Buffer[] = [];
+    const streamBody = response.readableStreamBody;
+    if (streamBody) {
+      for await (const chunk of streamBody) {
+        chunks.push(Buffer.from(chunk));
+      }
     }
-  }
 
-  return Buffer.concat(chunks);
+    return Buffer.concat(chunks);
+  } catch (error: unknown) {
+    if (error instanceof RestError && error.statusCode === 404) {
+      console.warn(`[Azure] File not found: ${blobName}`);
+      return null;
+    }
+    throw error;
+  }
 }
 
 export async function deleteFile(blobName: string): Promise<boolean> {
@@ -124,6 +135,12 @@ export async function downloadSoaFiles(
     downloadFile(excelBlobName),
     downloadFile(pdfBlobName),
   ]);
+
+  if (!(excelBuffer && pdfBuffer)) {
+    throw new Error(
+      `Missing files for customer ${customerCode}: excel=${!!excelBuffer}, pdf=${!!pdfBuffer}`
+    );
+  }
 
   console.log(`[Azure] Downloaded Excel: ${excelBuffer.length} bytes`);
   console.log(`[Azure] Downloaded PDF: ${pdfBuffer.length} bytes`);

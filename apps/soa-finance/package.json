@@ -17,7 +17,7 @@
     "postbundle": "cd dist && zip -r index.zip app.js*",
     "prebundle:lambda": "rm -rf dist-lambda",
     "bundle:lambda": "esbuild src/app.lambda.ts --bundle --minify --sourcemap --platform=node --target=es2020 --external:oracledb --outfile=dist-lambda/app.js",
-    "postbundle:lambda": "cd dist-lambda && mkdir -p node_modules && cp -rL ../node_modules/oracledb node_modules/ && zip -r lambda.zip app.js* node_modules",
+    "postbundle:lambda": "cd dist-lambda && mkdir -p node_modules src && cp -rL ../node_modules/oracledb node_modules/ && cp -r ../src/assets src/assets && zip -r lambda.zip app.js* node_modules",
     "build:layer": "bun run --filter @restate-tob/lambda-layers build:oracle"
   },
   "dependencies": {

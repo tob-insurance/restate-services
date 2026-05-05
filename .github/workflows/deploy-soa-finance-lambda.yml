@@ -21,6 +21,9 @@ on:
 
 jobs:
   deploy:
+    permissions:
+      id-token: write
+      contents: read
     uses: ./.github/workflows/deploy-restate-lambda.yml
     with:
       app-name: "soa-finance"

@@ -1,0 +1,5 @@
+{
+  "name": "querying-postgres",
+  "description": "Execute PostgreSQL queries via psql with pre-configured connection",
+  "version": "1.0.0"
+}

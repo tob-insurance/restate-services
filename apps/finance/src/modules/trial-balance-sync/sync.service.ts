@@ -154,7 +154,7 @@ export async function syncTrialBalanceFromGenius(
             console.log(
               `✅ Inserted ${calculatedData.length} records into PostgreSQL`
             );
-          } catch (error) {
+          } catch (error: unknown) {
             await client.query("ROLLBACK");
             console.error("❌ Failed to insert trial balance records:", error);
             throw error;
@@ -178,7 +178,7 @@ export async function syncTrialBalanceFromGenius(
       endTime,
       duration,
     };
-  } catch (error) {
+  } catch (error: unknown) {
     const endTime = new Date();
     const duration = endTime.getTime() - startTime.getTime();
 

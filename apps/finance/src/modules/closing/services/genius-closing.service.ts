@@ -12,6 +12,10 @@ import {
 } from "../../../infrastructure/index.js";
 import type { GeniusClosingJobSubmit, GeniusJobStatus } from "../types.js";
 
+const YEAR_REGEX = /^\d{4}$/;
+const MONTH_REGEX = /^\d{2}$/;
+const USER_ID_REGEX = /^[a-zA-Z0-9_]+$/;
+
 const SubmitJobInputSchema = z.object({
   closingDate: DateStringSchema,
   userId: UserIdSchema,
@@ -45,18 +49,27 @@ export async function submitGeniusClosingJob(
     );
 
     await withConnection(getOracleClient(), async (connection) => {
-      const escapeOracleString = (value: string): string =>
-        value.replace(/'/g, "''");
+      const yearStr = String(year);
+      const monthStr = String(month).padStart(2, "0");
 
-      const safeYear = escapeOracleString(String(year));
-      const safeMonth = escapeOracleString(String(month));
-      const safeUserId = escapeOracleString(validated.userId);
+      if (!(YEAR_REGEX.test(yearStr) && MONTH_REGEX.test(monthStr))) {
+        throw new TerminalError("Invalid year or month format", {
+          errorCode: 400,
+        });
+      }
+
+      if (!USER_ID_REGEX.test(validated.userId)) {
+        throw new TerminalError(
+          "Invalid userId format. Only alphanumeric characters and underscores are allowed.",
+          { errorCode: 400 }
+        );
+      }
 
       const plsqlBlock = `DECLARE
   l_out_1 VARCHAR2(4000);
   l_out_2 VARCHAR2(4000);
 BEGIN
-  Package_Rpt_Ac_Fi806.get_master_data('${safeYear}', '${safeMonth}', '${safeMonth}', '${safeUserId}', l_out_1, l_out_2);
+  Package_Rpt_Ac_Fi806.get_master_data('${yearStr}', '${monthStr}', '${monthStr}', '${validated.userId}', l_out_1, l_out_2);
 END;`;
 
       await connection.execute(
@@ -90,7 +103,7 @@ END;`;
         "Job submitted successfully. It will run in background for up to 6 hours.",
       startTime,
     };
-  } catch (error) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       throw new TerminalError(
         `Validation error: ${error.issues.map((e: z.ZodIssue) => e.message).join(", ")}`,
@@ -162,7 +175,7 @@ export async function checkGeniusClosingJobStatus(
         message,
       };
     });
-  } catch (error) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       throw new TerminalError(`Invalid job name: ${jobName}`, {
         errorCode: 400,

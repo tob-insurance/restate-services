@@ -1,0 +1,29 @@
+name: Deploy SOA Finance Lambda
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy"
+        required: true
+        default: "prod"
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+  push:
+    branches: [main]
+    paths:
+      - "apps/soa-finance/**"
+      - "packages/oracle/**"
+      - ".github/workflows/deploy-restate-lambda.yml"
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy-restate-lambda.yml
+    with:
+      app-name: "soa-finance"
+      lambda-name: "soa-finance"
+      environment: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'prod' }}
+    secrets: inherit

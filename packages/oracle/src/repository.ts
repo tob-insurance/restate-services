@@ -9,6 +9,54 @@ export type IOpenBalanceRepository = {
   ): AsyncGenerator<OpenBalance, void, undefined>;
 };
 
+type OpenBalanceRow = {
+  COACODE: unknown;
+  DESCRIPTION: unknown;
+  YEAR: unknown;
+  MONTH: unknown;
+  BRANCH: unknown;
+  BEGINNINGDEBIT: unknown;
+  BEGINNINGCREDIT: unknown;
+  DEBITAMOUNT: unknown;
+  CREDITAMOUNT: unknown;
+  ENDINGDEBIT: unknown;
+  ENDINGCREDIT: unknown;
+  CREATEBY: unknown;
+  CREATEDATE: unknown;
+  CURRENCY: unknown;
+};
+
+function toStringValue(value: unknown): string {
+  return typeof value === "string" ? value : String(value ?? "");
+}
+
+function toNumberValue(value: unknown): number {
+  return Number.parseFloat(String(value ?? 0));
+}
+
+function toDateValue(value: unknown): Date {
+  return value instanceof Date ? value : new Date(String(value));
+}
+
+function mapOpenBalanceRow(row: OpenBalanceRow): OpenBalance {
+  return {
+    coaCode: toStringValue(row.COACODE),
+    description: toStringValue(row.DESCRIPTION),
+    year: toNumberValue(row.YEAR),
+    month: toNumberValue(row.MONTH),
+    branch: toStringValue(row.BRANCH),
+    beginningDebit: toNumberValue(row.BEGINNINGDEBIT),
+    beginningCredit: toNumberValue(row.BEGINNINGCREDIT),
+    debitAmount: toNumberValue(row.DEBITAMOUNT),
+    creditAmount: toNumberValue(row.CREDITAMOUNT),
+    endingDebit: toNumberValue(row.ENDINGDEBIT),
+    endingCredit: toNumberValue(row.ENDINGCREDIT),
+    createBy: toStringValue(row.CREATEBY),
+    createDate: toDateValue(row.CREATEDATE),
+    currency: toStringValue(row.CURRENCY),
+  };
+}
+
 export class OpenBalanceRepository implements IOpenBalanceRepository {
   private readonly oracleClient: OracleClient;
 
@@ -53,26 +101,9 @@ export class OpenBalanceRepository implements IOpenBalanceRepository {
           }
         );
 
-        if (result.rows) {
-          // biome-ignore lint/suspicious/noExplicitAny: oracledb rows
-          for (const row of result.rows as any[]) {
-            yield {
-              coaCode: row.COACODE as string,
-              description: row.DESCRIPTION as string,
-              year: row.YEAR as number,
-              month: row.MONTH as number,
-              branch: row.BRANCH as string,
-              beginningDebit: Number.parseFloat(String(row.BEGINNINGDEBIT)),
-              beginningCredit: Number.parseFloat(String(row.BEGINNINGCREDIT)),
-              debitAmount: Number.parseFloat(String(row.DEBITAMOUNT)),
-              creditAmount: Number.parseFloat(String(row.CREDITAMOUNT)),
-              endingDebit: Number.parseFloat(String(row.ENDINGDEBIT)),
-              endingCredit: Number.parseFloat(String(row.ENDINGCREDIT)),
-              createBy: row.CREATEBY as string,
-              createDate: row.CREATEDATE as Date,
-              currency: row.CURRENCY as string,
-            };
-          }
+        const rows = (result.rows ?? []) as OpenBalanceRow[];
+        for (const row of rows) {
+          yield mapOpenBalanceRow(row);
         }
       }
     );

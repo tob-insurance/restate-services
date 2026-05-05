@@ -1,6 +1,18 @@
 import os from "node:os";
-import oracledb, { type Connection, type Pool } from "oracledb";
-import type { OracleClient, OracleConfig } from "./types.js";
+import oracledb, {
+  type BindParameters,
+  type Connection,
+  type ExecuteOptions,
+  type Pool,
+} from "oracledb";
+import type {
+  ExecuteManyResult,
+  ExecuteQueryResult,
+  OracleClient,
+  OracleConfig,
+  ProcedureOutBindDef,
+  ProcedureResult,
+} from "./types.js";
 
 export type { Connection } from "oracledb";
 
@@ -16,7 +28,7 @@ export async function withConnection<T>(
     if (connection) {
       try {
         await connection.close();
-      } catch (err) {
+      } catch (err: unknown) {
         console.error("Error closing Oracle connection:", err);
       }
     }
@@ -35,11 +47,62 @@ export async function* withConnectionGenerator<T>(
     if (connection) {
       try {
         await connection.close();
-      } catch (err) {
+      } catch (err: unknown) {
         console.error("Error closing Oracle connection:", err);
       }
     }
   }
+}
+
+type OracleUrlConfig = Omit<
+  OracleConfig,
+  "user" | "password" | "connectString"
+> & {
+  connectionString: string;
+};
+
+function parseOracleConnectionString(connectionString: string) {
+  const url = new URL(connectionString);
+
+  return {
+    user: decodeURIComponent(url.username),
+    password: decodeURIComponent(url.password),
+    connectString: `${url.hostname}:${url.port || "1521"}${url.pathname}`,
+  };
+}
+
+const BIND_TYPE_MAP: Record<
+  string,
+  { type: oracledb.DbType; dir: number; maxSize?: number }
+> = {
+  cursor: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT },
+  string: { type: oracledb.STRING, dir: oracledb.BIND_OUT, maxSize: 4000 },
+  number: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT },
+  date: { type: oracledb.DATE, dir: oracledb.BIND_OUT },
+  clob: { type: oracledb.CLOB, dir: oracledb.BIND_OUT },
+  blob: { type: oracledb.BLOB, dir: oracledb.BIND_OUT },
+};
+
+async function readCursorsFromBinds<TRow>(
+  outBinds: Record<string, unknown>,
+  outBindDefs: ProcedureOutBindDef
+): Promise<TRow[]> {
+  const rows: TRow[] = [];
+
+  for (const [key, type] of Object.entries(outBindDefs)) {
+    if (type === "cursor" && outBinds[key]) {
+      const cursor = outBinds[key] as oracledb.ResultSet<TRow>;
+      let row = await cursor.getRow();
+      while (row) {
+        rows.push(row);
+        row = await cursor.getRow();
+      }
+      await cursor.close();
+      delete outBinds[key];
+    }
+  }
+
+  return rows;
 }
 
 function initThickMode(instantClientPath?: string): void {
@@ -62,7 +125,7 @@ function initThickMode(instantClientPath?: string): void {
         `✅ Oracle Thick mode enabled${instantClientPath ? `: ${instantClientPath}` : ""}`
       );
     }
-  } catch (error) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.warn(
       `⚠️  Oracle Thick mode failed: ${errorMessage}. Using Thin mode (requires Oracle 12.1+)`
@@ -121,7 +184,7 @@ export function createOracleClient(config: OracleConfig): OracleClient {
         const result = await connection.execute("SELECT SYSDATE FROM DUAL");
         console.log("✅ Oracle connected:", result.rows?.[0]);
         return true;
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("❌ Oracle connection failed:", error);
         return false;
       } finally {
@@ -136,5 +199,81 @@ export function createOracleClient(config: OracleConfig): OracleClient {
         console.log("Oracle pool closed");
       }
     },
+
+    executeQuery<T = Record<string, unknown>>(
+      sql: string,
+      binds: BindParameters = {},
+      options: ExecuteOptions = {}
+    ): Promise<ExecuteQueryResult<T>> {
+      return withConnection(this, async (connection) => {
+        const result = await connection.execute(sql, binds, {
+          outFormat: oracledb.OUT_FORMAT_OBJECT,
+          ...options,
+        });
+        return {
+          rows: (result.rows as T[]) ?? [],
+          rowsAffected: result.rowsAffected,
+          metadata: result.metaData,
+        };
+      });
+    },
+
+    executeMany(
+      sql: string,
+      binds: BindParameters[],
+      options: ExecuteOptions = {}
+    ): Promise<ExecuteManyResult> {
+      return withConnection(this, async (connection) => {
+        const result = await connection.executeMany(sql, binds, {
+          autoCommit: true,
+          ...options,
+        });
+        return {
+          rowsAffected: result.rowsAffected ?? 0,
+          batchErrors: result.batchErrors,
+        };
+      });
+    },
+
+    executeProcedure<TRow = unknown, TOutBinds = Record<string, unknown>>(
+      procedureCall: string,
+      binds: BindParameters = {},
+      outBindDefs: ProcedureOutBindDef = {}
+    ): Promise<ProcedureResult<TRow, TOutBinds>> {
+      return withConnection(this, async (connection) => {
+        const bindParams = { ...binds } as Record<string, unknown>;
+
+        for (const [key, type] of Object.entries(outBindDefs)) {
+          const bindDef = BIND_TYPE_MAP[type];
+          if (bindDef) {
+            bindParams[key] = { ...bindDef };
+          }
+        }
+
+        const result = await connection.execute(
+          `BEGIN ${procedureCall}; END;`,
+          bindParams as BindParameters
+        );
+
+        const outBinds = result.outBinds as Record<string, unknown>;
+        const rows = await readCursorsFromBinds<TRow>(outBinds, outBindDefs);
+
+        return {
+          rows,
+          outBinds: outBinds as TOutBinds,
+        };
+      });
+    },
   };
+}
+
+export function createOracleClientFromUrl(
+  config: OracleUrlConfig
+): OracleClient {
+  const { connectionString, ...clientConfig } = config;
+
+  return createOracleClient({
+    ...parseOracleConnectionString(connectionString),
+    ...clientConfig,
+  });
 }

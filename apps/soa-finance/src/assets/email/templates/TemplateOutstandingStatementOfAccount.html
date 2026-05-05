@@ -1,0 +1,97 @@
+{% layout "_base" %}
+
+{% block title %}Statement of Account - PT. ASURANSI TOTAL BERSAMA{% endblock %}
+
+{% block preview %}Statement of Account for {{ customerName }} — per {{ formattedDate }}{% endblock %}
+
+{% block content %}
+
+<div id="Bahasa_Indonesia">
+  <p>Yth. {{ customerName }},</p>
+  <p>
+    Sebelumnya kami mengucapkan terima kasih atas kepercayaan
+    dan kerjasama yang telah terjalin selama ini dengan PT.
+    ASURANSI TOTAL BERSAMA.
+    <br />
+    Berdasarkan catatan kami per tanggal {{ formattedDate }},
+    terlampir adalah rincian tagihan premi.
+  </p>
+  <p>
+    Besar harapan kami kepada Bpk/Ibu dapat melakukan
+    pembayaran atas premi,
+    <span class="warning"
+      >terutama tagihan yang melewati tanggal jatuh tempo</span
+    >
+  </p>
+  <p>
+    Premi dapat dibayarkan ke BCA VIRTUAL ACCOUNT sebagai berikut:
+  </p>
+
+  {% render "_partials/bank-accounts-id", virtualAccount: virtualAccount, customerName: customerName %}
+
+  <p>
+    Apabila pembayaran telah dilakukan mohon dapat di infokan ke
+    <a
+      href="mailto:finance@tob-ins.com"
+      target="_blank"
+      rel="noopener noreferrer"
+      data-auth="NotApplicable"
+      data-safelink="true"
+      id="LPlnk548623"
+      data-linkindex="0"
+    >
+      <span class="email-link">finance@tob-ins.com</span>
+    </a>
+  </p>
+  <p>
+    Demikian kami sampaikan, atas perhatian dan kerjasamanya
+    kami ucapkan terima kasih.
+  </p>
+</div>
+
+<br />
+<br />
+<hr />
+
+<div id="Bahasa_Inggris">
+  <p>Dear {{ customerName }},</p>
+  <p>
+    First of all, we would like to thank you for the trust and
+    cooperation that has been established so far with PT.
+    ASURANSI TOTAL BERSAMA.
+    <br />
+    Based on our records as of {{ formattedDateEn }}, attached
+    is the detail of the premium statement.
+  </p>
+  <p>
+    We strictly hope that you can make payment for the premium,
+    <span class="warning"
+      >especially for bills that have passed the due date</span
+    >
+  </p>
+  <p>
+    Premium can be paid to BCA VIRTUAL ACCOUNT as follows:
+  </p>
+
+  {% render "_partials/bank-accounts-en", virtualAccount: virtualAccount, customerName: customerName %}
+
+  <p>
+    If payment has been made, please inform us at
+    <a
+      href="mailto:finance@tob-ins.com"
+      target="_blank"
+      rel="noopener noreferrer"
+      data-auth="NotApplicable"
+      data-safelink="true"
+      id="LPlnk548623"
+      data-linkindex="0"
+    >
+      <span class="email-link">finance@tob-ins.com</span>
+    </a>
+  </p>
+  <p>
+    Thus we convey, thank you for your attention and cooperation.
+  </p>
+</div>
+
+{% endblock %}

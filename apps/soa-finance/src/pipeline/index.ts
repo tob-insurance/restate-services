@@ -14,7 +14,7 @@ export async function generateSoaPipeline(
   console.log("[Pipeline] Starting SOA pipeline");
 
   if (isDevelopment()) {
-    console.log("[Pipeline] DEV MODE: using synthetic test data");
+    console.log("[Pipeline] DEV MODE: generating synthetic data");
     const testData = generateDevData();
     const testStream: AsyncIterable<IStatementOfAccountModel> = {
       [Symbol.asyncIterator]() {

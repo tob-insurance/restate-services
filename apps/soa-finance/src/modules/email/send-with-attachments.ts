@@ -3,8 +3,8 @@ import {
   getTestEmailRecipient,
   isDevelopment,
 } from "../../constants";
-import { downloadSoaFiles } from "../../infrastructure/azure";
 import type { ISendEmailResult } from "../../infrastructure/email/types";
+import { downloadSoaFiles } from "../../infrastructure/s3";
 import type { IAccount } from "../../types";
 import { excelSoaName, letterSoaPdfName } from "../../utils";
 import { sendSoaEmail } from "./send-soa";

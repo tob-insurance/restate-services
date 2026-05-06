@@ -1,7 +1,7 @@
 import type { ObjectContext } from "@restatedev/restate-sdk";
 import { CONTENT_TYPES, isDevelopment, ROMAN_MONTHS } from "../../constants";
-import { downloadSoaFiles } from "../../infrastructure/azure";
 import { getAccountEmails } from "../../infrastructure/database/index.js";
+import { downloadSoaFiles } from "../../infrastructure/s3";
 import type { IAccount, ISoaItem, IStatementOfAccountModel } from "../../types";
 import { reminderPdfName } from "../../utils/formatter";
 import { readSoaParquet } from "../data-access/parquet-reader";

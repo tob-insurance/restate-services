@@ -1,5 +1,5 @@
 import { PIPELINE } from "../../constants";
-import { uploadParquetToStorage } from "../../infrastructure/azure/pipeline-storage";
+import { uploadParquetToStorage } from "../../infrastructure/s3/pipeline-storage";
 import type { IStatementOfAccountModel } from "../../types";
 import { writeSoaParquetToBuffer } from "../lib";
 
@@ -35,17 +35,25 @@ export async function writeToParquet(
   const result = await uploadAccounts(datasAccount, referenceDate);
 
   if (result.failed > 0 && result.uploaded === 0 && datasAccount.size > 0) {
-    throw new Error("Failed to upload Parquet files for all accounts");
+    throw new Error(
+      `Failed to upload for all ${datasAccount.size} accounts. Errors: ${result.errors.slice(0, 3).join(" | ")}`
+    );
   }
 }
 
 async function uploadAccounts(
   datasAccount: Map<string, IStatementOfAccountModel[]>,
   referenceDate: Date
-): Promise<{ uploaded: number; failed: number; failedAccounts: string[] }> {
+): Promise<{
+  uploaded: number;
+  failed: number;
+  failedAccounts: string[];
+  errors: string[];
+}> {
   let uploaded = 0;
   let failed = 0;
   const failedAccounts: string[] = [];
+  const errors: string[] = [];
 
   for (const [distributionCode, rows] of datasAccount) {
     const fileName = `soa_${distributionCode}.parquet`;
@@ -69,8 +77,9 @@ async function uploadAccounts(
       );
     } catch (error) {
       failed += 1;
-      failedAccounts.push(distributionCode);
       const message = error instanceof Error ? error.message : String(error);
+      failedAccounts.push(distributionCode);
+      errors.push(`${distributionCode}: ${message}`);
       console.error(
         `[Pipeline] Failed to upload account ${distributionCode}: ${message}`
       );
@@ -85,5 +94,5 @@ async function uploadAccounts(
     }
   }
 
-  return { uploaded, failed, failedAccounts };
+  return { uploaded, failed, failedAccounts, errors };
 }

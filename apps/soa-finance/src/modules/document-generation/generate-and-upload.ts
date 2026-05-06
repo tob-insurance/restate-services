@@ -1,5 +1,5 @@
 import { CONTENT_TYPES } from "../../constants";
-import { uploadFile } from "../../infrastructure/azure";
+import { uploadFile } from "../../infrastructure/s3";
 import type {
   IAccount,
   IFileData,

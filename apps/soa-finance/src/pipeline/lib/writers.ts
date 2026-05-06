@@ -4,7 +4,7 @@ import {
   Table,
   WriterPropertiesBuilder,
   writeParquet,
-} from "parquet-wasm";
+} from "../../infrastructure/parquet-wasm";
 import type { IStatementOfAccountModel } from "../../types";
 
 export function writeSoaParquetToBuffer(

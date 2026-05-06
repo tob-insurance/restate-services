@@ -1,6 +1,6 @@
 import { tableFromIPC } from "apache-arrow";
-import { readParquet } from "parquet-wasm";
-import { downloadParquetFromStorage } from "../../infrastructure/azure/pipeline-storage";
+import { readParquet } from "../../infrastructure/parquet-wasm";
+import { downloadParquetFromStorage } from "../../infrastructure/s3/pipeline-storage";
 import type { IStatementOfAccountModel } from "../../types";
 
 export async function readSoaParquet(

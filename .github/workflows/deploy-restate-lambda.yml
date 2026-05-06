@@ -40,7 +40,8 @@ jobs:
           project-slug: ${{ vars.INFISICAL_PROJECT_SLUG }}
           env-slug: ${{ inputs.environment }}
           export-type: "file"
-          file-output-path: "/apps/${{ inputs.app-name }}/.env"
+          # Note: path is relative to workspace (no leading /)
+          file-output-path: "apps/${{ inputs.app-name }}/.env"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -77,18 +78,40 @@ jobs:
 
           aws lambda wait function-updated --function-name ${{ inputs.lambda-name }}
 
-          echo '{"Variables":{' > /tmp/env.json
-          cat "${{ github.workspace }}/apps/${{ inputs.app-name }}/.env" | grep -v '^#' | grep -v '^$' | grep '=' | while IFS='=' read -r key value; do
-            value=$(echo "$value" | sed 's/^["'"'"']//' | sed 's/["'"'"']$//')
-            value=$(echo "$value" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g')
-            echo "\"$key\":\"$value\","
-          done | sed '$ s/,$//' >> /tmp/env.json
-          echo '}}' >> /tmp/env.json
+          # Convert .env to JSON using Node.js (handles special chars safely)
+          node -e "
+            const fs = require('fs');
+            const path = require('path');
+            const envPath = path.join('${{ github.workspace }}', 'apps', '${{ inputs.app-name }}', '.env');
+            const content = fs.readFileSync(envPath, 'utf8');
+            const vars = {};
+            content.split('\n').forEach(line => {
+              line = line.trim();
+              if (!line || line.startsWith('#')) return;
+              const eqIdx = line.indexOf('=');
+              if (eqIdx === -1) return;
+              const key = line.slice(0, eqIdx).trim();
+              let value = line.slice(eqIdx + 1).trim();
+              // Remove surrounding quotes
+              if ((value.startsWith('\"') && value.endsWith('\"')) ||
+                  (value.startsWith(\"'\") && value.endsWith(\"'\"))) {
+                value = value.slice(1, -1);
+              }
+              vars[key] = value;
+            });
+            fs.writeFileSync('/tmp/env.json', JSON.stringify({ Variables: vars }));
+          "
 
           aws lambda update-function-configuration \
             --function-name ${{ inputs.lambda-name }} \
             --layers "$LAYER_ARN" \
             --environment file:///tmp/env.json
+
+      - name: Tag Lambda function
+        run: |
+          aws lambda tag-resource \
+            --resource "$(aws lambda get-function --function-name ${{ inputs.lambda-name }} --query 'Configuration.FunctionArn' --output text)" \
+            --tags "ManagedBy=github-actions"
 
       - name: Register with Restate
         if: success()
@@ -103,6 +126,8 @@ jobs:
           VERSION=$(aws lambda publish-version --function-name ${{ inputs.lambda-name }} --query 'Version' --output text)
           VERSIONED_ARN="${FUNCTION_ARN}:${VERSION}"
           echo "Registering Lambda ARN: $VERSIONED_ARN"
+
+          # Register with force to overwrite if exists
           RESPONSE=$(curl -s -w "\n%{http_code}" -u "$RESTATE_BASIC_AUTH" -X POST "$RESTATE_ADMIN_URL/deployments" \
             -H "Content-Type: application/json" \
             -d "{\"arn\": \"$VERSIONED_ARN\", \"assume_role_arn\": \"${{ secrets.AWS_INVOKE_ROLE_ARN }}\", \"force\": true}")

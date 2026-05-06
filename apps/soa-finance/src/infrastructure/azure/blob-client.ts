@@ -31,6 +31,13 @@ export function getContainerClient(): ContainerClient {
 
   logDevModeWarning(containerName);
 
+  // Azure SDK reads HTTPS_PROXY from env natively
+  console.log(
+    `[Proxy Debug] HTTPS_PROXY=${process.env.HTTPS_PROXY}`,
+    `HTTP_PROXY=${process.env.HTTP_PROXY}`,
+    `NO_PROXY=${process.env.NO_PROXY}`
+  );
+
   const blobServiceClient =
     BlobServiceClient.fromConnectionString(connectionString);
   containerClient = blobServiceClient.getContainerClient(containerName);

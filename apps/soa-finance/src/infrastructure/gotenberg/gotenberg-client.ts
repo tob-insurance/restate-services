@@ -1,3 +1,6 @@
+import { request as httpRequest, type IncomingMessage } from "node:http";
+import { request as httpsRequest } from "node:https";
+import { HttpsProxyAgent } from "https-proxy-agent";
 import { INFRASTRUCTURE_TIMEOUTS } from "../../constants";
 
 type PdfOptions = {
@@ -21,6 +24,47 @@ type PdfWithHeaderFooterOptions = PdfOptions & {
   footerHtml?: string;
 };
 
+function streamToBuffer(stream: IncomingMessage): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+    stream.on("end", () => resolve(Buffer.concat(chunks)));
+    stream.on("error", reject);
+  });
+}
+
+function buildMultipartBody(
+  parts: {
+    name: string;
+    value: string | Buffer;
+    filename?: string;
+    contentType?: string;
+  }[]
+): { body: Buffer; boundary: string } {
+  const boundary = `----Gotenberg${Math.random().toString(36).slice(2)}`;
+  const buffers: Buffer[] = [];
+
+  for (const part of parts) {
+    buffers.push(Buffer.from(`--${boundary}\r\n`));
+    buffers.push(
+      Buffer.from(`Content-Disposition: form-data; name="${part.name}"`)
+    );
+    if (part.filename) {
+      buffers.push(Buffer.from(`; filename="${part.filename}"`));
+    }
+    buffers.push(Buffer.from("\r\n"));
+    if (part.contentType) {
+      buffers.push(Buffer.from(`Content-Type: ${part.contentType}\r\n`));
+    }
+    buffers.push(Buffer.from("\r\n"));
+    buffers.push(Buffer.from(part.value));
+    buffers.push(Buffer.from("\r\n"));
+  }
+
+  buffers.push(Buffer.from(`--${boundary}--\r\n`));
+  return { body: Buffer.concat(buffers), boundary };
+}
+
 export async function generatePdfWithHeaderFooter(
   htmlContent: string,
   headerHtml: string,
@@ -41,56 +85,94 @@ export async function generatePdfWithHeaderFooter(
       scale = 1,
     } = options;
 
-    const formData = new FormData();
-
-    // Add main HTML file (body)
-    const htmlBlob = new Blob([htmlContent], { type: "text/html" });
-    formData.append("files", htmlBlob, "index.html");
-
-    // Add header HTML file
-    if (headerHtml) {
-      const headerBlob = new Blob([headerHtml], { type: "text/html" });
-      formData.append("files", headerBlob, "header.html");
-    }
-
-    // Add footer HTML file
-    if (footerHtml) {
-      const footerBlob = new Blob([footerHtml], { type: "text/html" });
-      formData.append("files", footerBlob, "footer.html");
-    }
-
-    // Add page properties
-    formData.append("marginTop", marginTop.toString());
-    formData.append("marginBottom", marginBottom.toString());
-    formData.append("marginLeft", marginLeft.toString());
-    formData.append("marginRight", marginRight.toString());
-    formData.append("paperWidth", paperWidth.toString());
-    formData.append("paperHeight", paperHeight.toString());
-    formData.append("scale", scale.toString());
+    const parts: {
+      name: string;
+      value: string | Buffer;
+      filename?: string;
+      contentType?: string;
+    }[] = [
+      {
+        name: "files",
+        value: htmlContent,
+        filename: "index.html",
+        contentType: "text/html",
+      },
+      { name: "marginTop", value: marginTop.toString() },
+      { name: "marginBottom", value: marginBottom.toString() },
+      { name: "marginLeft", value: marginLeft.toString() },
+      { name: "marginRight", value: marginRight.toString() },
+      { name: "paperWidth", value: paperWidth.toString() },
+      { name: "paperHeight", value: paperHeight.toString() },
+      { name: "scale", value: scale.toString() },
+    ];
 
     if (landscape) {
-      formData.append("landscape", "true");
+      parts.push({ name: "landscape", value: "true" });
     }
 
-    const response = await fetch(
-      `${GOTENBERG_URL}/forms/chromium/convert/html`,
-      {
-        method: "POST",
-        body: formData,
-        signal: AbortSignal.timeout(INFRASTRUCTURE_TIMEOUTS.GOTENBERG_PDF_MS),
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Gotenberg API error (${response.status}): ${errorText}`);
+    if (headerHtml) {
+      parts.push({
+        name: "files",
+        value: headerHtml,
+        filename: "header.html",
+        contentType: "text/html",
+      });
+    }
+    if (footerHtml) {
+      parts.push({
+        name: "files",
+        value: footerHtml,
+        filename: "footer.html",
+        contentType: "text/html",
+      });
     }
 
-    const arrayBuffer = await response.arrayBuffer();
-    return Buffer.from(arrayBuffer);
+    const { body, boundary } = buildMultipartBody(parts);
+
+    const url = new URL(`${GOTENBERG_URL}/forms/chromium/convert/html`);
+    const isHttps = url.protocol === "https:";
+    const requestFn = isHttps ? httpsRequest : httpRequest;
+
+    const proxyUrl = process.env.HTTPS_PROXY;
+    const agent =
+      proxyUrl && isHttps ? new HttpsProxyAgent(proxyUrl) : undefined;
+
+    const response = await new Promise<IncomingMessage>((resolve, reject) => {
+      const req = requestFn(
+        url,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": `multipart/form-data; boundary=${boundary}`,
+            "Content-Length": body.length.toString(),
+          },
+          agent,
+          timeout: INFRASTRUCTURE_TIMEOUTS.GOTENBERG_PDF_MS,
+        },
+        resolve
+      );
+
+      req.on("timeout", () => {
+        req.destroy();
+        reject(new DOMException("Request timed out", "AbortError"));
+      });
+
+      req.on("error", reject);
+      req.write(body);
+      req.end();
+    });
+
+    if (response.statusCode !== 200) {
+      const errorText = await streamToBuffer(response);
+      throw new Error(
+        `Gotenberg API error (${response.statusCode}): ${errorText.toString()}`
+      );
+    }
+
+    return await streamToBuffer(response);
   } catch (error: unknown) {
-    if (error instanceof DOMException && error.name === "TimeoutError") {
-      console.error("[Gotenberg] PDF generation timed out after 60s");
+    if (error instanceof DOMException && error.name === "AbortError") {
+      console.error("[Gotenberg] PDF generation timed out");
       throw new Error("PDF generation timed out after 60 seconds");
     }
 

@@ -1,8 +1,3 @@
-/**
- * Microsoft Graph API Client
- * Singleton for email sending via Microsoft 365
- */
-
 import { ClientSecretCredential } from "@azure/identity";
 import { Client } from "@microsoft/microsoft-graph-client";
 import { TokenCredentialAuthenticationProvider } from "@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials";

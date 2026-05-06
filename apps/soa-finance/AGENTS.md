@@ -67,24 +67,32 @@ src/
 ## Environment Variables
 
 ```env
-# Oracle Database
-ORACLE_URL=oracle://your_oracle_user:your_oracle_password@localhost:1521/ORCL
+# Application Environment
+APP_ENV=development                              # development | production
+NODE_ENV=development
 
-# Microsoft Graph (for email)
+# Oracle Database
+ORACLE_URL=oracle://user:password@host:1521/ORCL
+
+# Microsoft Graph (email sending)
 AZURE_TENANT_ID=your-tenant-id
 AZURE_CLIENT_ID=your-client-id
 AZURE_CLIENT_SECRET=your-client-secret
+AZURE_SHARED_MAILBOX=shared@tob-ins.com
+AZURE_INITIATOR_EMAIL=initiator@tob-ins.com
 
-# Email sender (optional, has fallback)
-SENDER_EMAIL=sender@example.com
+# Gotenberg PDF Lambda
+GOTENBERG_URL=https://xxxx.lambda-url.ap-southeast-3.on.aws
 
-# AWS Lambda detection (auto-detected via AWS_LAMBDA_FUNCTION_NAME)
+# S3 Storage (via Gateway Endpoint)
+S3_BUCKET=soa-finance-xxxxxxxx
+S3_PIPELINE_PREFIX=parquet
 
-# Azure Storage
-AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=https;AccountName=...
-AZURE_STORAGE_CONTAINER_NAME=soa-documents
-AZURE_STORAGE_SOA_PREFIX=soa/
+# Squid Proxy for external HTTPS
+HTTPS_PROXY=http://172.31.0.x:3128
 
-# Optional: Oracle Instant Client library path (only needed on Windows/macOS)
-ORACLE_LIB_DIR=/path/to/instantclient
+# Test email recipient (dev only)
+TEST_EMAIL_RECIPIENT=you@tob-ins.com
 ```
+
+> Full deployment guide: [`docs/deployment.md`](docs/deployment.md)

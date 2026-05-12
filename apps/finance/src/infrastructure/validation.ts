@@ -11,7 +11,3 @@ export const UserIdSchema = z.string().regex(/^[a-zA-Z0-9_]+$/, {
 export const UuidSchema = z.uuid({
   message: "Invalid UUID format",
 });
-
-export const JobNameSchema = z.string().regex(/^[A-Z0-9_]+$/, {
-  message: "Invalid job name format",
-});

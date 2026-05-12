@@ -1,5 +1,4 @@
 import {
-  type Duration,
   TerminalError,
   type WorkflowContext,
   type WorkflowSharedContext,
@@ -7,45 +6,32 @@ import {
 } from "@restatedev/restate-sdk";
 import { DateTime } from "luxon";
 import { z } from "zod";
-import { DEFAULT_USER_ID, GENIUS_JOB_CONFIG } from "../../../constants.js";
+import { DEFAULT_USER_ID } from "../../../constants.js";
 import {
   calculateFinancialMetrics,
   type FinancialMetricsResult,
   getCalculationRunStatus,
 } from "../../financial-metrics/index.js";
 import { syncTrialBalanceFromGeniusAndCalculateMetrics } from "../../trial-balance-sync/index.js";
-import {
-  checkGeniusClosingJobStatus,
-  submitGeniusClosingJob,
-} from "../services/index.js";
+import { submitGeniusClosingJob } from "../services/index.js";
 
 type WorkflowState = {
   currentStep:
     | "idle"
-    | "oracle-closing"
+    | "genius-closing"
     | "sync-trial-balance"
     | "financial-metrics"
     | "completed"
     | "failed";
-  oracleJobName?: string;
+  geniusJobName?: string;
   metricsRunId?: string;
   stepStartTime?: string;
   lastUpdate: string;
 };
 
-const getGeniusJobDurations = (): {
-  initialDelay: Duration;
-  pollInterval: Duration;
-  maxPollAttempts: number;
-} => ({
-  initialDelay: { hours: GENIUS_JOB_CONFIG.initialDelayHours },
-  pollInterval: { hours: GENIUS_JOB_CONFIG.pollIntervalHours },
-  maxPollAttempts: GENIUS_JOB_CONFIG.maxPollAttempts,
-});
-
 export const DailyClosingInput = z.object({
   date: z.string(),
-  skipOracleClosing: z.boolean().optional().default(false),
+  skipGeniusClosing: z.boolean().optional().default(false),
   skipFinancialMetrics: z.boolean().optional().default(false),
   userId: z.string().optional(),
 });
@@ -53,7 +39,7 @@ export const DailyClosingInput = z.object({
 export const DailyClosingResult = z.object({
   workflowId: z.string(),
   date: z.string(),
-  oracleClosing: z
+  geniusClosing: z
     .object({
       success: z.boolean(),
       startTime: z.string(),
@@ -96,7 +82,7 @@ function formatStepResult(result: StepResult | undefined) {
   };
 }
 
-type OracleStepResult = {
+type GeniusStepResult = {
   success: boolean;
   startTime: DateTime;
   endTime: DateTime;
@@ -105,28 +91,25 @@ type OracleStepResult = {
   jobName?: string;
 };
 
-async function executeOracleStep(
+async function executeGeniusStep(
   ctx: WorkflowContext,
   closingDate: string,
   userId: string,
   skip: boolean
-): Promise<OracleStepResult | undefined> {
+): Promise<GeniusStepResult | undefined> {
   if (skip) {
-    ctx.console.log("⏭️  Skipping Genius closing (skipOracleClosing=true)");
+    ctx.console.log("⏭️  Skipping Genius closing (skipGeniusClosing=true)");
     return;
   }
 
-  const jobConfig = getGeniusJobDurations();
   const currentTime = await ctx.date.now();
   const startTime = DateTime.fromMillis(currentTime);
 
-  ctx.console.log("⏳ Step 1: Submitting Genius closing job...");
-  ctx.console.log(
-    `   Initial delay: ${GENIUS_JOB_CONFIG.initialDelayHours}h, Poll interval: ${GENIUS_JOB_CONFIG.pollIntervalHours}h`
-  );
-
-  const job = await ctx.run("submit-genius-job", async () =>
-    submitGeniusClosingJob(closingDate, userId, currentTime)
+  ctx.console.log("⏳ Step 1: Running Genius closing procedure...");
+  const job = await ctx.run(
+    "submit-genius-job",
+    async () => submitGeniusClosingJob(closingDate, userId, currentTime),
+    { maxRetryAttempts: 1 }
   );
 
   if (!job.submitted) {
@@ -135,86 +118,25 @@ async function executeOracleStep(
     );
   }
 
-  ctx.console.log(`✅ Job ${job.jobName} submitted successfully`);
-
-  const initialStatus = await ctx.run("verify-job-started", async () =>
-    checkGeniusClosingJobStatus(job.jobName)
-  );
-
-  if (!(initialStatus.running || initialStatus.completed)) {
-    throw new TerminalError(
-      `Job ${job.jobName} not found in scheduler after submission. Status: ${initialStatus.status}`,
-      { errorCode: 500 }
-    );
-  }
+  const endTime = DateTime.fromMillis(await ctx.date.now());
+  const duration = endTime.diff(startTime, "seconds").seconds;
 
   ctx.console.log(
-    `✅ Verified job ${job.jobName} is running (status: ${initialStatus.status})`
-  );
-  ctx.console.log(
-    `⏸️  Waiting ${GENIUS_JOB_CONFIG.initialDelayHours} hours before first status check...`
+    `✅ Genius closing ${job.jobName} finished in ${Math.round(duration / 3600)}h`
   );
 
-  await ctx.sleep(jobConfig.initialDelay);
-
-  for (let attempt = 0; attempt < jobConfig.maxPollAttempts; attempt++) {
-    ctx.console.log(
-      `🔍 Checking job status (attempt ${attempt + 1}/${
-        jobConfig.maxPollAttempts
-      })...`
-    );
-
-    const status = await ctx.run(`check-job-status-${attempt}`, async () =>
-      checkGeniusClosingJobStatus(job.jobName)
-    );
-
-    if (status.completed) {
-      const endTime = DateTime.fromMillis(await ctx.date.now());
-      const duration = endTime.diff(startTime, "seconds").seconds;
-
-      ctx.console.log(
-        `✅ Genius closing completed in ${Math.round(duration / 3600)}h`
-      );
-
-      return {
-        success: true,
-        startTime,
-        endTime,
-        duration,
-        message: status.message,
-        jobName: job.jobName,
-      };
-    }
-
-    if (status.failed) {
-      throw new TerminalError(`Genius closing job failed: ${status.message}`, {
-        errorCode: 500,
-      });
-    }
-
-    if (attempt < jobConfig.maxPollAttempts - 1) {
-      ctx.console.log(
-        `⏸️  Job still running. Sleeping for ${GENIUS_JOB_CONFIG.pollIntervalHours} hour(s)...`
-      );
-      await ctx.sleep(jobConfig.pollInterval);
-    }
-  }
-
-  const initialDelayMinutes = GENIUS_JOB_CONFIG.initialDelayHours * 60;
-  const pollIntervalMinutes = GENIUS_JOB_CONFIG.pollIntervalHours * 60;
-
-  const totalMinutes =
-    initialDelayMinutes + jobConfig.maxPollAttempts * pollIntervalMinutes;
-  const totalHours = (totalMinutes / 60).toFixed(2);
-
-  throw new TerminalError(
-    `Genius closing job timed out after ${totalMinutes} minutes (${totalHours} hours). Job: ${job.jobName}`,
-    { errorCode: 504 }
-  );
+  return {
+    success: true,
+    startTime,
+    endTime,
+    duration,
+    message: job.message,
+    jobName: job.jobName,
+  };
 }
 
 /**
- * Step 2: Sync trial balance from Genius (Oracle) to PostgreSQL.
+ * Step 2: Sync trial balance from Genius PostgreSQL to financial report PostgreSQL.
  * This ensures the financial metrics calculation uses the latest data from Genius.
  */
 async function executeSyncTrialBalanceStep(
@@ -229,9 +151,7 @@ async function executeSyncTrialBalanceStep(
     return true;
   }
 
-  ctx.console.log(
-    "🔄 Step 2: Syncing trial balance from Genius to PostgreSQL..."
-  );
+  ctx.console.log("🔄 Step 2: Syncing trial balance from Genius PostgreSQL...");
 
   const currentTime = await ctx.date.now();
 
@@ -329,7 +249,7 @@ async function updateWorkflowState(
   });
 }
 
-async function processOracleStep(
+async function processGeniusStep(
   ctx: WorkflowContext,
   params: {
     closingDate: string;
@@ -341,17 +261,17 @@ async function processOracleStep(
 
   if (!skip) {
     await updateWorkflowState(ctx, {
-      currentStep: "oracle-closing",
+      currentStep: "genius-closing",
       stepStartTime: DateTime.fromMillis(await ctx.date.now()).toISO() ?? "",
     });
   }
 
-  const result = await executeOracleStep(ctx, closingDate, userId, skip);
+  const result = await executeGeniusStep(ctx, closingDate, userId, skip);
 
   if (result?.jobName) {
     await updateWorkflowState(ctx, {
-      currentStep: "oracle-closing",
-      oracleJobName: result.jobName,
+      currentStep: "genius-closing",
+      geniusJobName: result.jobName,
       stepStartTime: result.startTime.toISO() ?? "",
     });
   }
@@ -364,15 +284,15 @@ async function processSyncTrialBalanceStep(
   params: {
     closingDate: string;
     skip: boolean;
-    oracleJobName?: string;
+    geniusJobName?: string;
   }
 ) {
-  const { closingDate, skip, oracleJobName } = params;
+  const { closingDate, skip, geniusJobName } = params;
 
   if (!skip) {
     await updateWorkflowState(ctx, {
       currentStep: "sync-trial-balance",
-      oracleJobName,
+      geniusJobName,
       stepStartTime: DateTime.fromMillis(await ctx.date.now()).toISO() ?? "",
     });
   }
@@ -391,15 +311,15 @@ async function processFinancialMetricsStep(
   params: {
     closingDate: string;
     skip: boolean;
-    oracleJobName?: string;
+    geniusJobName?: string;
   }
 ) {
-  const { closingDate, skip, oracleJobName } = params;
+  const { closingDate, skip, geniusJobName } = params;
 
   if (!skip) {
     await updateWorkflowState(ctx, {
       currentStep: "financial-metrics",
-      oracleJobName,
+      geniusJobName,
       stepStartTime: DateTime.fromMillis(await ctx.date.now()).toISO() ?? "",
     });
   }
@@ -409,7 +329,7 @@ async function processFinancialMetricsStep(
   if (result?.runId) {
     await updateWorkflowState(ctx, {
       currentStep: "financial-metrics",
-      oracleJobName,
+      geniusJobName,
       metricsRunId: result.runId,
       stepStartTime: result.startTime.toISO() ?? "",
     });
@@ -421,14 +341,23 @@ async function processFinancialMetricsStep(
 export const dailyClosingWorkflow = workflow({
   name: "DailyClosing",
   options: {
+    // The Genius CALL inside ctx.run runs synchronously for up to ~6h.
+    // inactivityTimeout must be > the worst-case CALL duration, otherwise
+    // Restate considers the invocation hung and tears the stream down.
     abortTimeout: { hours: 13 },
-    inactivityTimeout: { hours: 2 },
+    inactivityTimeout: { hours: 8 },
     workflowRetention: { days: 7 },
     journalRetention: { days: 30 },
+    // Handler-level retry policy applies to side effects (`ctx.run`) that
+    // do NOT specify their own RunOptions. The Genius CALL pins its own
+    // policy explicitly with maxRetryAttempts: 1 (see executeGeniusStep);
+    // the values here only govern the lighter-weight idempotent side
+    // effects (sync, metrics, status reads) which can safely retry a few
+    // times before killing the invocation.
     retryPolicy: {
       initialInterval: { seconds: 5 },
       maxInterval: { seconds: 60 },
-      maxAttempts: 3,
+      maxAttempts: 5,
       onMaxAttempts: "kill",
     },
   },
@@ -441,7 +370,7 @@ export const dailyClosingWorkflow = workflow({
       const workflowStartTime = DateTime.fromMillis(await ctx.date.now());
 
       const closingDate = input?.date || workflowId;
-      const skipOracleClosing = input?.skipOracleClosing ?? false;
+      const skipGeniusClosing = input?.skipGeniusClosing ?? false;
       const skipFinancialMetrics = input?.skipFinancialMetrics ?? false;
       const userId = input?.userId || DEFAULT_USER_ID;
 
@@ -451,26 +380,26 @@ export const dailyClosingWorkflow = workflow({
 
       await updateWorkflowState(ctx, { currentStep: "idle" });
 
-      let oracleResult: OracleStepResult | undefined;
+      let geniusResult: GeniusStepResult | undefined;
       let financialMetricsResult: FinancialMetricsResult | undefined;
 
       try {
-        oracleResult = await processOracleStep(ctx, {
+        geniusResult = await processGeniusStep(ctx, {
           closingDate,
           userId,
-          skip: skipOracleClosing,
+          skip: skipGeniusClosing,
         });
 
         await processSyncTrialBalanceStep(ctx, {
           closingDate,
           skip: skipFinancialMetrics,
-          oracleJobName: oracleResult?.jobName,
+          geniusJobName: geniusResult?.jobName,
         });
 
         financialMetricsResult = await processFinancialMetricsStep(ctx, {
           closingDate,
           skip: skipFinancialMetrics,
-          oracleJobName: oracleResult?.jobName,
+          geniusJobName: geniusResult?.jobName,
         });
 
         const totalDuration = DateTime.fromMillis(await ctx.date.now()).diff(
@@ -480,7 +409,7 @@ export const dailyClosingWorkflow = workflow({
 
         await updateWorkflowState(ctx, {
           currentStep: "completed",
-          oracleJobName: oracleResult?.jobName,
+          geniusJobName: geniusResult?.jobName,
           metricsRunId: financialMetricsResult?.runId,
         });
 
@@ -491,7 +420,7 @@ export const dailyClosingWorkflow = workflow({
         return {
           workflowId,
           date: closingDate,
-          oracleClosing: formatStepResult(oracleResult),
+          geniusClosing: formatStepResult(geniusResult),
           financialMetrics: formatStepResult(financialMetricsResult),
           overallSuccess: true,
           totalDuration,
@@ -499,7 +428,7 @@ export const dailyClosingWorkflow = workflow({
       } catch (error) {
         await updateWorkflowState(ctx, {
           currentStep: "failed",
-          oracleJobName: oracleResult?.jobName,
+          geniusJobName: geniusResult?.jobName,
           metricsRunId: financialMetricsResult?.runId,
         });
 
@@ -545,7 +474,7 @@ export const dailyClosingWorkflow = workflow({
       return {
         workflowId: ctx.key,
         currentStep: state.currentStep,
-        oracleJobName: state.oracleJobName,
+        geniusJobName: state.geniusJobName,
         metricsRunId: state.metricsRunId,
         metricsProgress,
         stepStartTime: state.stepStartTime,

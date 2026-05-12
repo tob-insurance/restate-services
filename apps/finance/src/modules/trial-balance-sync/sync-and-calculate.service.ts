@@ -5,13 +5,12 @@ import {
 } from "./sync.service.js";
 
 /**
- * Syncs trial balance from Genius (Oracle) to PostgreSQL.
+ * Syncs trial balance from Genius PostgreSQL to financial report PostgreSQL.
  * This is the primary function called by the daily closing workflow.
  *
- * Flow: Genius Closing (Oracle) => Sync Trial Balance (Oracle -> PostgreSQL) => Calculate Financial Metrics (PostgreSQL)
+ * Flow: Genius Closing (PostgreSQL) => Sync Trial Balance (Genius PG -> Financial Report PG) => Calculate Financial Metrics (PostgreSQL)
  *
  * @param reportDate - The report date in ISO format (YYYY-MM-DD)
- * @param oracleClient - The Oracle client instance to use for connecting to Genius
  * @param currentTimeMillis - Optional current time in milliseconds for deterministic replay
  */
 export async function syncTrialBalanceFromGeniusAndCalculateMetrics(

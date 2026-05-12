@@ -1,11 +1,10 @@
-import { createOracleClient, type OracleClient } from "@restate-tob/oracle";
 import {
   createPostgresClient,
   type PostgresClient,
 } from "@restate-tob/postgres";
 
 let postgresClient: PostgresClient | null = null;
-let oracleClient: OracleClient | null = null;
+let geniusClient: PostgresClient | null = null;
 
 export function getPostgresClient(): PostgresClient {
   if (!postgresClient) {
@@ -18,46 +17,44 @@ export function getPostgresClient(): PostgresClient {
   return postgresClient;
 }
 
-export function getOracleClient(): OracleClient {
-  if (!oracleClient) {
-    const connectionString = process.env.ORACLE_URL;
+export function getGeniusClient(): PostgresClient {
+  if (!geniusClient) {
+    const connectionString = process.env.GENIUS_URL;
     if (!connectionString) {
-      throw new Error("ORACLE_URL environment variable is required");
+      throw new Error("GENIUS_URL environment variable is required");
     }
-
-    // Parse oracle://user:password@host:port/service
-    const url = new URL(connectionString);
-    oracleClient = createOracleClient({
-      user: decodeURIComponent(url.username),
-      password: decodeURIComponent(url.password),
-      connectString: `${url.hostname}:${url.port || "1521"}${url.pathname}`,
-      instantClientPath: process.env.ORACLE_INSTANT_CLIENT_PATH,
+    const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+    geniusClient = createPostgresClient({
+      connectionString,
+      ssl: { rejectUnauthorized: false },
+      query_timeout: SIX_HOURS_MS,
+      statement_timeout: SIX_HOURS_MS,
     });
   }
-  return oracleClient;
+  return geniusClient;
 }
 
 /**
- * Initializes the Oracle connection pool.
+ * Initializes the Genius PostgreSQL connection pool.
  * Call this at module load time to warm up the connection pool on Lambda cold start.
  */
-export function initOracleClient(): void {
-  getOracleClient();
+export function initGeniusClient(): void {
+  getGeniusClient();
 }
 
 export async function testConnections(): Promise<{
   postgres: boolean;
-  oracle: boolean;
+  genius: boolean;
 }> {
-  const [postgres, oracle] = await Promise.all([
+  const [postgres, genius] = await Promise.all([
     getPostgresClient().testConnection(),
-    getOracleClient().testConnection(),
+    getGeniusClient().testConnection(),
   ]);
-  return { postgres, oracle };
+  return { postgres, genius };
 }
 
 export async function closeConnections(): Promise<void> {
-  await Promise.all([postgresClient?.close(), oracleClient?.close()]);
+  await Promise.all([postgresClient?.close(), geniusClient?.close()]);
   postgresClient = null;
-  oracleClient = null;
+  geniusClient = null;
 }

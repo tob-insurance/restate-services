@@ -1,16 +1,15 @@
-import { withConnection } from "@restate-tob/oracle";
+import { withConnection } from "@restate-tob/postgres";
 import { parseDateParts } from "@restate-tob/shared";
 import { TerminalError } from "@restatedev/restate-sdk";
 import { DateTime } from "luxon";
-import { OUT_FORMAT_OBJECT } from "oracledb";
+import type { PoolClient } from "pg";
 import { z } from "zod";
 import {
   DateStringSchema,
-  getOracleClient,
-  JobNameSchema,
+  getGeniusClient,
   UserIdSchema,
 } from "../../../infrastructure/index.js";
-import type { GeniusClosingJobSubmit, GeniusJobStatus } from "../types.js";
+import type { GeniusClosingJobSubmit } from "../types.js";
 
 const SubmitJobInputSchema = z.object({
   closingDate: DateStringSchema,
@@ -18,78 +17,31 @@ const SubmitJobInputSchema = z.object({
   currentTimeMillis: z.number().optional(),
 });
 
+const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * Synchronously runs the `get_master_data` stored procedure on the Genius
+ * PostgreSQL database (GENIUS_URL). Resolves once the procedure returns;
+ * throws on procedure-reported failure.
+ *
+ * Failure semantics: every error that surfaces *after* the CALL has been
+ * issued is rethrown as a TerminalError. Re-running this 6-hour procedure
+ * is unsafe (the server-side execution may still be in flight after a
+ * client-socket drop, so a retry would race a duplicate run against the
+ * original). Operators must investigate and rerun manually.
+ */
 export async function submitGeniusClosingJob(
   closingDate: string,
   userId = "adm",
   currentTimeMillis?: number
 ): Promise<GeniusClosingJobSubmit> {
-  const validated = SubmitJobInputSchema.parse({
-    closingDate,
-    userId,
-    currentTimeMillis,
-  });
-
-  const startTime = validated.currentTimeMillis
-    ? DateTime.fromMillis(validated.currentTimeMillis)
-    : DateTime.now();
-
+  let validated: z.infer<typeof SubmitJobInputSchema>;
   try {
-    const { year, month } = parseDateParts(validated.closingDate);
-    const shortYear = String(year).slice(-2);
-    const uniqueSuffix = startTime.toMillis().toString(36).toUpperCase();
-    const jobName = `GNS_${shortYear}${month}_${uniqueSuffix}`;
-
-    console.log(`🚀 Submitting Genius closing job: ${jobName}`);
-    console.log(
-      `   Year: ${year}, Month: ${month}, UserId: ${validated.userId}`
-    );
-
-    await withConnection(getOracleClient(), async (connection) => {
-      const escapeOracleString = (value: string): string =>
-        value.replace(/'/g, "''");
-
-      const safeYear = escapeOracleString(String(year));
-      const safeMonth = escapeOracleString(String(month));
-      const safeUserId = escapeOracleString(validated.userId);
-
-      const plsqlBlock = `DECLARE
-  l_out_1 VARCHAR2(4000);
-  l_out_2 VARCHAR2(4000);
-BEGIN
-  Package_Rpt_Ac_Fi806.get_master_data('${safeYear}', '${safeMonth}', '${safeMonth}', '${safeUserId}', l_out_1, l_out_2);
-END;`;
-
-      await connection.execute(
-        `BEGIN
-           DBMS_SCHEDULER.CREATE_JOB (
-             job_name   => :jobName,
-             job_type   => 'PLSQL_BLOCK',
-             job_action => :jobAction,
-             enabled    => TRUE
-           );
-         END;`,
-        {
-          jobName,
-          jobAction: plsqlBlock,
-        },
-        { autoCommit: true }
-      );
+    validated = SubmitJobInputSchema.parse({
+      closingDate,
+      userId,
+      currentTimeMillis,
     });
-
-    console.log(
-      `✅ Job ${jobName} submitted successfully (running in background)`
-    );
-    console.log(
-      `   Use checkGeniusClosingJobStatus('${jobName}') to check progress`
-    );
-
-    return {
-      submitted: true,
-      jobName,
-      message:
-        "Job submitted successfully. It will run in background for up to 6 hours.",
-      startTime,
-    };
   } catch (error) {
     if (error instanceof z.ZodError) {
       throw new TerminalError(
@@ -99,75 +51,113 @@ END;`;
     }
     throw error;
   }
-}
 
-export async function checkGeniusClosingJobStatus(
-  jobName: string
-): Promise<GeniusJobStatus> {
+  const startTime = validated.currentTimeMillis
+    ? DateTime.fromMillis(validated.currentTimeMillis)
+    : DateTime.now();
+
+  const { year, month } = parseDateParts(validated.closingDate);
+  const shortYear = String(year).slice(-2);
+  const uniqueSuffix = startTime.toMillis().toString(36).toUpperCase();
+  const jobName = `GNS_${shortYear}${month}_${uniqueSuffix}`;
+
+  console.log(`🚀 Submitting Genius closing job: ${jobName}`);
+  console.log(`   Year: ${year}, Month: ${month}, UserId: ${validated.userId}`);
+
+  let callIssued = false;
   try {
-    const validated = JobNameSchema.parse(jobName);
+    await withConnection(getGeniusClient(), async (client: PoolClient) => {
+      // Extend timeout for this long-running procedure (up to 6 hours).
+      // The procedure calls multiple sub-procedures (fi801–fi809) with heavy data processing.
+      await client.query(`SET statement_timeout = ${SIX_HOURS_MS}`);
 
-    return await withConnection(getOracleClient(), async (connection) => {
-      const result = await connection.execute(
-        `SELECT state, failure_count,
-                TO_CHAR(last_start_date, 'YYYY-MM-DD HH24:MI:SS') as last_start,
-                TO_CHAR(last_run_duration, 'HH24:MI:SS') as duration
-         FROM user_scheduler_jobs
-         WHERE job_name = :jobName`,
-        { jobName: validated },
-        { outFormat: OUT_FORMAT_OBJECT }
-      );
+      // Set aggressive server-side TCP keepalive to prevent network/firewall
+      // devices from dropping the connection during the long-running procedure.
+      // Without this, firewalls may consider the connection "idle" (no data transfer)
+      // even though there's an active query, and terminate it.
+      await client.query("SET tcp_keepalives_idle = 10"); // seconds before first probe
+      await client.query("SET tcp_keepalives_interval = 10"); // seconds between probes
+      await client.query("SET tcp_keepalives_count = 6"); // max failed probes
 
-      if (!result.rows || result.rows.length === 0) {
-        return {
-          status: "NOT_FOUND",
-          running: false,
-          completed: true,
-          failed: false,
-          message: `Job ${validated} not found. It likely completed successfully and was cleaned up by the scheduler.`,
-        };
+      // Also set client-side socket keepalive for bidirectional protection.
+      const stream = (
+        client as unknown as {
+          connection?: {
+            stream?: {
+              setKeepAlive?: (enable: boolean, delay: number) => void;
+            };
+          };
+        }
+      ).connection?.stream;
+      if (stream?.setKeepAlive) {
+        stream.setKeepAlive(true, 10_000); // 10-second keepalive interval
       }
 
-      const row = result.rows[0] as {
-        STATE: string;
-        FAILURE_COUNT: number;
-        LAST_START: string;
-        DURATION: string;
-      };
-      const state = row.STATE;
-      const failureCount = row.FAILURE_COUNT;
-      const lastStart = row.LAST_START;
-      const duration = row.DURATION;
+      try {
+        // Past this point the procedure has begun executing on Genius;
+        // any error must be treated as terminal (see function header).
+        callIssued = true;
 
-      const running = state === "RUNNING";
-      const completed = state === "SUCCEEDED" || state === "COMPLETED";
-      const failed = state === "FAILED" || failureCount > 0;
+        // Call the get_master_data procedure on Genius PostgreSQL.
+        // PROCEDURE with INOUT params: (year, month_from, month_to, user_id, OUT status, OUT error_message)
+        const result = await client.query(
+          "CALL acpdb.package_rpt_ac_fi806__get_master_data($1, $2, $3, $4, $5, $6)",
+          [
+            String(year),
+            String(month),
+            String(month),
+            validated.userId,
+            null, // p_status (INOUT - will be populated by the procedure)
+            null, // p_error_message (INOUT - will be populated by the procedure)
+          ]
+        );
 
-      let message = `Job ${validated}: ${state}`;
-      if (lastStart) {
-        message += ` (started: ${lastStart})`;
+        // Check procedure result status
+        const row = result.rows?.[0];
+        if (row) {
+          const status = row.p_status;
+          const errorMessage = row.p_error_message;
+          if (status === "0") {
+            throw new TerminalError(
+              `Genius closing procedure reported failure: ${errorMessage || "Unknown error"}`,
+              { errorCode: 500 }
+            );
+          }
+          console.log(
+            `   Procedure status: ${status}, message: ${errorMessage}`
+          );
+        }
+      } finally {
+        try {
+          await client.query("RESET statement_timeout");
+        } catch (resetErr) {
+          console.warn(
+            "RESET statement_timeout failed (connection likely dropped):",
+            resetErr instanceof Error ? resetErr.message : resetErr
+          );
+        }
       }
-      if (duration) {
-        message += ` (duration: ${duration})`;
-      }
-      if (failureCount) {
-        message += ` [Failures: ${failureCount}]`;
-      }
-
-      return {
-        status: state,
-        running,
-        completed,
-        failed,
-        message,
-      };
     });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new TerminalError(`Invalid job name: ${jobName}`, {
-        errorCode: 400,
-      });
+    if (error instanceof TerminalError) {
+      throw error;
+    }
+    if (callIssued) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new TerminalError(
+        `Genius closing job ${jobName} failed mid-execution and cannot be retried automatically (manual investigation required): ${message}`,
+        { errorCode: 500 }
+      );
     }
     throw error;
   }
+
+  console.log(`✅ Job ${jobName} completed successfully`);
+
+  return {
+    submitted: true,
+    jobName,
+    message: "Job completed successfully via direct PostgreSQL function call.",
+    startTime,
+  };
 }

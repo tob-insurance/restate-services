@@ -1,4 +1,4 @@
-import "varlock/auto-load";
+import "dotenv/config";
 import { serve } from "@restatedev/restate-sdk";
 import { testConnections } from "./infrastructure/database.js";
 import {
@@ -6,14 +6,14 @@ import {
   dailyClosingWorkflow,
 } from "./modules/closing/index.js";
 
-testConnections().then(({ postgres, oracle }) => {
+testConnections().then(({ postgres, genius }) => {
   if (!postgres) {
     console.error(
       "⚠️  PostgreSQL connection failed, but server will continue..."
     );
   }
-  if (!oracle) {
-    console.error("⚠️  Oracle connection failed, but server will continue...");
+  if (!genius) {
+    console.error("⚠️  genius connection failed, but server will continue...");
   }
 
   serve({

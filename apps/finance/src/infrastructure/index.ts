@@ -1,5 +1,6 @@
 export {
   closeConnections,
+  getGeniusClient,
   getPostgresClient,
   initPostgresClient,
   testConnections,

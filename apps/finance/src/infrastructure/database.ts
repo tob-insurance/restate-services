@@ -5,6 +5,7 @@ import {
 import type { PoolConfig } from "pg";
 
 let postgresClient: PostgresClient | null = null;
+let geniusClient: PostgresClient | null = null;
 
 type ParsedConnection = PoolConfig & { schema?: string };
 
@@ -66,27 +67,49 @@ export function getPostgresClient(): PostgresClient {
     postgresClient = createPostgresClient({
       ...parseConnection(raw),
       ssl: { rejectUnauthorized: false },
-      // Sized for the longest legitimate query on this pool (Genius closing
-      // procedure, up to 6h). Short queries finish in ms and never approach it.
-      query_timeout: SIX_HOURS_MS,
     });
   }
   return postgresClient;
 }
 
+export function getGeniusClient(): PostgresClient {
+  if (!geniusClient) {
+    const raw = process.env.GENIUS_URL;
+    if (!raw) {
+      throw new Error("GENIUS_URL environment variable is required");
+    }
+    geniusClient = createPostgresClient({
+      ...parseConnection(raw),
+      ssl: { rejectUnauthorized: false },
+      // Sized for the longest legitimate query on this pool (Genius closing
+      // procedure, up to 6h). Short queries finish in ms and never approach it.
+      query_timeout: SIX_HOURS_MS,
+    });
+  }
+  return geniusClient;
+}
+
 /**
- * Warms up the PostgreSQL connection pool on Lambda cold start.
+ * Warms up the PostgreSQL connection pools on Lambda cold start.
  */
 export function initPostgresClient(): void {
   getPostgresClient();
+  getGeniusClient();
 }
 
-export async function testConnections(): Promise<{ postgres: boolean }> {
-  const postgres = await getPostgresClient().testConnection();
-  return { postgres };
+export async function testConnections(): Promise<{
+  postgres: boolean;
+  genius: boolean;
+}> {
+  const [postgres, genius] = await Promise.all([
+    getPostgresClient().testConnection(),
+    getGeniusClient().testConnection(),
+  ]);
+  return { postgres, genius };
 }
 
 export async function closeConnections(): Promise<void> {
-  await postgresClient?.close();
+  await Promise.all([postgresClient?.close(), geniusClient?.close()]);
   postgresClient = null;
+  geniusClient = null;
 }

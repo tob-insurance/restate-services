@@ -18,18 +18,6 @@ const SubmitJobInputSchema = z.object({
 });
 
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
-
-/**
- * Synchronously runs the `get_master_data` stored procedure on the shared
- * PostgreSQL database (POSTGRES_URL). Resolves once the procedure returns;
- * throws on procedure-reported failure.
- *
- * Failure semantics: every error that surfaces *after* the CALL has been
- * issued is rethrown as a TerminalError. Re-running this 6-hour procedure
- * is unsafe (the server-side execution may still be in flight after a
- * client-socket drop, so a retry would race a duplicate run against the
- * original). Operators must investigate and rerun manually.
- */
 export async function submitGeniusClosingJob(
   closingDate: string,
   userId = "adm",
@@ -69,36 +57,13 @@ export async function submitGeniusClosingJob(
     await withConnection(getPostgresClient(), async (client: PoolClient) => {
       await client.query("SET search_path TO acpdb");
       await client.query(`SET statement_timeout = ${SIX_HOURS_MS}`);
-
-      // Set aggressive server-side TCP keepalive to prevent network/firewall
-      // devices from dropping the connection during the long-running procedure.
-      // Without this, firewalls may consider the connection "idle" (no data transfer)
-      // even though there's an active query, and terminate it.
-      await client.query("SET tcp_keepalives_idle = 10"); // seconds before first probe
-      await client.query("SET tcp_keepalives_interval = 10"); // seconds between probes
-      await client.query("SET tcp_keepalives_count = 6"); // max failed probes
-
-      // Also set client-side socket keepalive for bidirectional protection.
-      const stream = (
-        client as unknown as {
-          connection?: {
-            stream?: {
-              setKeepAlive?: (enable: boolean, delay: number) => void;
-            };
-          };
-        }
-      ).connection?.stream;
-      if (stream?.setKeepAlive) {
-        stream.setKeepAlive(true, 10_000); // 10-second keepalive interval
-      }
+      await client.query("SET tcp_keepalives_idle = 10");
+      await client.query("SET tcp_keepalives_interval = 10");
+      await client.query("SET tcp_keepalives_count = 6");
 
       try {
-        // Past this point the procedure has begun executing on Genius;
-        // any error must be treated as terminal (see function header).
         callIssued = true;
 
-        // Call the get_master_data procedure on Genius PostgreSQL.
-        // PROCEDURE with INOUT params: (year, month_from, month_to, user_id, OUT status, OUT error_message)
         const result = await client.query(
           "CALL acpdb.package_rpt_ac_fi806__get_master_data($1, $2, $3, $4, $5, $6)",
           [

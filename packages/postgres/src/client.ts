@@ -10,9 +10,6 @@ export async function withConnection<T>(
   const poolClient = await client.pool.connect();
   let connectionError: Error | null = null;
 
-  // Attach an error handler on the active client to prevent unhandled
-  // 'error' events from crashing the Node.js process when the connection
-  // drops mid-query (e.g. network timeout to remote RDS).
   const onError = (err: Error) => {
     connectionError = err;
     console.error("PostgreSQL connection error during operation:", err.message);
@@ -33,8 +30,6 @@ export async function withConnection<T>(
     throw err;
   } finally {
     poolClient.removeListener("error", onError);
-    // If a connection error occurred, release with truthy arg to destroy
-    // the broken client instead of returning it to the pool.
     const captured = connectionError as Error | null;
     poolClient.release(captured ?? undefined);
   }
@@ -63,10 +58,6 @@ export function createPostgresClient(config: PostgresConfig): PostgresClient {
     connectionTimeoutMillis: 10_000,
     statement_timeout: 300_000,
     query_timeout: 300_000,
-    // Keep TCP connections alive to prevent network/firewall timeouts,
-    // especially important for long-running stored procedures on remote RDS.
-    keepAlive: true,
-    keepAliveInitialDelayMillis: 10_000,
     ...poolConfig,
   });
 

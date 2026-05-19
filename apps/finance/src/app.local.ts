@@ -1,12 +1,12 @@
 import "dotenv/config";
 import { serve } from "@restatedev/restate-sdk";
-import { testConnections } from "./infrastructure/database.js";
+import { testConnection } from "./infrastructure/database.js";
 import {
   DailyClosingScheduler,
   dailyClosingWorkflow,
 } from "./modules/closing/index.js";
 
-testConnections().then(({ postgres }) => {
+testConnection().then((postgres) => {
   if (!postgres) {
     console.error(
       "⚠️  PostgreSQL connection failed, but server will continue..."

@@ -2,7 +2,7 @@ export {
   closeConnections,
   getPostgresClient,
   initPostgresClient,
-  testConnections,
+  testConnection,
 } from "./database.js";
 
 export {

@@ -6,14 +6,11 @@ import {
   dailyClosingWorkflow,
 } from "./modules/closing/index.js";
 
-testConnections().then(({ postgres, genius }) => {
+testConnections().then(({ postgres }) => {
   if (!postgres) {
     console.error(
       "⚠️  PostgreSQL connection failed, but server will continue..."
     );
-  }
-  if (!genius) {
-    console.error("⚠️  genius connection failed, but server will continue...");
   }
 
   serve({

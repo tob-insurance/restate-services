@@ -1,8 +1,7 @@
 export {
   closeConnections,
-  getGeniusClient,
   getPostgresClient,
-  initGeniusClient,
+  initPostgresClient,
   testConnections,
 } from "./database.js";
 

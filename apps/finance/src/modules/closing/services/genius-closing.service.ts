@@ -6,7 +6,7 @@ import type { PoolClient } from "pg";
 import { z } from "zod";
 import {
   DateStringSchema,
-  getGeniusClient,
+  getPostgresClient,
   UserIdSchema,
 } from "../../../infrastructure/index.js";
 import type { GeniusClosingJobSubmit } from "../types.js";
@@ -20,8 +20,8 @@ const SubmitJobInputSchema = z.object({
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 
 /**
- * Synchronously runs the `get_master_data` stored procedure on the Genius
- * PostgreSQL database (GENIUS_URL). Resolves once the procedure returns;
+ * Synchronously runs the `get_master_data` stored procedure on the shared
+ * PostgreSQL database (POSTGRES_URL). Resolves once the procedure returns;
  * throws on procedure-reported failure.
  *
  * Failure semantics: every error that surfaces *after* the CALL has been
@@ -66,9 +66,8 @@ export async function submitGeniusClosingJob(
 
   let callIssued = false;
   try {
-    await withConnection(getGeniusClient(), async (client: PoolClient) => {
-      // Extend timeout for this long-running procedure (up to 6 hours).
-      // The procedure calls multiple sub-procedures (fi801–fi809) with heavy data processing.
+    await withConnection(getPostgresClient(), async (client: PoolClient) => {
+      await client.query("SET search_path TO acpdb");
       await client.query(`SET statement_timeout = ${SIX_HOURS_MS}`);
 
       // Set aggressive server-side TCP keepalive to prevent network/firewall
@@ -130,9 +129,10 @@ export async function submitGeniusClosingJob(
       } finally {
         try {
           await client.query("RESET statement_timeout");
+          await client.query("RESET search_path");
         } catch (resetErr) {
           console.warn(
-            "RESET statement_timeout failed (connection likely dropped):",
+            "RESET session settings failed (connection likely dropped):",
             resetErr instanceof Error ? resetErr.message : resetErr
           );
         }

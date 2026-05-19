@@ -1,9 +1,6 @@
 import { withConnection as withPostgresConnection } from "@restate-tob/postgres";
 import type { PoolClient } from "pg";
-import {
-  getGeniusClient,
-  getPostgresClient,
-} from "../../infrastructure/index.js";
+import { getPostgresClient } from "../../infrastructure/index.js";
 
 /**
  * Represents a calculated trial balance record.
@@ -82,8 +79,10 @@ export async function syncTrialBalanceFromGenius(
     const geniusData = new Map<string, CalculatedTrialBalance>();
 
     await withPostgresConnection(
-      getGeniusClient(),
+      getPostgresClient(),
       async (client: PoolClient) => {
+        // AC_GLOPENBALANCE lives in the acpdb schema (legacy Genius data).
+        await client.query("SET search_path TO acpdb");
         const query = `
           SELECT
               op.COACODE,

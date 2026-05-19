@@ -84,7 +84,7 @@ export function createPostgresClient(config: PostgresConfig): PostgresClient {
         );
         client.release();
         return true;
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("❌ PostgreSQL connection failed:", error);
         return false;
       }

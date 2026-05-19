@@ -1,0 +1,140 @@
+name: Deploy Restate Lambda
+
+on:
+  workflow_call:
+    inputs:
+      app-name:
+        description: "App directory name (e.g., finance, soa-finance)"
+        type: string
+        required: true
+      lambda-name:
+        description: "AWS Lambda function name"
+        type: string
+        required: true
+      environment:
+        description: "Deployment environment"
+        type: string
+        default: "prod"
+
+env:
+  AWS_REGION: ap-southeast-3
+  LAMBDA_LAYER_NAME: oracle-instantclient
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.15
+        with:
+          method: "oidc"
+          identity-id: ${{ secrets.INFISICAL_MACHINE_IDENTITY_ID }}
+          domain: "https://infisical.tob-insurance.com"
+          project-slug: ${{ vars.INFISICAL_PROJECT_SLUG }}
+          env-slug: ${{ inputs.environment }}
+          export-type: "file"
+          # Note: path is relative to workspace (no leading /)
+          file-output-path: "apps/${{ inputs.app-name }}/.env"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build packages
+        run: bun run build
+
+      - name: Build Lambda bundle
+        run: bun run --filter @restate-tob/${{ inputs.app-name }} bundle:lambda
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy Lambda Function
+        id: deploy
+        run: |
+          LAYER_ARN=$(aws lambda list-layer-versions \
+            --layer-name ${{ env.LAMBDA_LAYER_NAME }} \
+            --query 'LayerVersions[0].LayerVersionArn' \
+            --output text)
+          echo "Using Oracle layer: $LAYER_ARN"
+
+          aws lambda update-function-code \
+            --function-name ${{ inputs.lambda-name }} \
+            --zip-file fileb://apps/${{ inputs.app-name }}/dist-lambda/lambda.zip
+
+          aws lambda wait function-updated --function-name ${{ inputs.lambda-name }}
+
+          # Convert .env to JSON using Node.js (handles special chars safely)
+          node -e "
+            const fs = require('fs');
+            const path = require('path');
+            const envPath = path.join('${{ github.workspace }}', 'apps', '${{ inputs.app-name }}', '.env');
+            const content = fs.readFileSync(envPath, 'utf8');
+            const vars = {};
+            content.split('\n').forEach(line => {
+              line = line.trim();
+              if (!line || line.startsWith('#')) return;
+              const eqIdx = line.indexOf('=');
+              if (eqIdx === -1) return;
+              const key = line.slice(0, eqIdx).trim();
+              let value = line.slice(eqIdx + 1).trim();
+              // Remove surrounding quotes
+              if ((value.startsWith('\"') && value.endsWith('\"')) ||
+                  (value.startsWith(\"'\") && value.endsWith(\"'\"))) {
+                value = value.slice(1, -1);
+              }
+              vars[key] = value;
+            });
+            fs.writeFileSync('/tmp/env.json', JSON.stringify({ Variables: vars }));
+          "
+
+          aws lambda update-function-configuration \
+            --function-name ${{ inputs.lambda-name }} \
+            --layers "$LAYER_ARN" \
+            --environment file:///tmp/env.json
+
+      - name: Tag Lambda function
+        run: |
+          aws lambda tag-resource \
+            --resource "$(aws lambda get-function --function-name ${{ inputs.lambda-name }} --query 'Configuration.FunctionArn' --output text)" \
+            --tags "ManagedBy=github-actions"
+
+      - name: Register with Restate
+        if: success()
+        env:
+          RESTATE_ADMIN_URL: ${{ secrets.RESTATE_ADMIN_URL }}
+          RESTATE_BASIC_AUTH: ${{ secrets.RESTATE_BASIC_AUTH }}
+        run: |
+          FUNCTION_ARN=$(aws lambda get-function --function-name ${{ inputs.lambda-name }} --query 'Configuration.FunctionArn' --output text)
+
+          aws lambda wait function-updated --function-name ${{ inputs.lambda-name }}
+
+          VERSION=$(aws lambda publish-version --function-name ${{ inputs.lambda-name }} --query 'Version' --output text)
+          VERSIONED_ARN="${FUNCTION_ARN}:${VERSION}"
+          echo "Registering Lambda ARN: $VERSIONED_ARN"
+
+          # Register with force to overwrite if exists
+          RESPONSE=$(curl -s -w "\n%{http_code}" -u "$RESTATE_BASIC_AUTH" -X POST "$RESTATE_ADMIN_URL/deployments" \
+            -H "Content-Type: application/json" \
+            -d "{\"arn\": \"$VERSIONED_ARN\", \"assume_role_arn\": \"${{ secrets.AWS_INVOKE_ROLE_ARN }}\", \"force\": true}")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          echo "Response: $BODY"
+          if [ "$HTTP_CODE" -ge 400 ]; then
+            echo "Error: HTTP $HTTP_CODE"
+            exit 1
+          fi

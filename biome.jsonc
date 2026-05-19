@@ -2,7 +2,12 @@
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "extends": ["ultracite/core"],
   "files": {
-    "includes": ["!**/bun.lock"]
+    "includes": [
+      "!**/bun.lock",
+      "!**/templates/html/**/*.html",
+      "!**/templates/*.html",
+      "!**/assets/email/templates/**/*.html"
+    ]
   },
   "linter": {
     "rules": {

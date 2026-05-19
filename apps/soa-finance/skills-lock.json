@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "restatedev": {
+      "source": "docs.restate.dev",
+      "sourceType": "well-known",
+      "computedHash": "f6cc6f0742eb9dfeb9431fd1e252194c88fcebb6ea3116841e51194005a03fee"
+    }
+  }
+}

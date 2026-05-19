@@ -59,7 +59,7 @@ export async function calculateFinancialMetrics(
           "SELECT financial_report.calculate_financial_metrics($1::UUID, $2::INTEGER, $3::INTEGER) as result",
           [validated.runId, year, month]
         );
-      } catch (execError) {
+      } catch (execError: unknown) {
         const pgError = execError as {
           message?: string;
           detail?: string;
@@ -98,7 +98,7 @@ export async function calculateFinancialMetrics(
         runId: validated.runId,
       };
     });
-  } catch (error) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       throw new TerminalError(
         `Validation error: ${error.issues
@@ -139,7 +139,7 @@ export async function getCalculationRunStatus(
         metadata: row.metadata,
       };
     });
-  } catch (error) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       console.error("Invalid run ID format:", error);
       return null;

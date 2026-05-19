@@ -11,6 +11,10 @@ import {
 } from "../../../infrastructure/index.js";
 import type { GeniusClosingJobSubmit } from "../types.js";
 
+const YEAR_REGEX = /^\d{4}$/;
+const MONTH_REGEX = /^\d{2}$/;
+const USER_ID_REGEX = /^[a-zA-Z0-9_]+$/;
+
 const SubmitJobInputSchema = z.object({
   closingDate: DateStringSchema,
   userId: UserIdSchema,

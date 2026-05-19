@@ -174,7 +174,7 @@ async function executeSyncTrialBalanceStep(
       `✅ Trial balance sync completed successfully: ${result.message}`
     );
     return true;
-  } catch (error) {
+  } catch (error: unknown) {
     ctx.console.error(
       `❌ Trial balance sync failed: ${
         error instanceof Error ? error.message : "Unknown error"
@@ -425,7 +425,7 @@ export const dailyClosingWorkflow = workflow({
           overallSuccess: true,
           totalDuration,
         };
-      } catch (error) {
+      } catch (error: unknown) {
         await updateWorkflowState(ctx, {
           currentStep: "failed",
           geniusJobName: geniusResult?.jobName,

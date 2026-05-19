@@ -7,6 +7,10 @@ const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 
 let postgresClient: PostgresClient | null = null;
 
+function getOracleInstantClientPath(): string | undefined {
+  return process.env.ORACLE_INSTANT_CLIENT_PATH ?? process.env.ORACLE_LIB_DIR;
+}
+
 export function getPostgresClient(): PostgresClient {
   if (postgresClient) {
     return postgresClient;

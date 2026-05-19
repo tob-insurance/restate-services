@@ -1,0 +1,281 @@
+{% layout "_base" %}
+
+{% block title %}
+  {% if reminderType == "1" %}
+    1st Reminder Letter - PT. ASURANSI TOTAL BERSAMA
+  {% elsif reminderType == "2" %}
+    2nd Reminder Letter - PT. ASURANSI TOTAL BERSAMA
+  {% elsif reminderType == "3" %}
+    Warning Letter - PT. ASURANSI TOTAL BERSAMA
+  {% endif %}
+{% endblock %}
+
+{% block preview %}
+  {% if reminderType == "1" %}
+    Reminder for {{ customerName }} — IDR {{ formattedTotalPremium }} due {{ deadlineDateId }}
+  {% elsif reminderType == "2" %}
+    2nd Reminder: {{ customerName }} — IDR {{ formattedTotalPremium }}
+  {% else %}
+    Final Notice: {{ customerName }} — IDR {{ formattedTotalPremium }}
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+
+<!-- INDONESIAN SECTION -->
+<div id="Bahasa_Indonesia">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+      <td style="text-align:left;width:50%">Jakarta, {{ formattedDate }}</td>
+      <td style="text-align:right;width:50%">No: {{ letterNo }}</td>
+    </tr>
+  </table>
+  <p>{{ customerName }},</p>
+  <p>{{ branch }}</p>
+  <p><br /></p>
+  <p>
+    {% if reminderType == "1" %}
+    <strong>Hal : Surat Penagihan Premi</strong>
+    {% elsif reminderType == "2" %}
+    <strong>Hal : Surat Penagihan Premi Ke 2</strong>
+    {% elsif reminderType == "3" %}
+    <strong>Hal : Surat Penagihan Premi Ke 3</strong>
+    {% endif %}
+  </p>
+  <p>Dengan hormat,</p>
+
+  <p>
+    Sebelumnya kami mengucapkan terima kasih atas kepercayaan
+    dan kerjasama yang telah terjalin selama ini antara {{
+    customerName }} dengan PT. ASURANSI TOTAL BERSAMA.
+  </p>
+
+  {% if reminderType == "1" %}
+  <p>
+    Berdasarkan catatan kami per tanggal {{ formattedDate
+    }}, kami ingin menginformasikan bahwa saldo premi sudah
+    terhutang selama lebih dari 60 hari, sebagai berikut:
+  </p>
+  {% else %}
+  <p>
+    Melanjutkan surat tagihan premi {% if reminderType == "2"
+    %}ke-1{% else %}ke-2{% endif %} reff no {{
+    previousLetterNo }} tanggal {{ formattedSentDate }}
+    perihal saldo terhutang lebih dari 60 hari,
+    kami informasikan kembali bahwa per tanggal {{
+    formattedDate }} {{ customerName }} masih terdapat saldo
+    premi terhutang, sebagai berikut:
+  </p>
+  {% endif %}
+
+  <p style="text-align:center;margin:0">
+    <strong
+      >Total Tagihan Premi : IDR {{ formattedTotalPremium }}
+      (detail terlampir)
+    </strong>
+  </p>
+
+  <p>
+    Mengingat pertanggungan polis telah berjalan lebih dari 60
+    hari, maka kami mengharapkan {% if reminderType != "1"
+    %}perhatian dan kerjasama Bpk/Ibu agar{% endif %}
+    pembayaran dapat dilakukan sebelum tanggal
+    <strong>{{ deadlineDateId }}</strong>
+  </p>
+
+  {% if reminderType == "3" %}
+  <p>
+    Apabila sampai dengan tanggal tersebut belum kami terima
+    pembayarannya, maka dengan berat hati kami akan
+    membatalkan pertanggungan atas polis tersebut secara
+    prorate dan premi prorate tetap akan kami tagihkan
+    kembali.
+    <strong>
+      Jika terjadi risiko atas pertanggungan polis ini, maka
+      kami tidak berkewajiban untuk menanggung risiko
+      tersebut.
+    </strong>
+  </p>
+  {% endif %}
+
+  <p>Premi dapat dibayarkan ke :</p>
+  <table style="width:auto;border-collapse:collapse">
+    <tr>
+      <td style="padding-right:20px;vertical-align:top;white-space:nowrap">1. No Rekening</td>
+      <td style="vertical-align:top">:</td>
+      <td style="vertical-align:top">879-209-1333</td>
+    </tr>
+    <tr>
+      <td style="padding-right:20px;vertical-align:top;white-space:nowrap">&nbsp;&nbsp;&nbsp; Nama Rekening</td>
+      <td style="vertical-align:top">:</td>
+      <td style="vertical-align:top">PT. ASURANSI TOTAL BERSAMA</td>
+    </tr>
+    <tr>
+      <td style="padding-right:20px;vertical-align:top;white-space:nowrap">&nbsp;&nbsp;&nbsp; Bank</td>
+      <td style="vertical-align:top">:</td>
+      <td style="vertical-align:top">BCA Cab. WTC Mangga Dua</td>
+    </tr>
+    <tr>
+      <td><br /></td>
+    </tr>
+    <tr>
+      <td style="padding-right:20px;vertical-align:top;white-space:nowrap">2. No Rekening</td>
+      <td style="vertical-align:top">:</td>
+      <td style="vertical-align:top">120-00-3288888-0 (MANDIRI IDR)</td>
+    </tr>
+    <tr>
+      <td style="padding-right:20px;vertical-align:top;white-space:nowrap">&nbsp;&nbsp;&nbsp; Nama Rekening</td>
+      <td style="vertical-align:top">:</td>
+      <td style="vertical-align:top">PT. ASURANSI TOTAL BERSAMA</td>
+    </tr>
+    <tr>
+      <td style="padding-right:20px;vertical-align:top;white-space:nowrap">&nbsp;&nbsp;&nbsp; Bank</td>
+      <td style="vertical-align:top">:</td>
+      <td style="vertical-align:top">Mandiri Cab Sunter Permai</td>
+    </tr>
+  </table>
+  <p>
+    Apabila terdapat pertanyaan, mohon untuk menghubungi kami
+    melalui telepon (021) 3971-7273 atau melalui email ke
+    finance@tob-ins.com.
+  </p>
+  <p>
+    Jika tagihan tersebut telah dibayarkan sebelum surat ini
+    diterima, mohon untuk menginformasikannya kepada kami dan
+    abaikan surat tagihan ini.
+  </p>
+  <p>
+    Demikian kami sampaikan, atas perhatian
+    dan kerjasamanya kami ucapkan terima kasih.
+  </p>
+
+  {% render "_partials/signature" %}
+</div>
+
+<br />
+<br />
+<hr />
+
+<!-- ENGLISH SECTION -->
+<div id="Bahasa_Inggris">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+      <td style="text-align:left;width:50%">Jakarta, {{ formattedDateEn }}</td>
+      <td style="text-align:right;width:50%">No: {{ letterNo }}</td>
+    </tr>
+  </table>
+  <p>{{ customerName }},</p>
+  <p>{{ branch }}</p>
+  <p><br /></p>
+  <p>
+    {% if reminderType == "1" %}
+    <strong>RE : 1st Reminder Letter </strong>
+    {% elsif reminderType == "2" %}
+    <strong>RE : 2nd Reminder Letter </strong>
+    {% elsif reminderType == "3" %}
+    <strong>RE : 3rd Reminder Letter </strong>
+    {% endif %}
+  </p>
+  <p>Dear Sir & Madam,</p>
+
+  <p>
+    Firstly, we would like to thank you for your trust &amp;
+    cooperation of {{ customerName }} to PT. ASURANSI TOTAL
+    BERSAMA.
+  </p>
+
+  {% if reminderType == "1" %}
+  <p>
+    Based on our records, we would like to inform you that the
+    premium outstanding balance overdue 60 days as of {{
+    formattedDateEn }}, are as follows:
+  </p>
+  {% else %}
+  <p>
+    Referring to our {% if reminderType == "2" %}first{% else
+    %}second{% endif %} reminder letter No. {{
+    previousLetterNo }} dated {{ formattedSentDateEn }}
+    regarding the premium outstanding overdue 60 days as of {{
+    formattedDateEn }}, we would like to remind you that we
+    have not yet received the remittance for the outstanding
+    balance, as follows:
+  </p>
+  {% endif %}
+
+  <p style="text-align:center;margin:0">
+    <strong
+      >Total Premium : IDR {{ formattedTotalPremium }}
+      (details attached)
+    </strong>
+  </p>
+
+  <p>
+    We highly appreciate your attention &amp; cooperation to
+    inform the client to resolve the above outstandings
+    immediately before
+    <strong>{{ deadlineDateEn }}</strong>
+  </p>
+
+  {% if reminderType == "3" %}
+  <p>
+    Please be advised that if we do not receive the payment by
+    the deadline, we regret to inform you that the claim
+    process for {{ customerName }} will be put on hold without
+    further notice.
+  </p>
+  {% endif %}
+
+  <p>Premium can be paid to :</p>
+  <table style="width:auto;border-collapse:collapse">
+    <tr>
+      <td style="padding-right:20px;vertical-align:top;white-space:nowrap">1. Account No</td>
+      <td style="vertical-align:top">:</td>
+      <td style="vertical-align:top">879-209-1333</td>
+    </tr>
+    <tr>
+      <td style="padding-right:20px;vertical-align:top;white-space:nowrap">&nbsp;&nbsp;&nbsp; Account Name</td>
+      <td style="vertical-align:top">:</td>
+      <td style="vertical-align:top">PT. ASURANSI TOTAL BERSAMA</td>
+    </tr>
+    <tr>
+      <td style="padding-right:20px;vertical-align:top;white-space:nowrap">&nbsp;&nbsp;&nbsp; Bank</td>
+      <td style="vertical-align:top">:</td>
+      <td style="vertical-align:top">BCA Cab. WTC Mangga Dua</td>
+    </tr>
+    <tr>
+      <td><br /></td>
+    </tr>
+    <tr>
+      <td style="padding-right:20px;vertical-align:top;white-space:nowrap">2. Account No</td>
+      <td style="vertical-align:top">:</td>
+      <td style="vertical-align:top">120-00-3288888-0 (MANDIRI IDR)</td>
+    </tr>
+    <tr>
+      <td style="padding-right:20px;vertical-align:top;white-space:nowrap">&nbsp;&nbsp;&nbsp; Account Name</td>
+      <td style="vertical-align:top">:</td>
+      <td style="vertical-align:top">PT. ASURANSI TOTAL BERSAMA</td>
+    </tr>
+    <tr>
+      <td style="padding-right:20px;vertical-align:top;white-space:nowrap">&nbsp;&nbsp;&nbsp; Bank</td>
+      <td style="vertical-align:top">:</td>
+      <td style="vertical-align:top">Mandiri Cab Sunter Permai</td>
+    </tr>
+  </table>
+  <p>
+    Should you have any questions, please do not hesitate to
+    contact us by phone at (021) 3971-7273 or via email at
+    finance@tob-ins.com.
+  </p>
+  <p>
+    If the outstanding amount has already been paid prior to
+    receiving this letter, please notify us and kindly
+    disregard this.
+  </p>
+  <p>Thank you for your attention.</p>
+
+  <p>Warmest regards,</p>
+  <img src="cid:mgr-signature" class="signature-img" />
+  <p>Finance Dept.</p>
+</div>
+
+{% endblock %}

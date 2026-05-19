@@ -1,0 +1,16 @@
+services:
+  restate:
+    image: docker.restate.dev/restatedev/restate:latest
+    container_name: restate_dev
+    ports:
+      - "8080:8080"
+      - "9070:9070"
+      - "9071:9071"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - restate-network
+
+networks:
+  restate-network:
+    driver: bridge

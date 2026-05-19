@@ -1,0 +1,12 @@
+# Data
+datas/
+*.parquet
+
+__test__/
+
+# Logs/Reports
+lint.txt
+lint.json
+lint.log
+*_lint.json
+dist-lambda

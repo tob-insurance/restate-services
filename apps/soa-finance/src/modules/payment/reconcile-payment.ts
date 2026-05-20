@@ -30,6 +30,17 @@ export const reconcilePayment = async (
     return [];
   }
 
+  // Safety: don't mark ALL reminders as paid at once (likely data issue)
+  if (
+    paidDcNotes.length === Object.keys(details).length &&
+    paidDcNotes.length > 5
+  ) {
+    ctx.console.log(
+      `[Payment] Skipping bulk payment: ${paidDcNotes.length}/${Object.keys(details).length} would be marked paid — possible data issue`
+    );
+    return [];
+  }
+
   const updatedDetails = { ...details };
   for (const paid of paidDcNotes) {
     updatedDetails[paid.dcNoteId] = { ...paid, isPaid: true };

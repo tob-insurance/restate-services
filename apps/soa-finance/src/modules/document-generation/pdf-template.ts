@@ -1,13 +1,13 @@
-import { SCHEDULE_CONFIG } from "../../constants/schedule";
-import type { IAccount, IStatementOfAccountModel } from "../../types";
+import type { IAccount } from "../../types/customer.type.js";
+import type { IStatementOfAccountModel } from "../../types/soa.type.js";
 import {
+  computeDeadline,
   formatDateEnglish,
-  formatDateEnglishMonthFirst,
   formatDateIndonesian,
   formatMonthEnglish,
   formatMonthIndonesian,
-  formatThousands,
-} from "../../utils/formatter";
+} from "../../utils/formatter/date.formatter.js";
+import { formatThousands } from "../../utils/formatter/number.formatter.js";
 import { getSignature } from "./pdf-assets";
 
 type LatestLetterInfo = {
@@ -25,24 +25,6 @@ type BuildPdfTemplateDataParams = {
   reminderCount: string;
   latestLetter?: LatestLetterInfo;
 };
-
-function computeDeadline(
-  reminderCount: string,
-  asAtDate: Date
-): { deadlineId: string; deadlineEn: string } | null {
-  const soaType = Number(reminderCount) + 1;
-  const schedule = SCHEDULE_CONFIG.find((s) => s.soaType === soaType);
-  const graceDays = schedule?.graceDays ?? 0;
-  if (graceDays === 0) {
-    return null;
-  }
-  const deadline = new Date(asAtDate);
-  deadline.setDate(deadline.getDate() + graceDays);
-  return {
-    deadlineId: formatDateIndonesian(deadline),
-    deadlineEn: formatDateEnglishMonthFirst(deadline),
-  };
-}
 
 export async function buildPdfTemplateData(
   params: BuildPdfTemplateDataParams

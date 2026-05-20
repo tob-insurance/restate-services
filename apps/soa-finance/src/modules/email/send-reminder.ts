@@ -1,6 +1,9 @@
-import { getTestEmailRecipient, isDevelopment } from "../../constants";
+import {
+  getTestEmailRecipient,
+  isDevelopment,
+} from "../../constants/environment.js";
 import { sendEmail } from "../../infrastructure/email";
-import type { IAccount } from "../../types";
+import type { IAccount } from "../../types/customer.type.js";
 import type { IReminderEmailData } from "../reminder/types";
 import {
   buildEmailAttachments,

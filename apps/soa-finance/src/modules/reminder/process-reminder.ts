@@ -1,5 +1,6 @@
 import type { ObjectContext } from "@restatedev/restate-sdk";
-import { type IAccount, type ISoaItem, SoaType } from "../../types";
+import type { IAccount } from "../../types/customer.type.js";
+import { type ISoaItem, SoaTypeLabels } from "../../types/soa.type.js";
 import type { ReminderHeader } from "../soa/objects/state";
 import { readDcNoteIndex, stateKeys } from "../soa/objects/state";
 import { generateReminderLetter } from "./generate-reminder-letter";
@@ -25,7 +26,7 @@ export const processReminderLetter = async (
 
   ctx.console.log(
     `[Reminder] Processing for ${customer.code}, type: ${
-      SoaType[item.processingType]
+      SoaTypeLabels[item.processingType]
     }`
   );
 

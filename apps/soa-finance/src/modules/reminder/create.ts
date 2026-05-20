@@ -1,5 +1,6 @@
 import type { ObjectContext } from "@restatedev/restate-sdk";
-import type { IAccount, IStatementOfAccountModel } from "../../types";
+import type { IAccount } from "../../types/customer.type.js";
+import type { IStatementOfAccountModel } from "../../types/soa.type.js";
 import type { ReminderDetail, ReminderHeader } from "../soa/objects/state";
 import { stateKeys } from "../soa/objects/state";
 

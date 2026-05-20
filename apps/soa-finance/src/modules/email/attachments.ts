@@ -1,44 +1,19 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { IEmailAttachment } from "../../infrastructure/email/types";
-import type { IFileData } from "../../types";
+import type { IFileData } from "../../types/soa.type.js";
+import { EMAIL_CONFIG } from "../../utils/config/emails.js";
+import logger from "../../utils/logger.js";
 import { ASSETS_DIR } from "../../utils/paths";
 
-export const FALLBACK_EMAIL =
-  process.env.SOA_FALLBACK_EMAIL || "collection@tob-ins.com";
-
-function parseEnvCcList(): string[] | null {
-  const raw = process.env.SOA_CC_RECIPIENTS;
-  if (!raw) {
-    return null;
-  }
-  const items = raw
-    .split(",")
-    .map((e) => e.trim())
-    .filter((e) => e.includes("@"));
-  return items.length > 0 ? items : null;
-}
-
-const GLOBAL_CC = parseEnvCcList();
-const DEFAULT_CC: Record<string, string[]> = {
-  DIP: ["finance@tob-ins.com", "mkt.nonleasing@tob-ins.com"],
-  DIG: [
-    "finance@tob-ins.com",
-    "mkt.nonleasing@tob-ins.com",
-    "mkt.directgroup@tob-ins.com",
-  ],
-  DEFAULT: ["finance@tob-ins.com"],
-};
+export const FALLBACK_EMAIL = EMAIL_CONFIG.FALLBACK_EMAIL;
 
 export function getCcRecipients(actingCode: string): string[] {
-  if (GLOBAL_CC) {
-    return GLOBAL_CC;
-  }
-  return DEFAULT_CC[actingCode] || DEFAULT_CC.DEFAULT;
+  return EMAIL_CONFIG.getCcRecipients(actingCode);
 }
 
 export function resolveRecipientEmail(email?: string): string {
-  return email || FALLBACK_EMAIL;
+  return email || EMAIL_CONFIG.FALLBACK_EMAIL;
 }
 
 function getSignatureAttachment(): IEmailAttachment | null {
@@ -52,9 +27,20 @@ function getSignatureAttachment(): IEmailAttachment | null {
       isInline: true,
       contentId: "mgr-signature",
     };
-  } catch {
-    console.warn("[Email] Signature file not found, skipping inline image");
-    return null;
+  } catch (error: unknown) {
+    if (
+      error instanceof Error &&
+      "code" in error &&
+      (error as NodeJS.ErrnoException).code === "ENOENT"
+    ) {
+      logger.warn(
+        { component: "Email" },
+        "Signature file not found, skipping inline image"
+      );
+      return null;
+    }
+
+    throw error;
   }
 }
 

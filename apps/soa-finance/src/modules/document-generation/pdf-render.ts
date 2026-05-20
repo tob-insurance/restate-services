@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ASSETS_DIR } from "../../utils/paths";
-import { renderTemplate } from "../../utils/template";
+import { renderString } from "../../utils/template/engine.js";
 import { getSignature } from "./pdf-assets";
 
 const TEMPLATES_DIR = join(ASSETS_DIR, "email/templates");
@@ -32,5 +32,5 @@ export async function renderLiquidToHtml(
     ImgSign: data.ImgSign ?? getSignature(),
   };
 
-  return await renderTemplate(templateContent, enrichedData);
+  return await renderString(templateContent, enrichedData);
 }

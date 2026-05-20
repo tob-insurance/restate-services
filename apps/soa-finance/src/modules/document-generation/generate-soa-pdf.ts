@@ -1,4 +1,4 @@
-import { CONTENT_TYPES } from "../../constants";
+import { CONTENT_TYPES } from "../../constants/constants.js";
 import { generatePdfWithHeaderFooter } from "../../infrastructure/gotenberg/gotenberg-client";
 import { createFooter } from "./html/footer";
 import { createHeader } from "./html/header";

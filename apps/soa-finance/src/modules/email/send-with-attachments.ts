@@ -1,56 +1,71 @@
 import {
-  CONTENT_TYPES,
   getTestEmailRecipient,
   isDevelopment,
-} from "../../constants";
+} from "../../constants/environment.js";
 import type { ISendEmailResult } from "../../infrastructure/email/types";
-import { downloadSoaFiles } from "../../infrastructure/s3";
-import type { IAccount } from "../../types";
-import { excelSoaName, letterSoaPdfName } from "../../utils";
+import type { IAccount } from "../../types/customer.type.js";
+import type { IFileData } from "../../types/soa.type.js";
+import { sendReminderEmail } from "./send-reminder";
 import { sendSoaEmail } from "./send-soa";
 
 export type SendWithAttachmentsParams = {
-  customerId: string;
   customerData: IAccount;
   date: Date;
+  isReminder?: boolean;
+  reminderType?: string;
+  letterNo?: string;
+  previousLetterNo?: string;
+  previousLetterDate?: Date;
+  branch?: string;
+  totalPremium?: number;
+  excelFile: IFileData;
+  pdfFile: IFileData;
 };
 
 export async function sendWithAttachments(
   params: SendWithAttachmentsParams
 ): Promise<ISendEmailResult> {
-  const { customerId, customerData, date } = params;
-
-  const excelFileName = excelSoaName(customerData.code, date);
-  const pdfFileName = letterSoaPdfName(customerData.code);
-
-  const { excelBuffer, pdfBuffer } = await downloadSoaFiles(
-    customerId,
-    excelFileName,
-    pdfFileName
-  );
-
-  const excelFile = {
-    fileName: excelFileName,
-    bytes: excelBuffer,
-    contentType: CONTENT_TYPES.XLSX,
-  };
-
-  const pdfFile = {
-    fileName: pdfFileName,
-    bytes: pdfBuffer,
-    contentType: CONTENT_TYPES.PDF,
-  };
+  const {
+    customerData,
+    date,
+    isReminder,
+    reminderType,
+    letterNo,
+    previousLetterNo,
+    previousLetterDate,
+    branch,
+    totalPremium,
+    excelFile,
+    pdfFile,
+  } = params;
 
   const customerEmail = isDevelopment()
     ? getTestEmailRecipient()
     : customerData.email || "";
-  await sendSoaEmail({
-    customer: customerData,
-    toEmail: customerEmail,
-    excelFile,
-    pdfFile,
-    date,
-  });
+
+  if (isReminder) {
+    await sendReminderEmail({
+      customer: customerData,
+      toEmail: customerEmail,
+      reminderType: reminderType || "1",
+      letterNo: letterNo || "",
+      previousLetterNo,
+      previousLetterDate,
+      branch,
+      totalPremium,
+      excelFile,
+      pdfFile,
+      date,
+    });
+  } else {
+    await sendSoaEmail({
+      customer: customerData,
+      toEmail: customerEmail,
+      excelFile,
+      pdfFile,
+      date,
+    });
+  }
 
   return { sent: true };
 }

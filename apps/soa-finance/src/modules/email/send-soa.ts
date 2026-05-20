@@ -1,8 +1,12 @@
-import { getTestEmailRecipient, isDevelopment } from "../../constants";
+import {
+  getTestEmailRecipient,
+  isDevelopment,
+} from "../../constants/environment.js";
 import { sendEmail } from "../../infrastructure/email";
 import type { IEmailMessage } from "../../infrastructure/email/types";
-import type { IAccount, IFileData } from "../../types";
-import { formatDateDDMMYYYY } from "../../utils";
+import type { IAccount } from "../../types/customer.type.js";
+import type { IFileData } from "../../types/soa.type.js";
+import { formatDateDDMMYYYY } from "../../utils/formatter/date.formatter.js";
 import {
   buildEmailAttachments,
   getCcRecipients,
@@ -43,8 +47,6 @@ export const sendSoaEmail = async (
     body: emailHtml,
     attachments: buildEmailAttachments(excelFile, pdfFile),
   };
-
-  console.log(`[Email] Sending SOA for ${customer.code} to: ${recipientEmail}`);
 
   const sent = await sendEmail(message);
 

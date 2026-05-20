@@ -1,7 +1,11 @@
 const hucrePromise = import("hucre/xlsx");
 
-import { CONTENT_TYPES, NUMBER_FORMATS, toExcelDate } from "../../constants";
-import type { IStatementOfAccountModel } from "../../types";
+import {
+  CONTENT_TYPES,
+  NUMBER_FORMATS,
+  toExcelDate,
+} from "../../constants/constants.js";
+import type { IStatementOfAccountModel } from "../../types/soa.type.js";
 
 export type IExcelColumn = {
   header: string;
@@ -75,7 +79,7 @@ export const excelColumns: IExcelColumn[] = [
   { header: "Due Date", key: "dueDate", width: 12, format: "date" },
 ];
 
-function groupAndAggregateSoa(
+export function groupAndAggregateSoa(
   soaData: IStatementOfAccountModel[]
 ): IStatementOfAccountModel[] {
   if (soaData.length === 0) {
@@ -138,7 +142,7 @@ function groupAndAggregateSoa(
   return aggregatedData;
 }
 
-function sortSoaData(
+export function sortSoaData(
   soaData: IStatementOfAccountModel[]
 ): IStatementOfAccountModel[] {
   return [...soaData].sort((a, b) => {

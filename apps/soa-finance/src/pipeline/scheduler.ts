@@ -4,14 +4,14 @@ import {
   TerminalError,
 } from "@restatedev/restate-sdk";
 import { DateTime } from "luxon";
+import { TIMEZONE } from "../constants/constants.js";
 import {
   type IScheduleConfig,
   SCHEDULE_CONFIG,
-  TIMEZONE,
-} from "../constants/index.js";
+} from "../constants/schedule.js";
 import { batchWorkflow } from "../modules/soa/workflows/batch-workflow.js";
-import type { SoaType } from "../types/index.js";
-import { formatDuration } from "../utils/index.js";
+import type { SoaType } from "../types/soa.type.js";
+import { formatDuration } from "../utils/formatter/date.formatter.js";
 import { generateSoaPipeline } from "./index.js";
 
 type ScheduleTriggerResult = {
@@ -136,10 +136,16 @@ async function runPipelineAndBatch(
 
   const pipelineStartTime = await ctx.date.now();
 
-  // Wrap the pipeline in ctx.run() so Oracle reads and storage uploads are journaled.
-  await ctx.run("generate-soa-pipeline", () =>
-    generateSoaPipeline(now.toJSDate())
+  const pipelineResult = await ctx.run(
+    "generate-soa-pipeline",
+    { timeout: 300_000 },
+    () => generateSoaPipeline(now.toJSDate())
   );
+  if (!pipelineResult.success) {
+    throw new Error(
+      `Pipeline returned success: false — aborting batch for ${schedule.type}`
+    );
+  }
   const pipelineEndTime = await ctx.date.now();
   const pipelineDuration = formatDuration(pipelineEndTime - pipelineStartTime);
 

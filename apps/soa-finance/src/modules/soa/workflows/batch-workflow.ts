@@ -5,10 +5,15 @@ import {
   TerminalError,
   workflow,
 } from "@restatedev/restate-sdk";
-import { isDevelopment } from "../../../constants";
-import { getAllAccounts } from "../../../infrastructure/database/index.js";
-import type { IAccount, SoaType } from "../../../types";
-import { formatDateToUnixTimestamp, formatTimePeriod } from "../../../utils";
+import { SENTINEL_ALL } from "../../../constants/constants.js";
+import { isDevelopment } from "../../../constants/environment.js";
+import { getAllAccounts } from "../../../infrastructure/database/queries/customer-query.js";
+import type { IAccount } from "../../../types/customer.type.js";
+import type { SoaType } from "../../../types/soa.type.js";
+import {
+  formatDateToUnixTimestamp,
+  formatTimePeriod,
+} from "../../../utils/formatter/date.formatter.js";
 import { soaCustomer } from "../objects/soa-customer";
 import { soaSchema } from "../types";
 
@@ -43,6 +48,7 @@ const DEV_TEST_CUSTOMER_CODES = parseEnvList("SOA_TEST_CUSTOMERS") ?? [
 ];
 
 const MAX_WORKERS = parseEnvInt("SOA_MAX_WORKERS", 5);
+const INACTIVITY_TIMEOUT_HOURS = parseEnvInt("SOA_INACTIVITY_TIMEOUT_HOURS", 6);
 
 type WorkerResult = {
   accountId: string;
@@ -54,6 +60,10 @@ type IBatchWorkflowResult = {
   message: string;
   totalAccounts: number;
   failedAccountCount: number;
+  failedAccounts: Array<{
+    accountId: string;
+    error: string;
+  }>;
   status: "Completed";
 };
 
@@ -73,6 +83,9 @@ type IBatchWorkflowResult = {
 
 export const batchWorkflow = workflow({
   name: "BatchWorkflow",
+  options: {
+    inactivityTimeout: { hours: INACTIVITY_TIMEOUT_HOURS },
+  },
   handlers: {
     run: async (
       ctx: WorkflowContext,
@@ -86,29 +99,29 @@ export const batchWorkflow = workflow({
         );
       }
 
-      // STEP 1: Initialize Date Parameters
-      const processingDates = await ctx.run("initialize-dates", () => {
-        const currentDate = new Date();
-        return {
-          timePeriod: formatTimePeriod(currentDate),
-          toDate: formatDateToUnixTimestamp(currentDate),
-          processingDate: currentDate.toISOString(),
-        };
-      });
+      // STEP 1: Initialize Date Parameters (deterministic timestamp from Restate context)
+      const now = await ctx.date.now();
+      const currentDate = new Date(now);
+      const processingDates = {
+        timePeriod: formatTimePeriod(currentDate),
+        toDate: formatDateToUnixTimestamp(currentDate),
+        processingDate: currentDate.toISOString(),
+      };
 
       const soaProcessingType = parseResult.data.type as SoaType;
       const soaOptions = {
-        classOfBusiness: "ALL",
-        branch: "ALL",
+        classOfBusiness: SENTINEL_ALL,
+        branch: SENTINEL_ALL,
       };
 
       // STEP 2: Fetch Customer Accounts
       const allAccounts = await ctx.run(
         "get-all-accounts",
+        { timeout: 60_000 },
         async (): Promise<IAccount[]> => {
           const accounts = await getAllAccounts();
           if (!accounts || accounts.length === 0) {
-            throw new TerminalError("No customer accounts found");
+            throw new Error("No customer accounts found");
           }
 
           return accounts;
@@ -134,6 +147,7 @@ export const batchWorkflow = workflow({
       // Process accounts in chunks of MAX_WORKERS. Errors from individual
       // accounts are isolated via .map() so one failure does not kill the batch.
       let failedAccountCount = 0;
+      const failedAccounts: IBatchWorkflowResult["failedAccounts"] = [];
       let processedAccountCount = 0;
 
       for (let i = 0; i < accountsToProcess.length; i += MAX_WORKERS) {
@@ -171,6 +185,10 @@ export const batchWorkflow = workflow({
           processedAccountCount += 1;
           if (result.failed) {
             failedAccountCount += 1;
+            failedAccounts.push({
+              accountId: result.accountId,
+              error: result.error ?? "Unknown error",
+            });
             ctx.console.log(
               `[Batch] Worker failed for ${result.accountId}: ${result.error}`
             );
@@ -183,6 +201,11 @@ export const batchWorkflow = workflow({
       }
 
       ctx.console.log(
+        "[Batch] Failed accounts:",
+        JSON.stringify(failedAccounts)
+      );
+
+      ctx.console.log(
         `Batch completed: ${processedAccountCount - failedAccountCount} succeeded, ${failedAccountCount} failed, out of ${totalAccounts} accounts`
       );
 
@@ -190,6 +213,7 @@ export const batchWorkflow = workflow({
         message: "SOA batch processing completed successfully",
         totalAccounts,
         failedAccountCount,
+        failedAccounts,
         status: "Completed",
       };
     },

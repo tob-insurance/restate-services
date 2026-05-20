@@ -1,35 +1,60 @@
 import "varlock/auto-load";
 import { serve } from "@restatedev/restate-sdk";
 import {
-  initOracleClient,
-  testOracleConnection,
-} from "./infrastructure/database/database.js";
+  initPostgresClient,
+  testPostgresConnection,
+} from "./infrastructure/database/postgres.js";
 import { sharedServices } from "./services.js";
+import {
+  checkGotenbergConnectivity,
+  checkS3BucketAccess,
+} from "./utils/health.js";
+import logger from "./utils/logger.js";
 
 const PORT = 9080;
 
 async function main() {
-  console.log("[App] Testing Oracle connection...");
-  initOracleClient();
+  logger.info({ component: "App" }, "Testing PostgreSQL connection...");
+  initPostgresClient();
 
-  const oracle = await testOracleConnection();
-  if (!oracle) {
-    console.error("⚠️  Oracle connection failed, but server will continue...");
+  const postgres = await testPostgresConnection();
+  if (!postgres) {
+    logger.error(
+      { component: "App" },
+      "⚠️  PostgreSQL connection failed, but server will continue..."
+    );
   }
+
+  const [s3Ok, gotenbergOk] = await Promise.all([
+    checkS3BucketAccess(),
+    checkGotenbergConnectivity(),
+  ]);
+  logger.info(
+    {
+      component: "HealthCheck",
+      postgres: !!postgres,
+      s3: s3Ok,
+      gotenberg: gotenbergOk,
+    },
+    "External service health"
+  );
 
   await serve({
     services: sharedServices,
     port: PORT,
   });
 
-  console.log(`[App] Server started on port ${PORT}`);
-  console.log("[App] Registered services:");
+  logger.info({ component: "App", port: PORT }, "Server started");
+  logger.info({ component: "App" }, "Registered services");
   for (const service of sharedServices) {
-    console.log(`[App]   - ${service.name}`);
+    logger.info(
+      { component: "App", service: service.name },
+      "Registered service"
+    );
   }
 }
 
 main().catch((err) => {
-  console.error("[App] Failed to start application:", err);
+  logger.error({ component: "App", err }, "Failed to start application");
   process.exit(1);
 });

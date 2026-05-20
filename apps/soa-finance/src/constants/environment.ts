@@ -15,7 +15,7 @@ export function isDevelopment(): boolean {
 }
 
 export function getPipelinePathPrefix(): string {
-  const raw = process.env.AZURE_STORAGE_PIPELINE_PREFIX || "parquet";
+  const raw = process.env.S3_PIPELINE_PREFIX || "parquet";
   const prefix = raw.replace(TRAILING_SLASHES, "");
   return `${prefix}/${getAppEnvironment()}`;
 }

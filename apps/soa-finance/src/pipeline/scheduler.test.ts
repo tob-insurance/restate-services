@@ -1,43 +1,104 @@
-import assert from "node:assert/strict";
-import { describe, test } from "node:test";
+import { describe, expect, it } from "bun:test";
 import { DateTime } from "luxon";
-import { SCHEDULE_CONFIG, TIMEZONE } from "../constants/index.js";
-import { computeNextRun } from "./scheduler.js";
+import { computeNextRun } from "./scheduler";
+
+const MOCK_SCHEDULES = [
+  { type: "SOA" as const, soaType: 1 as const, sendDay: 4, graceDays: 0 },
+  { type: "RL1" as const, soaType: 2 as const, sendDay: 11, graceDays: 7 },
+  { type: "RL2" as const, soaType: 3 as const, sendDay: 19, graceDays: 5 },
+  { type: "WL" as const, soaType: 4 as const, sendDay: 25, graceDays: 3 },
+];
 
 describe("computeNextRun", () => {
-  test("keeps same-day schedule when current time is before cutoff", () => {
-    const now = DateTime.fromISO("2026-04-04T00:30:00", { zone: TIMEZONE });
-
-    const nextRun = computeNextRun(now, SCHEDULE_CONFIG);
-
-    assert.equal(nextRun.schedule.type, "SOA");
-    assert.equal(
-      nextRun.targetTime.toISO(),
-      DateTime.fromISO("2026-04-04T01:00:00", { zone: TIMEZONE }).toISO()
-    );
+  it("returns next schedule in the same month", () => {
+    const now = DateTime.fromISO("2026-05-10T10:00:00", {
+      zone: "Asia/Jakarta",
+    });
+    const result = computeNextRun(now, MOCK_SCHEDULES);
+    expect(result.schedule.soaType).toBe(2);
+    expect(result.schedule.type).toBe("RL1");
   });
 
-  test("moves to the next configured schedule after cutoff", () => {
-    const now = DateTime.fromISO("2026-04-04T01:30:00", { zone: TIMEZONE });
-
-    const nextRun = computeNextRun(now, SCHEDULE_CONFIG);
-
-    assert.equal(nextRun.schedule.type, "RL1");
-    assert.equal(
-      nextRun.targetTime.toISO(),
-      DateTime.fromISO("2026-04-11T01:00:00", { zone: TIMEZONE }).toISO()
-    );
+  it("wraps to next month when no schedules remain", () => {
+    const now = DateTime.fromISO("2026-05-26T10:00:00", {
+      zone: "Asia/Jakarta",
+    });
+    const result = computeNextRun(now, MOCK_SCHEDULES);
+    expect(result.schedule.soaType).toBe(1);
+    expect(result.targetTime.month).toBe(6);
+    expect(result.targetTime.day).toBe(4);
   });
 
-  test("rolls to next month after the last schedule in the month", () => {
-    const now = DateTime.fromISO("2026-04-25T02:00:00", { zone: TIMEZONE });
+  it("selects today when before cutoff time", () => {
+    const now = DateTime.fromISO("2026-05-04T00:59:59", {
+      zone: "Asia/Jakarta",
+    });
+    const result = computeNextRun(now, MOCK_SCHEDULES);
+    expect(result.schedule.type).toBe("SOA");
+  });
 
-    const nextRun = computeNextRun(now, SCHEDULE_CONFIG);
+  it("returns today's schedule at 1:00 AM when evaluated before cutoff", () => {
+    const now = DateTime.fromISO("2026-05-04T00:00:00", {
+      zone: "Asia/Jakarta",
+    });
+    const result = computeNextRun(now, MOCK_SCHEDULES);
+    expect(result.schedule.type).toBe("SOA");
+    expect(result.targetTime.hour).toBe(1);
+    expect(result.targetTime.minute).toBe(0);
+  });
 
-    assert.equal(nextRun.schedule.type, "SOA");
-    assert.equal(
-      nextRun.targetTime.toISO(),
-      DateTime.fromISO("2026-05-04T01:00:00", { zone: TIMEZONE }).toISO()
-    );
+  it("skips today when past cutoff time", () => {
+    const now = DateTime.fromISO("2026-05-04T02:00:00", {
+      zone: "Asia/Jakarta",
+    });
+    const result = computeNextRun(now, MOCK_SCHEDULES);
+    expect(result.schedule.type).toBe("RL1");
+    expect(result.targetTime.day).toBe(11);
+  });
+
+  it("handles December to January year wrap", () => {
+    const now = DateTime.fromISO("2026-12-26T10:00:00", {
+      zone: "Asia/Jakarta",
+    });
+    const result = computeNextRun(now, MOCK_SCHEDULES);
+    expect(result.schedule.type).toBe("SOA");
+    expect(result.targetTime.year).toBe(2027);
+    expect(result.targetTime.month).toBe(1);
+    expect(result.targetTime.day).toBe(4);
+  });
+
+  it("handles end of month with no remaining schedules", () => {
+    const now = DateTime.fromISO("2026-05-31T23:00:00", {
+      zone: "Asia/Jakarta",
+    });
+    const result = computeNextRun(now, MOCK_SCHEDULES);
+    expect(result.schedule.type).toBe("SOA");
+    expect(result.targetTime.month).toBe(6);
+    expect(result.targetTime.day).toBe(4);
+  });
+
+  it("keeps input order for multiple schedules with the same sendDay", () => {
+    const now = DateTime.fromISO("2026-05-10T10:00:00", {
+      zone: "Asia/Jakarta",
+    });
+    const schedules = [
+      { type: "RL2" as const, soaType: 3 as const, sendDay: 11, graceDays: 5 },
+      { type: "RL1" as const, soaType: 2 as const, sendDay: 11, graceDays: 7 },
+    ];
+    const result = computeNextRun(now, schedules);
+    expect(result.schedule.type).toBe("RL2");
+  });
+
+  it("throws for empty schedule config", () => {
+    const now = DateTime.fromISO("2026-05-10T10:00:00", {
+      zone: "Asia/Jakarta",
+    });
+    let message = "";
+    try {
+      computeNextRun(now, []);
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toBe("No valid future schedule could be computed");
   });
 });

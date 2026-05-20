@@ -1,5 +1,6 @@
-import type { IAccount } from "../../../types";
-import { executeQuery } from "../database";
+import { SENTINEL_ALL } from "../../../constants/constants.js";
+import type { IAccount } from "../../../types/customer.type.js";
+import { executeQuery } from "../postgres";
 
 export const getAllAccounts = async () => {
   const query = `SELECT 
@@ -8,14 +9,11 @@ export const getAllAccounts = async () => {
       CM_FULLNAME AS "fullName",
       ACTING_CODE AS "actingCode"
     FROM MASTER_CM 
-    WHERE IS_CUSTOMER = 'N'`;
-  // WHERE IS_CUSTOMER = 'N'
-  // AND ROWNUM <= 5`;
+    WHERE IS_CUSTOMER = 'N'
+    ORDER BY CM_CODE`;
 
-  const result = await executeQuery(query);
-  const rows = (result.rows as IAccount[]) || [];
-
-  return rows;
+  const result = await executeQuery<IAccount>(query);
+  return result.rows;
 };
 
 export const getAccountById = async (
@@ -30,13 +28,11 @@ export const getAccountById = async (
       EMAIL AS "email",
       VIRTUAL_ACC AS "virtualAccount"
     FROM MASTER_CM 
-    WHERE CM_CODE = :customerId
+    WHERE CM_CODE = $1
   `;
 
-  const result = await executeQuery(query, { customerId });
-  const rows = (result.rows as IAccount[]) || [];
-
-  return rows?.[0] ?? null;
+  const result = await executeQuery<IAccount>(query, [customerId]);
+  return result.rows?.[0] ?? null;
 };
 
 type EmailRow = { EMAIL: string };
@@ -48,20 +44,17 @@ export const getAccountEmails = async (
   let query = `
     SELECT DISTINCT EMAIL 
     FROM MASTER_COLLECTION 
-    WHERE CM_CODE = :cmCode 
+    WHERE CM_CODE = $1 
       AND EMAIL IS NOT NULL
   `;
 
-  const binds: Record<string, string> = { cmCode };
+  const params: unknown[] = [cmCode];
 
-  if (officeCode && officeCode !== "ALL") {
-    query += " AND OFFICE_CODE = :officeCode";
-    binds.officeCode = officeCode;
+  if (officeCode && officeCode !== SENTINEL_ALL) {
+    query += " AND OFFICE_CODE = $2";
+    params.push(officeCode);
   }
 
-  const result = await executeQuery(query, binds);
-  const rows =
-    (result.rows as EmailRow[])?.map((r) => r.EMAIL).filter(Boolean) ?? [];
-
-  return rows;
+  const result = await executeQuery<EmailRow>(query, params);
+  return result.rows.map((r) => r.EMAIL).filter(Boolean);
 };

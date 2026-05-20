@@ -1,52 +1,27 @@
-import { isDevelopment } from "../constants";
-import type { IStatementOfAccountModel } from "../types";
-import { generateDevData } from "./dev-data";
-import { streamSoaData } from "./read";
-import { transformSoaStream } from "./transform";
+import { isDevelopment } from "../constants/environment.js";
+import logger from "../utils/logger.js";
+import { refreshStaging } from "./read/staging";
 import type { ISoaPipelineResult } from "./types";
-import { writeToParquet } from "./write";
 
-// Run complete SOA pipeline: Oracle → Transform → Parquet by account code → upload to Azure Blob
+// Pipeline: materialize SOA query result into staging table.
+// The SOA workflow reads from the staging table directly — no Parquet intermediary.
 
 export async function generateSoaPipeline(
   asAtDate: Date
 ): Promise<ISoaPipelineResult> {
-  console.log("[Pipeline] Starting SOA pipeline");
+  logger.info({ component: "Pipeline" }, "Starting SOA pipeline");
 
   if (isDevelopment()) {
-    console.log("[Pipeline] DEV MODE: generating synthetic data");
-    const testData = generateDevData();
-    const testStream: AsyncIterable<IStatementOfAccountModel> = {
-      [Symbol.asyncIterator]() {
-        let i = -1;
-        return {
-          next: () =>
-            Promise.resolve().then(
-              (): IteratorResult<IStatementOfAccountModel> => {
-                i += 1;
-                return i < testData.length
-                  ? { value: testData[i], done: false as const }
-                  : { value: undefined, done: true as const };
-              }
-            ),
-        };
-      },
-    };
-    await writeToParquet(testStream, asAtDate);
-    console.log("[Pipeline] Dev pipeline completed");
+    logger.info(
+      { component: "Pipeline" },
+      "DEV MODE: skipping staging refresh"
+    );
     return { success: true };
   }
 
-  // Create pipeline: Reader → Transformer
-  const oracleStream = streamSoaData(asAtDate);
-  const transformedStream = transformSoaStream(oracleStream);
+  await refreshStaging(asAtDate);
 
-  // Write to Parquet
-  await writeToParquet(transformedStream, asAtDate);
+  logger.info({ component: "Pipeline" }, "Completed");
 
-  console.log("[Pipeline] Completed");
-
-  return {
-    success: true,
-  };
+  return { success: true };
 }

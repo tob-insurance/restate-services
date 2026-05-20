@@ -1,7 +1,8 @@
 import { request as httpRequest, type IncomingMessage } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { HttpsProxyAgent } from "https-proxy-agent";
-import { INFRASTRUCTURE_TIMEOUTS } from "../../constants";
+import { INFRASTRUCTURE_TIMEOUTS } from "../../constants/constants.js";
+import logger from "../../utils/logger.js";
 
 type PdfOptions = {
   marginTop?: number;
@@ -172,13 +173,22 @@ export async function generatePdfWithHeaderFooter(
     return await streamToBuffer(response);
   } catch (error: unknown) {
     if (error instanceof DOMException && error.name === "AbortError") {
-      console.error("[Gotenberg] PDF generation timed out");
-      throw new Error("PDF generation timed out after 60 seconds");
+      logger.error(
+        { component: "Gotenberg", err: error },
+        "PDF generation timed out"
+      );
+      throw new Error("PDF generation timed out after 60 seconds", {
+        cause: error,
+      });
     }
 
-    console.error("[Gotenberg] PDF generation failed:", error);
-    throw new Error(
-      `Failed to generate PDF: ${error instanceof Error ? error.message : String(error)}`
+    logger.error(
+      { component: "Gotenberg", err: error },
+      "PDF generation failed"
     );
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to generate PDF: ${errorMessage}`, {
+      cause: error,
+    });
   }
 }

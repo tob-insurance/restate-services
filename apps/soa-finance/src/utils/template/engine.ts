@@ -50,9 +50,13 @@ export async function renderEmail(
   });
 }
 
-export function renderPlain(
-  templateName: EmailTemplateName,
+const simpleLiquid = new Liquid({
+  cache: process.env.NODE_ENV === "production",
+});
+
+export function renderString(
+  template: string,
   data: Record<string, unknown>
 ): Promise<string> {
-  return engine.renderFile(templateName, data);
+  return simpleLiquid.parseAndRender(template, data);
 }

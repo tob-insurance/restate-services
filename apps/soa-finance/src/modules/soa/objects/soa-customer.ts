@@ -4,12 +4,14 @@ import {
   TerminalError,
 } from "@restatedev/restate-sdk";
 
-import { getAccountById } from "../../../infrastructure/database/index.js";
-import type { ISoaItem } from "../../../types";
-import { sendWithAttachments } from "../../email";
+import { PERIODS_TO_KEEP } from "../../../constants/constants.js";
+import { getAccountById } from "../../../infrastructure/database/queries/customer-query.js";
+import type { ISoaItem } from "../../../types/soa.type.js";
 import { processReminderLetter } from "../../reminder";
 import { processBranchSoa } from "../services/process-branches";
 import { readDcNoteIndex } from "./state";
+
+const PERIOD_STATE_KEY_REGEX = /^[^:]+:(\d{4}-\d{2})(?::|$)/;
 
 type SoaCustomerResult = {
   customerId: string;
@@ -40,8 +42,10 @@ export const soaCustomer = object({
 
       ctx.console.log(`[SoaCustomer] Starting for customer: ${customerId}`);
 
-      const customerData = await ctx.run("get-customer-data", () =>
-        getAccountById(customerId)
+      const customerData = await ctx.run(
+        "get-customer-data",
+        { timeout: 30_000 },
+        () => getAccountById(customerId)
       );
 
       if (!customerData) {
@@ -57,24 +61,14 @@ export const soaCustomer = object({
           item: soaParams,
         });
       } else {
-        const dateNow = new Date(soaParams.processingDate);
-        const hasDocuments = await processBranchSoa({
+        // Email is sent inside processBranchSoa (generate+upload+send in one ctx.run)
+        const branchResult = await processBranchSoa({
           ctx,
           customerData,
           params: soaParams,
         });
 
-        if (hasDocuments) {
-          await ctx.run(
-            "send-email",
-            async () =>
-              await sendWithAttachments({
-                customerId: soaParams.customerId,
-                customerData,
-                date: dateNow,
-              })
-          );
-        } else {
+        if (!branchResult.hasDocuments) {
           ctx.console.log(
             `Skipping email for ${soaParams.customerId}: no documents generated`
           );
@@ -82,6 +76,8 @@ export const soaCustomer = object({
       }
 
       ctx.console.log(`[SoaCustomer] Completed for customer: ${customerId}`);
+
+      await cleanupOldPeriodState(ctx, timePeriod);
 
       return { customerId, status: "completed" };
     },
@@ -99,4 +95,30 @@ async function hasRemindersForPeriod(
   return Object.values(dcNoteIndex).some((reminderId) =>
     reminderId.startsWith(`${timePeriod}:`)
   );
+}
+
+async function cleanupOldPeriodState(
+  ctx: ObjectContext,
+  currentTimePeriod: string
+): Promise<void> {
+  const cutoffPeriodIndex =
+    getPeriodIndex(currentTimePeriod) - PERIODS_TO_KEEP + 1;
+  const keys = await ctx.stateKeys();
+
+  for (const key of keys) {
+    const match = key.match(PERIOD_STATE_KEY_REGEX);
+    if (!match) {
+      continue;
+    }
+
+    const periodIndex = getPeriodIndex(match[1]);
+    if (periodIndex < cutoffPeriodIndex) {
+      ctx.clear(key);
+    }
+  }
+}
+
+function getPeriodIndex(timePeriod: string): number {
+  const [year, month] = timePeriod.split("-").map(Number);
+  return year * 12 + month;
 }

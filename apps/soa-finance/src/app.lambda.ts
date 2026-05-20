@@ -1,17 +1,18 @@
 import { createEndpointHandler } from "@restatedev/restate-sdk/lambda";
-import { initOracleClient } from "./infrastructure/database/database.js";
+import { initPostgresClient } from "./infrastructure/database/postgres.js";
 import { sharedServices } from "./services.js";
+import logger from "./utils/logger.js";
 
 // Catch unhandled rejections
 process.on("unhandledRejection", (reason) => {
-  console.error("[FATAL] Unhandled Rejection:", reason);
+  logger.error({ component: "FATAL", err: reason }, "Unhandled Rejection");
 });
 
 process.on("uncaughtException", (error) => {
-  console.error("[FATAL] Uncaught Exception:", error);
+  logger.error({ component: "FATAL", err: error }, "Uncaught Exception");
 });
 
-initOracleClient();
+initPostgresClient();
 
 export const handler = createEndpointHandler({
   services: sharedServices,

@@ -2,6 +2,8 @@
  * Date Formatting Functions
  */
 
+import { SCHEDULE_CONFIG } from "../../constants/schedule";
+
 const INDONESIAN_MONTHS = [
   "Januari",
   "Februari",
@@ -31,13 +33,6 @@ const ENGLISH_MONTHS = [
   "November",
   "December",
 ];
-
-export function formatIndonesianDate(date: Date): string {
-  const day = date.getDate().toString().padStart(2, "0");
-  const month = INDONESIAN_MONTHS[date.getMonth()];
-  const year = date.getFullYear();
-  return `Jakarta, ${day} ${month} ${year}`;
-}
 
 export function formatDateIndonesian(date: Date): string {
   return `${date.getDate()} ${INDONESIAN_MONTHS[date.getMonth()]} ${date.getFullYear()}`;
@@ -93,6 +88,24 @@ export function formatDuration(durationMs: number): string {
   const ss = date.getUTCSeconds().toString().padStart(2, "0");
 
   return `${hh}:${mm}:${ss}`;
+}
+
+export function computeDeadline(
+  type: string,
+  processingDate: Date
+): { deadlineId: string; deadlineEn: string } | null {
+  const soaType = Number(type) + 1;
+  const schedule = SCHEDULE_CONFIG.find((s) => s.soaType === soaType);
+  const graceDays = schedule?.graceDays ?? 0;
+  if (graceDays === 0) {
+    return null;
+  }
+  const deadline = new Date(processingDate);
+  deadline.setDate(deadline.getDate() + graceDays);
+  return {
+    deadlineId: formatDateIndonesian(deadline),
+    deadlineEn: formatDateEnglishMonthFirst(deadline),
+  };
 }
 
 export function parseDate(value: unknown): string {

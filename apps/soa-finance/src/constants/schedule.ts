@@ -1,4 +1,4 @@
-import type { SoaType } from "../types";
+import type { SoaType } from "../types/soa.type.js";
 
 export type IScheduleConfig = {
   type: "SOA" | "RL1" | "RL2" | "WL";
@@ -10,6 +10,7 @@ export type IScheduleConfig = {
 function parseScheduleDays(): number[] {
   const raw = process.env.SOA_SCHEDULE_DAYS;
   if (!raw) {
+    // Business default schedule days; override with SOA_SCHEDULE_DAYS when needed.
     return [4, 11, 19, 25];
   }
   const days = raw.split(",").map((s) => Number(s.trim()));
@@ -19,6 +20,7 @@ function parseScheduleDays(): number[] {
   ) {
     return days;
   }
+  // Invalid overrides fall back to the business default schedule days.
   return [4, 11, 19, 25];
 }
 

@@ -27,10 +27,6 @@ export const AZURE_UPLOAD = {
   UPLOAD_TIMEOUT_MS: INFRASTRUCTURE_TIMEOUTS.AZURE_UPLOAD_MS,
 } as const;
 
-export const ORACLE_STREAM = {
-  FETCH_ARRAY_SIZE: 500,
-} as const;
-
 export const PIPELINE = {
   LARGE_DATASET_WARN_THRESHOLD: 100_000,
 } as const;
@@ -50,6 +46,12 @@ export const NUMBER_FORMATS = {
   date: "dd/mm/yyyy",
   text: "@",
 } as const;
+
+// ── Business Rules ──────────────────────────────────────────
+export const AGING_THRESHOLD = 60;
+export const PERIODS_TO_KEEP = 3;
+export const SENTINEL_ALL = "ALL";
+export const DOTNET_TICKS_EPOCH_OFFSET = 621_355_968_000_000_000;
 
 const DATE_PATTERN = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 

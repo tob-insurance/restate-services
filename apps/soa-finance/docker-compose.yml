@@ -11,6 +11,14 @@ services:
     networks:
       - restate-network
 
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    container_name: gotenberg_dev
+    ports:
+      - "3000:3000"
+    networks:
+      - restate-network
+
 networks:
   restate-network:
     driver: bridge

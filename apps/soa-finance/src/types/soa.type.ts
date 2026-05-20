@@ -1,11 +1,11 @@
-export const SoaType = {
+export const SoaTypeLabels = {
   1: "SOA",
   2: "RL1",
   3: "RL2",
   4: "WL",
-};
+} as const;
 
-export type SoaType = keyof typeof SoaType;
+export type SoaType = 1 | 2 | 3 | 4;
 
 export type ISoaItem = {
   customerId: string;
@@ -55,10 +55,6 @@ export type IStatementOfAccountModel = {
   netPremiumIdr: number;
   installment: string;
   origAmount: number;
-  dcNoteNo?: string;
-  classOfBusiness?: string;
-  customerCode: string;
-  officeCode?: string;
   distributionCode: string;
 };
 

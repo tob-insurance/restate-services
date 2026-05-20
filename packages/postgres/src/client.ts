@@ -30,6 +30,7 @@ export function createPostgresClient(config: PostgresConfig): PostgresClient {
     validateSchemaName(schema);
   }
 
+  const isLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
   const pool = new Pool({
     max: 20,
     min: 2,
@@ -39,6 +40,7 @@ export function createPostgresClient(config: PostgresConfig): PostgresClient {
     statement_timeout: 300_000,
     query_timeout: 300_000,
     ...poolConfig,
+    ...(isLambda ? { min: 0, max: 1 } : {}),
   });
 
   pool.on("connect", (client) => {
@@ -73,6 +75,19 @@ export function createPostgresClient(config: PostgresConfig): PostgresClient {
     async close(): Promise<void> {
       await pool.end();
       console.log("PostgreSQL pool closed");
+    },
+
+    async executeQuery<T>(
+      sql: string,
+      params?: unknown[]
+    ): Promise<{ rows: T[]; rowCount: number | null }> {
+      const conn = await pool.connect();
+      try {
+        const result = await conn.query(sql, params);
+        return { rows: result.rows as T[], rowCount: result.rowCount ?? null };
+      } finally {
+        conn.release();
+      }
     },
   };
 }

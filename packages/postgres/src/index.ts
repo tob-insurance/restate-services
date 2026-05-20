@@ -6,4 +6,5 @@ export {
   isDataIntegrityError,
   PG_ERROR_CODES,
 } from "./errors.js";
+export { Cursor, PG_STREAM, withConnectionGenerator } from "./stream.js";
 export type { PostgresClient, PostgresConfig } from "./types.js";

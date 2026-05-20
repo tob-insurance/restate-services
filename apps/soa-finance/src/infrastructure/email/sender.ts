@@ -1,6 +1,8 @@
 import { request as httpsRequest } from "node:https";
 import { ClientSecretCredential } from "@azure/identity";
 import { HttpsProxyAgent } from "https-proxy-agent";
+import { EMAIL_CONFIG } from "../../utils/config/emails.js";
+import logger from "../../utils/logger.js";
 import type { IEmailAttachment, IEmailMessage } from "./types";
 
 type GraphSendMailBody = {
@@ -20,8 +22,7 @@ type GraphSendMailBody = {
   saveToSentItems: boolean;
 };
 
-const SHARED_MAILBOX =
-  process.env.AZURE_SHARED_MAILBOX || "collection@tob-ins.com";
+const SHARED_MAILBOX = EMAIL_CONFIG.SHARED_MAILBOX;
 
 function formatRecipients(emails: string[]) {
   return emails.map((email) => ({ emailAddress: { address: email } }));
@@ -119,12 +120,13 @@ export async function sendEmail(message: IEmailMessage): Promise<boolean> {
       req.end();
     });
 
-    console.log(
-      `[Email] Sent to: ${message.to.join(", ")}, subject: ${message.subject}`
+    logger.info(
+      { component: "Email", subject: message.subject, to: message.to },
+      "Sent email"
     );
     return true;
   } catch (error: unknown) {
-    console.error("[Email] Failed to send:", error);
+    logger.error({ component: "Email", err: error }, "Failed to send");
     throw error;
   }
 }

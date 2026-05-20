@@ -30,4 +30,5 @@ jobs:
       app-name: "finance"
       lambda-name: "finance-closing"
       environment: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'prod' }}
+      oracle-layer-name: "oracle-instantclient"
     secrets: inherit

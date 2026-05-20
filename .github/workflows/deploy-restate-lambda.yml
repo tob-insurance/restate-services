@@ -15,10 +15,14 @@ on:
         description: "Deployment environment"
         type: string
         default: "prod"
+      oracle-layer-name:
+        description: "Oracle Instant Client Lambda layer name (leave empty to clear layers)"
+        type: string
+        required: false
+        default: ""
 
 env:
   AWS_REGION: ap-southeast-3
-  LAMBDA_LAYER_NAME: oracle-instantclient
 
 jobs:
   deploy:
@@ -63,15 +67,19 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Look up Oracle Lambda Layer (if configured)
+        id: oracle-layer
+        if: inputs.oracle-layer-name != ''
+        run: |
+          LAYER_ARN=$(aws lambda list-layer-versions \
+            --layer-name ${{ inputs.oracle-layer-name }} \
+            --query 'LayerVersions[0].LayerVersionArn' \
+            --output text)
+          echo "layer-arn=$LAYER_ARN" >> "$GITHUB_OUTPUT"
+
       - name: Deploy Lambda Function
         id: deploy
         run: |
-          LAYER_ARN=$(aws lambda list-layer-versions \
-            --layer-name ${{ env.LAMBDA_LAYER_NAME }} \
-            --query 'LayerVersions[0].LayerVersionArn' \
-            --output text)
-          echo "Using Oracle layer: $LAYER_ARN"
-
           aws lambda update-function-code \
             --function-name ${{ inputs.lambda-name }} \
             --zip-file fileb://apps/${{ inputs.app-name }}/dist-lambda/lambda.zip
@@ -92,7 +100,6 @@ jobs:
               if (eqIdx === -1) return;
               const key = line.slice(0, eqIdx).trim();
               let value = line.slice(eqIdx + 1).trim();
-              // Remove surrounding quotes
               if ((value.startsWith('\"') && value.endsWith('\"')) ||
                   (value.startsWith(\"'\") && value.endsWith(\"'\"))) {
                 value = value.slice(1, -1);
@@ -102,10 +109,17 @@ jobs:
             fs.writeFileSync('/tmp/env.json', JSON.stringify({ Variables: vars }));
           "
 
-          aws lambda update-function-configuration \
-            --function-name ${{ inputs.lambda-name }} \
-            --layers "$LAYER_ARN" \
-            --environment file:///tmp/env.json
+          if [ -n "${{ steps.oracle-layer.outputs.layer-arn }}" ]; then
+            aws lambda update-function-configuration \
+              --function-name ${{ inputs.lambda-name }} \
+              --layers "${{ steps.oracle-layer.outputs.layer-arn }}" \
+              --environment file:///tmp/env.json
+          else
+            aws lambda update-function-configuration \
+              --function-name ${{ inputs.lambda-name }} \
+              --layers '[]' \
+              --environment file:///tmp/env.json
+          fi
 
       - name: Tag Lambda function
         run: |

@@ -16,7 +16,7 @@ on:
     branches: [main]
     paths:
       - "apps/soa-finance/**"
-      - "packages/oracle/**"
+      - "packages/postgres/**"
       - ".github/workflows/deploy-restate-lambda.yml"
 
 jobs:
@@ -29,4 +29,5 @@ jobs:
       app-name: "soa-finance"
       lambda-name: "soa-finance"
       environment: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'prod' }}
+      oracle-layer-name: ""  # soa-finance doesn't use Oracle; clears any existing layers
     secrets: inherit

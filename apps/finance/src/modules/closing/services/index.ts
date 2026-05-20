@@ -1,5 +1,2 @@
-export type { GeniusClosingJobSubmit, GeniusJobStatus } from "../types.js";
-export {
-  checkGeniusClosingJobStatus,
-  submitGeniusClosingJob,
-} from "./genius-closing.service.js";
+export type { GeniusClosingJobSubmit } from "../types.js";
+export { submitGeniusClosingJob } from "./genius-closing.service.js";

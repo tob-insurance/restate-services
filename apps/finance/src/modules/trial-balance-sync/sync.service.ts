@@ -1,13 +1,44 @@
-import {
-  type CalculatedTrialBalance,
-  OpenBalanceRepository,
-} from "@restate-tob/oracle";
 import { withConnection as withPostgresConnection } from "@restate-tob/postgres";
 import type { PoolClient } from "pg";
-import {
-  getOracleClient,
-  getPostgresClient,
-} from "../../infrastructure/index.js";
+import { getPostgresClient } from "../../infrastructure/index.js";
+
+/**
+ * Represents a calculated trial balance record.
+ * Previously imported from @restate-tob/oracle, now defined locally
+ * since Oracle dependency has been removed.
+ */
+export type CalculatedTrialBalance = {
+  coaCode: string;
+  branchCode: string;
+  description: string;
+  startDebit: number;
+  startCredit: number;
+  startBalance: number;
+  movementDebit: number;
+  movementCredit: number;
+  movementBalance: number;
+  endDebit: number;
+  endCredit: number;
+  endBalance: number;
+  hasAnyValue: boolean;
+};
+
+/**
+ * Represents a raw open balance record from the Genius PostgreSQL database.
+ */
+type OpenBalanceRow = {
+  coacode: string;
+  description: string;
+  year: number;
+  month: number;
+  branch: string;
+  beginningdebit: string;
+  beginningcredit: string;
+  debitamount: string;
+  creditamount: string;
+  endingdebit: string;
+  endingcredit: string;
+};
 
 export type SyncTrialBalanceResult = {
   success: boolean;
@@ -28,9 +59,7 @@ export async function syncTrialBalanceFromGenius(
   );
 
   try {
-    const repository = new OpenBalanceRepository(getOracleClient());
-
-    // Delete existing data for the period
+    // Delete existing data for the period from financial_report PostgreSQL
     await withPostgresConnection(
       getPostgresClient(),
       async (client: PoolClient) => {
@@ -46,31 +75,60 @@ export async function syncTrialBalanceFromGenius(
       }
     );
 
-    // Extract Genius data and process COA hierarchy
+    // Extract data from Genius PostgreSQL (replaces Oracle OpenBalanceRepository)
     const geniusData = new Map<string, CalculatedTrialBalance>();
 
-    for await (const openBalance of repository.getList(year, month)) {
-      const key = `${openBalance.coaCode}|${openBalance.branch}`;
-      geniusData.set(key, {
-        coaCode: openBalance.coaCode,
-        branchCode: openBalance.branch,
-        description: openBalance.description,
-        startDebit: Number(openBalance.beginningDebit),
-        startCredit: Number(openBalance.beginningCredit),
-        startBalance:
-          Number(openBalance.beginningDebit) -
-          Number(openBalance.beginningCredit),
-        movementDebit: Number(openBalance.debitAmount),
-        movementCredit: Number(openBalance.creditAmount),
-        movementBalance:
-          Number(openBalance.debitAmount) - Number(openBalance.creditAmount),
-        endDebit: Number(openBalance.endingDebit),
-        endCredit: Number(openBalance.endingCredit),
-        endBalance:
-          Number(openBalance.endingDebit) - Number(openBalance.endingCredit),
-        hasAnyValue: true,
-      });
-    }
+    await withPostgresConnection(
+      getPostgresClient(),
+      async (client: PoolClient) => {
+        // AC_GLOPENBALANCE lives in the acpdb schema (legacy Genius data).
+        await client.query("SET search_path TO acpdb");
+        const query = `
+          SELECT
+              op.COACODE,
+              MAX(op.DESCRIPTION) AS description,
+              op.GLYEAR AS year,
+              op.GLMONTH AS month,
+              op.BRANCH,
+              SUM(op.BEGINNING_DEBIT) AS beginningdebit,
+              SUM(op.BEGINNING_CREDIT) AS beginningcredit,
+              SUM(op.DEBIT_AMOUNT) AS debitamount,
+              SUM(op.CREDIT_AMOUNT) AS creditamount,
+              SUM(op.ENDING_DEBIT) AS endingdebit,
+              SUM(op.ENDING_CREDIT) AS endingcredit
+          FROM AC_GLOPENBALANCE op
+          WHERE op.GLYEAR = $1 AND op.GLMONTH = $2
+          GROUP BY op.COACODE, op.BRANCH, op.GLYEAR, op.GLMONTH
+        `;
+
+        const result = await client.query<OpenBalanceRow>(query, [year, month]);
+
+        for (const row of result.rows) {
+          const key = `${row.coacode}|${row.branch}`;
+          geniusData.set(key, {
+            coaCode: row.coacode,
+            branchCode: row.branch,
+            description: row.description,
+            startDebit: Number.parseFloat(String(row.beginningdebit)),
+            startCredit: Number.parseFloat(String(row.beginningcredit)),
+            startBalance:
+              Number.parseFloat(String(row.beginningdebit)) -
+              Number.parseFloat(String(row.beginningcredit)),
+            movementDebit: Number.parseFloat(String(row.debitamount)),
+            movementCredit: Number.parseFloat(String(row.creditamount)),
+            movementBalance:
+              Number.parseFloat(String(row.debitamount)) -
+              Number.parseFloat(String(row.creditamount)),
+            endDebit: Number.parseFloat(String(row.endingdebit)),
+            endCredit: Number.parseFloat(String(row.endingcredit)),
+            endBalance:
+              Number.parseFloat(String(row.endingdebit)) -
+              Number.parseFloat(String(row.endingcredit)),
+            hasAnyValue: true,
+          });
+        }
+      }
+    );
 
     console.log(`📊 Extracted ${geniusData.size} records from Genius system`);
 
@@ -96,14 +154,8 @@ export async function syncTrialBalanceFromGenius(
               batch.forEach((record, idx) => {
                 const offset = idx * 15;
                 placeholders.push(`(
-                  gen_random_uuid(), $${offset + 1}, $${offset + 2}, $${
-                    offset + 3
-                  }, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${
-                    offset + 7
-                  }, $${offset + 8}, $${offset + 9}, 
-                  $${offset + 10}, $${offset + 11}, $${offset + 12}, $${
-                    offset + 13
-                  }, $${offset + 14}, $${offset + 15}, NOW(), NOW()
+                  gen_random_uuid(), $${offset + 1}, $${offset + 2}, ${`$${offset + 3}`}, $${offset + 4}, $${offset + 5}, $${offset + 6}, ${`$${offset + 7}`}, $${offset + 8}, $${offset + 9}, 
+                  $${offset + 10}, $${offset + 11}, $${offset + 12}, ${`$${offset + 13}`}, $${offset + 14}, $${offset + 15}, NOW(), NOW()
                 )`);
 
                 values.push(

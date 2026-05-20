@@ -57,7 +57,7 @@ export const DailyClosingScheduler = object({
 
       ctx.workflowSendClient(dailyClosingWorkflow, dateStr).run({
         date: dateStr,
-        skipOracleClosing: false,
+        skipGeniusClosing: false,
         skipFinancialMetrics: false,
         userId: "adm",
       });

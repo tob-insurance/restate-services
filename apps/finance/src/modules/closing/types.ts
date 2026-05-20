@@ -6,11 +6,3 @@ export type GeniusClosingJobSubmit = {
   message: string;
   startTime: DateTime;
 };
-
-export type GeniusJobStatus = {
-  status: string;
-  running: boolean;
-  completed: boolean;
-  failed: boolean;
-  message: string;
-};

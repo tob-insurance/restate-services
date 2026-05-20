@@ -8,10 +8,30 @@ export async function withConnection<T>(
   operation: (poolClient: PoolClient) => Promise<T>
 ): Promise<T> {
   const poolClient = await client.pool.connect();
+  let connectionError: Error | null = null;
+
+  const onError = (err: Error) => {
+    connectionError = err;
+    console.error("PostgreSQL connection error during operation:", err.message);
+  };
+  poolClient.on("error", onError);
+
   try {
     return await operation(poolClient);
+  } catch (err) {
+    const captured = connectionError as Error | null;
+    if (captured) {
+      const wrapped = new Error(
+        `PostgreSQL connection lost during operation: ${captured.message}`
+      );
+      wrapped.cause = err;
+      throw wrapped;
+    }
+    throw err;
   } finally {
-    poolClient.release();
+    poolClient.removeListener("error", onError);
+    const captured = connectionError as Error | null;
+    poolClient.release(captured ?? undefined);
   }
 }
 

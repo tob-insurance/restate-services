@@ -1,14 +1,12 @@
 export {
   closeConnections,
-  getOracleClient,
   getPostgresClient,
-  initOracleClient,
-  testConnections,
+  initPostgresClient,
+  testConnection,
 } from "./database.js";
 
 export {
   DateStringSchema,
-  JobNameSchema,
   UserIdSchema,
   UuidSchema,
 } from "./validation.js";

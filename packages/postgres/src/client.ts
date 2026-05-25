@@ -43,6 +43,22 @@ function validateSchemaName(schema: string): void {
   }
 }
 
+async function connectWithSchema(
+  pool: Pool,
+  schema: string | undefined
+): Promise<PoolClient> {
+  const client = await pool.connect();
+  if (schema) {
+    try {
+      await client.query(`SET search_path TO "${schema}"`);
+    } catch (err) {
+      client.release();
+      throw err;
+    }
+  }
+  return client;
+}
+
 export function createPostgresClient(config: PostgresConfig): PostgresClient {
   const { schema, ...poolConfig } = config;
 
@@ -58,15 +74,8 @@ export function createPostgresClient(config: PostgresConfig): PostgresClient {
     allowExitOnIdle: false,
     connectionTimeoutMillis: 10_000,
     statement_timeout: 300_000,
-    query_timeout: 300_000,
     ...poolConfig,
     ...(isLambda ? { min: 0, max: 1 } : {}),
-  });
-
-  pool.on("connect", (client) => {
-    if (schema) {
-      client.query(`SET search_path TO "${schema}"`);
-    }
   });
 
   pool.on("error", (err) => {
@@ -77,18 +86,20 @@ export function createPostgresClient(config: PostgresConfig): PostgresClient {
     pool,
 
     async testConnection(): Promise<boolean> {
+      let client: PoolClient | undefined;
       try {
-        const client = await pool.connect();
+        client = await pool.connect();
         const result = await client.query("SELECT NOW()");
         console.log(
           "✅ PostgreSQL connected successfully at:",
           result.rows[0].now
         );
-        client.release();
         return true;
       } catch (error: unknown) {
         console.error("❌ PostgreSQL connection failed:", error);
         return false;
+      } finally {
+        client?.release();
       }
     },
 
@@ -101,7 +112,7 @@ export function createPostgresClient(config: PostgresConfig): PostgresClient {
       sql: string,
       params?: unknown[]
     ): Promise<{ rows: T[]; rowCount: number | null }> {
-      const conn = await pool.connect();
+      const conn = await connectWithSchema(pool, schema);
       try {
         const result = await conn.query(sql, params);
         return { rows: result.rows as T[], rowCount: result.rowCount ?? null };

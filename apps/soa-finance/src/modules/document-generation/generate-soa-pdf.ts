@@ -1,9 +1,9 @@
 import { CONTENT_TYPES } from "../../constants/constants.js";
-import { generatePdfWithHeaderFooter } from "../../infrastructure/gotenberg/gotenberg-client";
-import { createFooter } from "./html/footer";
-import { createHeader } from "./html/header";
-import { getFooter, getHeader } from "./pdf-assets";
-import { renderLiquidToHtml } from "./pdf-render";
+import { generatePdfWithHeaderFooter } from "../../infrastructure/gotenberg/gotenberg-client.js";
+import { createFooter } from "./html/footer.js";
+import { createHeader } from "./html/header.js";
+import { getFooter, getHeader } from "./pdf-assets.js";
+import { renderLiquidToHtml } from "./pdf-render.js";
 
 export async function generateSoaPdfHandler(params: {
   templateName: string;

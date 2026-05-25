@@ -1,5 +1,5 @@
-import type { IAccount } from "../../types/customer.type.js";
-import type { IStatementOfAccountModel } from "../../types/soa.type.js";
+import type { Account } from "../../types/customer.type.js";
+import type { StatementOfAccountModel } from "../../types/soa.type.js";
 import {
   computeDeadline,
   formatDateEnglish,
@@ -8,7 +8,7 @@ import {
   formatMonthIndonesian,
 } from "../../utils/formatter/date.formatter.js";
 import { formatThousands } from "../../utils/formatter/number.formatter.js";
-import { getSignature } from "./pdf-assets";
+import { getSignature } from "./pdf-assets.js";
 
 type LatestLetterInfo = {
   letterNo: string;
@@ -17,12 +17,12 @@ type LatestLetterInfo = {
 
 interface BuildPdfTemplateDataParams {
   branchName: string;
-  customerData: IAccount;
+  customerData: Account;
   isReminder: boolean;
   latestLetter?: LatestLetterInfo;
   letterNo: string;
   reminderCount: string;
-  soaData: IStatementOfAccountModel[];
+  soaData: StatementOfAccountModel[];
   toDate: Date;
 }
 
@@ -42,7 +42,7 @@ export async function buildPdfTemplateData(
 
   if (isReminder) {
     const totalPremiumVal = soaData.reduce(
-      (acc: number, item: IStatementOfAccountModel) =>
+      (acc: number, item: StatementOfAccountModel) =>
         acc + (item.netPremiumIdr || 0),
       0
     );

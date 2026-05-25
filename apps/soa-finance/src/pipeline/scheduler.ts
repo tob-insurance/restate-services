@@ -6,10 +6,7 @@ import {
 } from "@restatedev/restate-sdk";
 import { DateTime } from "luxon";
 import { TIMEZONE } from "../constants/constants.js";
-import {
-  type IScheduleConfig,
-  SCHEDULE_CONFIG,
-} from "../constants/schedule.js";
+import { SCHEDULE_CONFIG, type ScheduleConfig } from "../constants/schedule.js";
 import { PIPELINE_TIMEOUT_MS } from "../constants/timeouts.js";
 import { batchWorkflow } from "../modules/soa/workflows/batch-workflow.js";
 import { formatDuration } from "../utils/formatter/date.formatter.js";
@@ -30,13 +27,13 @@ export interface ScheduledTriggerPayload {
 
 interface NextRun {
   delayMs: number;
-  schedule: IScheduleConfig;
+  schedule: ScheduleConfig;
   targetTime: DateTime;
 }
 
 export function computeNextRun(
   now: DateTime,
-  schedules: IScheduleConfig[]
+  schedules: ScheduleConfig[]
 ): NextRun {
   const sortedSchedules = [...schedules].sort((a, b) => a.sendDay - b.sendDay);
 
@@ -152,7 +149,7 @@ export const SoaScheduler = object({
 async function runPipelineAndBatch(
   ctx: ObjectContext,
   now: DateTime,
-  schedule: IScheduleConfig
+  schedule: ScheduleConfig
 ): Promise<ScheduleTriggerResult> {
   ctx.console.log(
     `Triggering ${schedule.type} (soaType ${schedule.soaType}): pipeline + batch`

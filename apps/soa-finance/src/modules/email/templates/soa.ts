@@ -1,6 +1,6 @@
 import { formatDateIndonesian } from "../../../utils/formatter/date.formatter.js";
-import { formatEnDate } from "../../../utils/template/email-formatters";
-import { renderEmail } from "../../../utils/template/engine";
+import { formatEnDate } from "../../../utils/template/email-formatters.js";
+import { renderEmail } from "../../../utils/template/engine.js";
 
 export interface SoaEmailData {
   asAtDate: Date;

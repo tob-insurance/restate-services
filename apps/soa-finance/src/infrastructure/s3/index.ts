@@ -1,7 +1,7 @@
 import { PutObjectCommand } from "@aws-sdk/client-s3";
-import type { IFileData } from "../../types/soa.type.js";
+import type { FileData } from "../../types/soa.type.js";
 import logger from "../../utils/logger.js";
-import { getBucketName, getS3Client } from "./s3-client";
+import { getBucketName, getS3Client } from "./s3-client.js";
 
 interface UploadResult {
   key: string;
@@ -22,7 +22,7 @@ function generateStoragePath(
 }
 
 export async function uploadFile(
-  fileData: IFileData,
+  fileData: FileData,
   customerCode: string,
   type: "excel" | "pdf",
   date: Date

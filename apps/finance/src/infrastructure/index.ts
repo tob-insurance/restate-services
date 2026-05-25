@@ -1,5 +1,6 @@
 export {
   closeConnections,
+  executeQuery,
   getPostgresClient,
   initPostgresClient,
   testConnection,

@@ -1,6 +1,7 @@
 import "varlock/auto-load";
 import { serve } from "@restatedev/restate-sdk";
 import {
+  closeConnections,
   initPostgresClient,
   testPostgresConnection,
 } from "./infrastructure/database/postgres.js";
@@ -10,6 +11,21 @@ import {
   checkS3BucketAccess,
 } from "./utils/health.js";
 import logger from "./utils/logger.js";
+
+function registerShutdownHandlers(): void {
+  const shutdown = async (signal: string) => {
+    logger.info(
+      { component: "App", signal },
+      "Shutdown signal received, closing connections..."
+    );
+    await closeConnections();
+    process.exit(0);
+  };
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
+}
+
+registerShutdownHandlers();
 
 const PORT = 9080;
 

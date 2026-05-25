@@ -6,10 +6,10 @@ import {
 
 import { PERIODS_TO_KEEP } from "../../../constants/constants.js";
 import { getAccountById } from "../../../infrastructure/database/queries/customer-query.js";
-import type { ISoaItem } from "../../../types/soa.type.js";
+import type { SoaItem } from "../../../types/soa.type.js";
 import { processReminderLetter } from "../../reminder";
-import { processBranchSoa } from "../services/process-branches";
-import { readDcNoteIndex } from "./state";
+import { processBranchSoa } from "../services/process-branches.js";
+import { readDcNoteIndex } from "./state.js";
 
 const PERIOD_STATE_KEY_REGEX = /^[^:]+:(\d{4}-\d{2})(?::|$)/;
 
@@ -30,7 +30,7 @@ export const soaCustomer = object({
   handlers: {
     process: async (
       ctx: ObjectContext,
-      soaParams: ISoaItem
+      soaParams: SoaItem
     ): Promise<SoaCustomerResult> => {
       const { customerId, timePeriod, processingType } = soaParams;
 

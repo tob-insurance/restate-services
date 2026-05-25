@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { DateTime } from "luxon";
-import { computeNextRun } from "./scheduler";
+import { computeNextRun } from "./scheduler.js";
 
 const MOCK_SCHEDULES = [
   { type: "SOA" as const, soaType: 1 as const, sendDay: 4, graceDays: 0 },

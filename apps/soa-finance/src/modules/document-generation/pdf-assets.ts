@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ASSETS_DIR } from "../../utils/paths";
+import { ASSETS_DIR } from "../../utils/paths.js";
 
 let cachedSignature: string | null = null;
 let cachedHeader: string | null = null;

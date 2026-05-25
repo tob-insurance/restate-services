@@ -66,7 +66,7 @@ export async function executeSyncTrialBalanceStep(
 ): Promise<boolean> {
   if (skip) {
     ctx.console.log(
-      "⏭️  Skipping trial balance sync (skipFinancialMetrics=true)"
+      "⏭️  Skipping trial balance sync (skipSyncTrialBalance=true)"
     );
     return true;
   }

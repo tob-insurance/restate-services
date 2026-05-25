@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ASSETS_DIR } from "../../utils/paths";
+import { ASSETS_DIR } from "../../utils/paths.js";
 import { renderString } from "../../utils/template/engine.js";
-import { getSignature } from "./pdf-assets";
+import { getSignature } from "./pdf-assets.js";
 
 const TEMPLATES_DIR = join(ASSETS_DIR, "email/templates");
 const templateCache = new Map<string, string>();

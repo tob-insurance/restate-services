@@ -1,4 +1,4 @@
-export interface IAccount {
+export interface Account {
   actingCode: string;
   code: string;
   email?: string;

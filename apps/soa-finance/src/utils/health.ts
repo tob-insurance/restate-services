@@ -1,6 +1,6 @@
 import { HeadBucketCommand } from "@aws-sdk/client-s3";
-import { getBucketName, getS3Client } from "../infrastructure/s3/s3-client";
-import logger from "./logger";
+import { getBucketName, getS3Client } from "../infrastructure/s3/s3-client.js";
+import logger from "./logger.js";
 
 export async function checkS3BucketAccess(): Promise<boolean> {
   try {

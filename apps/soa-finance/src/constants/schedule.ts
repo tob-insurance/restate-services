@@ -1,6 +1,6 @@
 import type { SoaType } from "../types/soa.type.js";
 
-export interface IScheduleConfig {
+export interface ScheduleConfig {
   graceDays: number;
   sendDay: number;
   soaType: SoaType;
@@ -27,7 +27,7 @@ function parseScheduleDays(): number[] {
 
 const [soaDay, rl1Day, rl2Day, wlDay] = parseScheduleDays();
 
-export const SCHEDULE_CONFIG: IScheduleConfig[] = [
+export const SCHEDULE_CONFIG: ScheduleConfig[] = [
   { type: "SOA", soaType: 1, sendDay: soaDay, graceDays: 0 },
   { type: "RL1", soaType: 2, sendDay: rl1Day, graceDays: 7 },
   { type: "RL2", soaType: 3, sendDay: rl2Day, graceDays: 5 },

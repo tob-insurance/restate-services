@@ -1,4 +1,4 @@
-export interface IEmailAttachment {
+export interface EmailAttachment {
   contentBytes: string;
   contentId?: string;
   contentType: string;
@@ -6,15 +6,15 @@ export interface IEmailAttachment {
   name: string;
 }
 
-export interface IEmailMessage {
-  attachments?: IEmailAttachment[];
+export interface EmailMessage {
+  attachments?: EmailAttachment[];
   body: string;
   cc?: string[];
   subject: string;
   to: string[];
 }
 
-export interface ISendEmailResult {
+export interface SendEmailResult {
   reason?: string;
   sent: boolean;
 }

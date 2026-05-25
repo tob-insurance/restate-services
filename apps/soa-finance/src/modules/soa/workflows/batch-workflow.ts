@@ -11,14 +11,14 @@ import {
 import { SENTINEL_ALL } from "../../../constants/constants.js";
 import { isDevelopment } from "../../../constants/environment.js";
 import { getAllAccounts } from "../../../infrastructure/database/queries/customer-query.js";
-import type { IAccount } from "../../../types/customer.type.js";
+import type { Account } from "../../../types/customer.type.js";
 import type { SoaType } from "../../../types/soa.type.js";
 import {
   formatDateToUnixTimestamp,
   formatTimePeriod,
 } from "../../../utils/formatter/date.formatter.js";
-import { soaCustomer } from "../objects/soa-customer";
-import { soaSchema } from "../types";
+import { soaCustomer } from "../objects/soa-customer.js";
+import { soaSchema } from "../types.js";
 
 function parseEnvInt(key: string, defaultVal: number): number {
   const raw = process.env[key];
@@ -59,7 +59,7 @@ interface WorkerResult {
   failed: boolean;
 }
 
-export interface IBatchWorkflowResult {
+export interface BatchWorkflowResult {
   failedAccountCount: number;
   failedAccounts: Array<{
     accountId: string;
@@ -93,7 +93,7 @@ export const batchWorkflow = workflow({
     run: async (
       ctx: WorkflowContext,
       soaRequest: soaSchema
-    ): Promise<IBatchWorkflowResult> => {
+    ): Promise<BatchWorkflowResult> => {
       // Validate input
       const parseResult = soaSchema.safeParse(soaRequest);
       if (!parseResult.success) {
@@ -122,7 +122,7 @@ export const batchWorkflow = workflow({
 
       const allAccounts = await ctx.run(
         "get-all-accounts",
-        async (): Promise<IAccount[]> => {
+        async (): Promise<Account[]> => {
           const accounts = await getAllAccounts();
           if (!accounts || accounts.length === 0) {
             throw new Error("No customer accounts found");
@@ -132,7 +132,7 @@ export const batchWorkflow = workflow({
         }
       );
 
-      let accountsToProcess: IAccount[];
+      let accountsToProcess: Account[];
       if (isDevelopment()) {
         const testCodes = new Set(DEV_TEST_CUSTOMER_CODES);
         accountsToProcess = allAccounts.filter((a) => testCodes.has(a.code));
@@ -158,7 +158,7 @@ export const batchWorkflow = workflow({
       // Process accounts in chunks of MAX_WORKERS. Errors from individual
       // accounts are isolated via .map() so one failure does not kill the batch.
       let failedAccountCount = 0;
-      const failedAccounts: IBatchWorkflowResult["failedAccounts"] = [];
+      const failedAccounts: BatchWorkflowResult["failedAccounts"] = [];
       let processedAccountCount = 0;
 
       for (let i = 0; i < accountsToProcess.length; i += MAX_WORKERS) {
@@ -238,7 +238,6 @@ export const batchWorkflow = workflow({
         message: "SOA batch processing completed successfully",
         totalAccounts,
         failedAccountCount,
-        totalFailedCount: failedAccountCount,
         failedAccounts: compactFailedAccounts,
         status: "Completed" as const,
       };

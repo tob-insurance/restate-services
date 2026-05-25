@@ -1,29 +1,29 @@
 import { CONTENT_TYPES } from "../../constants/constants.js";
 import { uploadFile } from "../../infrastructure/s3";
-import type { IAccount } from "../../types/customer.type.js";
+import type { Account } from "../../types/customer.type.js";
 import type {
-  IFileData,
-  ISoaItem,
-  IStatementOfAccountModel,
+  FileData,
+  SoaItem,
+  StatementOfAccountModel,
 } from "../../types/soa.type.js";
 import { excelSoaName } from "../../utils/formatter/naming.formatter.js";
-import { generateExcel } from "./excel.generator";
-import { generateSoaPdfHandler } from "./generate-soa-pdf";
-import { buildPdfTemplateData } from "./pdf-template";
+import { generateExcel } from "./excel.generator.js";
+import { generateSoaPdfHandler } from "./generate-soa-pdf.js";
+import { buildPdfTemplateData } from "./pdf-template.js";
 
 interface GenerateAndUploadParams {
   branchName: string;
-  customerData: IAccount;
+  customerData: Account;
   latestLetter: { letterNo: string; sentDate: Date } | null;
   letterNo: string;
-  params: ISoaItem;
+  params: SoaItem;
   pdfFileName: string;
-  soaData: IStatementOfAccountModel[];
+  soaData: StatementOfAccountModel[];
 }
 
 interface GenerateAndUploadResult {
-  excelFile: IFileData;
-  pdfFile: IFileData;
+  excelFile: FileData;
+  pdfFile: FileData;
 }
 
 export async function generateAndUploadDocuments(

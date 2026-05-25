@@ -1,3 +1,4 @@
+import { logger } from "@restate-tob/shared";
 import { Pool, type PoolClient } from "pg";
 import type { PostgresClient, PostgresConfig } from "./types.js";
 
@@ -12,7 +13,10 @@ export async function withConnection<T>(
 
   const onError = (err: Error) => {
     connectionError = err;
-    console.error("PostgreSQL connection error during operation:", err.message);
+    logger.error(
+      { component: "PostgresPool", err: err.message },
+      "PostgreSQL connection error during operation"
+    );
   };
   poolClient.on("error", onError);
 
@@ -79,7 +83,10 @@ export function createPostgresClient(config: PostgresConfig): PostgresClient {
   });
 
   pool.on("error", (err) => {
-    console.error("Unexpected error on idle PostgreSQL client", err);
+    logger.error(
+      { component: "PostgresPool", err },
+      "Unexpected error on idle PostgreSQL client"
+    );
   });
 
   return {
@@ -90,13 +97,16 @@ export function createPostgresClient(config: PostgresConfig): PostgresClient {
       try {
         client = await pool.connect();
         const result = await client.query("SELECT NOW()");
-        console.log(
-          "✅ PostgreSQL connected successfully at:",
-          result.rows[0].now
+        logger.info(
+          { component: "PostgresPool", connectedAt: result.rows[0].now },
+          "PostgreSQL connected successfully"
         );
         return true;
       } catch (error: unknown) {
-        console.error("❌ PostgreSQL connection failed:", error);
+        logger.error(
+          { component: "PostgresPool", err: error },
+          "PostgreSQL connection failed"
+        );
         return false;
       } finally {
         client?.release();
@@ -105,7 +115,7 @@ export function createPostgresClient(config: PostgresConfig): PostgresClient {
 
     async close(): Promise<void> {
       await pool.end();
-      console.log("PostgreSQL pool closed");
+      logger.info({ component: "PostgresPool" }, "PostgreSQL pool closed");
     },
 
     async executeQuery<T>(

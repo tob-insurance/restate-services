@@ -1,3 +1,3 @@
-export interface ISoaPipelineResult {
+export interface SoaPipelineResult {
   success: boolean;
 }

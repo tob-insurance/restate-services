@@ -1,2 +1,2 @@
 // Email Infrastructure
-export { sendEmail } from "./sender";
+export { sendEmail } from "./sender.js";

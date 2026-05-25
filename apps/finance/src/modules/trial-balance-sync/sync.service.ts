@@ -1,4 +1,7 @@
-import { withConnection as withPostgresConnection } from "@restate-tob/postgres";
+import {
+  isDataIntegrityError,
+  withConnection as withPostgresConnection,
+} from "@restate-tob/postgres";
 import { TerminalError } from "@restatedev/restate-sdk";
 import type { PoolClient } from "pg";
 import { getPostgresClient } from "../../infrastructure/index.js";
@@ -188,13 +191,19 @@ export async function syncTrialBalanceFromGenius(
           await client.query("COMMIT");
         } catch (error: unknown) {
           await client.query("ROLLBACK");
+          const pgError = error as { code?: string; message?: string };
+          if (isDataIntegrityError(pgError.code)) {
+            throw new TerminalError(
+              `Database integrity error during trial balance sync: ${pgError.message ?? "Unknown constraint violation"}`
+            );
+          }
           throw error;
         }
       }
     );
   }
 
-  const endTime = new Date(currentTimeMillis);
+  const endTime = new Date();
   const duration = endTime.getTime() - startTime.getTime();
 
   return {

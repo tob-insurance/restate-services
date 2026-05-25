@@ -1,6 +1,6 @@
 import { SENTINEL_ALL } from "../../constants/constants.js";
 import { getPostgresClient } from "../../infrastructure/database/postgres.js";
-import type { IStatementOfAccountModel } from "../../types/soa.type.js";
+import type { StatementOfAccountModel } from "../../types/soa.type.js";
 
 interface StagingRow {
   acting_code: string;
@@ -42,7 +42,7 @@ interface StagingRow {
   tsi: number;
 }
 
-function mapRow(row: StagingRow): IStatementOfAccountModel {
+function mapRow(row: StagingRow): StatementOfAccountModel {
   const netPremium = Number(row.nett_premium) || 0;
   const exchangeRate = Number(row.exch_rate) || 1;
   const s = (v: string | null | undefined) => v ?? "";
@@ -93,7 +93,7 @@ function mapRow(row: StagingRow): IStatementOfAccountModel {
 export async function getStagingSoaData(
   customerCode: string,
   branchCode: string
-): Promise<IStatementOfAccountModel[]> {
+): Promise<StatementOfAccountModel[]> {
   const client = getPostgresClient();
   const result = await client.executeQuery<StagingRow>(
     `SELECT * FROM soa_pipeline_staging

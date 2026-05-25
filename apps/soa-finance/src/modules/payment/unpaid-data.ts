@@ -1,26 +1,26 @@
 import type { ObjectContext } from "@restatedev/restate-sdk";
 import { SENTINEL_ALL } from "../../constants/constants.js";
-import type { IAccount } from "../../types/customer.type.js";
-import type { IStatementOfAccountModel } from "../../types/soa.type.js";
-import { getStagingSoaData } from "../data-access/staging-reader";
-import type { ISoaReminder } from "../reminder/types";
-import type { ReminderDetail } from "../soa/objects/state";
-import { stateKeys } from "../soa/objects/state";
-import { reconcilePayment } from "./reconcile-payment";
+import type { Account } from "../../types/customer.type.js";
+import type { StatementOfAccountModel } from "../../types/soa.type.js";
+import { getStagingSoaData } from "../data-access/staging-reader.js";
+import type { SoaReminder } from "../reminder/types.js";
+import type { ReminderDetail } from "../soa/objects/state.js";
+import { stateKeys } from "../soa/objects/state.js";
+import { reconcilePayment } from "./reconcile-payment.js";
 
 export async function getUnpaidSoaData(
   ctx: ObjectContext,
-  customer: IAccount,
-  reminder: ISoaReminder
+  customer: Account,
+  reminder: SoaReminder
 ): Promise<{
-  unpaidItems: IStatementOfAccountModel[];
+  unpaidItems: StatementOfAccountModel[];
   dcNotesPaid: string[];
 } | null> {
   const branchCode = reminder.officeId || SENTINEL_ALL;
 
   const soaList = (await ctx.run("read-soa-staging", () =>
     getStagingSoaData(customer.code, branchCode)
-  )) as IStatementOfAccountModel[];
+  )) as StatementOfAccountModel[];
 
   if (soaList.length === 0) {
     return null;

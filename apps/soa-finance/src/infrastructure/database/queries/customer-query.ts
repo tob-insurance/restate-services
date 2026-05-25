@@ -1,6 +1,6 @@
 import { SENTINEL_ALL } from "../../../constants/constants.js";
-import type { IAccount } from "../../../types/customer.type.js";
-import { executeQuery } from "../postgres";
+import type { Account } from "../../../types/customer.type.js";
+import { executeQuery } from "../postgres.js";
 
 export const getAllAccounts = async () => {
   const query = `SELECT 
@@ -11,13 +11,13 @@ export const getAllAccounts = async () => {
     WHERE IS_CUSTOMER = 'N'
     ORDER BY CM_CODE`;
 
-  const result = await executeQuery<IAccount>(query);
+  const result = await executeQuery<Account>(query);
   return result.rows;
 };
 
 export const getAccountById = async (
   customerId: string
-): Promise<IAccount | null> => {
+): Promise<Account | null> => {
   const query = `
     SELECT 
       CM_CODE AS "code", 
@@ -30,7 +30,7 @@ export const getAccountById = async (
     WHERE CM_CODE = $1
   `;
 
-  const result = await executeQuery<IAccount>(query, [customerId]);
+  const result = await executeQuery<Account>(query, [customerId]);
   return result.rows?.[0] ?? null;
 };
 

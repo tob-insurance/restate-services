@@ -2,20 +2,20 @@ import {
   getTestEmailRecipient,
   isDevelopment,
 } from "../../constants/environment.js";
-import type { ISendEmailResult } from "../../infrastructure/email/types";
-import type { IAccount } from "../../types/customer.type.js";
-import type { IFileData } from "../../types/soa.type.js";
-import { sendReminderEmail } from "./send-reminder";
-import { sendSoaEmail } from "./send-soa";
+import type { SendEmailResult } from "../../infrastructure/email/types.js";
+import type { Account } from "../../types/customer.type.js";
+import type { FileData } from "../../types/soa.type.js";
+import { sendReminderEmail } from "./send-reminder.js";
+import { sendSoaEmail } from "./send-soa.js";
 
 export interface SendWithAttachmentsParams {
   branch?: string;
-  customerData: IAccount;
+  customerData: Account;
   date: Date;
-  excelFile: IFileData;
+  excelFile: FileData;
   isReminder?: boolean;
   letterNo?: string;
-  pdfFile: IFileData;
+  pdfFile: FileData;
   previousLetterDate?: Date;
   previousLetterNo?: string;
   reminderType?: string;
@@ -24,7 +24,7 @@ export interface SendWithAttachmentsParams {
 
 export async function sendWithAttachments(
   params: SendWithAttachmentsParams
-): Promise<ISendEmailResult> {
+): Promise<SendEmailResult> {
   const {
     customerData,
     date,

@@ -1,15 +1,15 @@
 import type { ObjectContext } from "@restatedev/restate-sdk";
-import type { IAccount } from "../../types/customer.type.js";
-import { type ISoaItem, SoaTypeLabels } from "../../types/soa.type.js";
-import type { ReminderHeader } from "../soa/objects/state";
-import { readDcNoteIndex, stateKeys } from "../soa/objects/state";
+import type { Account } from "../../types/customer.type.js";
+import { type SoaItem, SoaTypeLabels } from "../../types/soa.type.js";
+import type { ReminderHeader } from "../soa/objects/state.js";
+import { readDcNoteIndex, stateKeys } from "../soa/objects/state.js";
 import { generateReminderLetter } from "./generate-reminder-letter";
-import type { IProcessReminder } from "./types";
+import type { ProcessReminder } from "./types.js";
 
 interface ProcessReminderParams {
   ctx: ObjectContext;
-  customer: IAccount;
-  item: ISoaItem;
+  customer: Account;
+  item: SoaItem;
 }
 
 interface SoaReminder {
@@ -21,7 +21,7 @@ interface SoaReminder {
 
 export const processReminderLetter = async (
   params: ProcessReminderParams
-): Promise<IProcessReminder> => {
+): Promise<ProcessReminder> => {
   const { ctx, customer, item } = params;
 
   ctx.console.log(

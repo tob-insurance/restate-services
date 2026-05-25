@@ -5,24 +5,24 @@ import {
   NUMBER_FORMATS,
   toExcelDate,
 } from "../../constants/constants.js";
-import type { IStatementOfAccountModel } from "../../types/soa.type.js";
+import type { StatementOfAccountModel } from "../../types/soa.type.js";
 
-export interface IExcelColumn {
+export interface ExcelColumn {
   format?: "number" | "currency" | "date" | "text";
   header: string;
   key: ExcelColumnKey;
   width?: number;
 }
 
-type ExcelColumnKey = keyof IStatementOfAccountModel;
+type ExcelColumnKey = keyof StatementOfAccountModel;
 
-export interface ISoaFileResult {
+export interface SoaFileResult {
   bytes: Buffer;
   contentType: string;
   fileName: string;
 }
 
-export const excelColumns: IExcelColumn[] = [
+export const excelColumns: ExcelColumn[] = [
   { header: "DC Note", key: "debitAndCreditNoteNo", width: 18 },
   { header: "Branch", key: "branch", width: 10 },
   { header: "Policy No", key: "policyNo", width: 20 },
@@ -80,8 +80,8 @@ export const excelColumns: IExcelColumn[] = [
 ];
 
 export function groupAndAggregateSoa(
-  soaData: IStatementOfAccountModel[]
-): IStatementOfAccountModel[] {
+  soaData: StatementOfAccountModel[]
+): StatementOfAccountModel[] {
   if (soaData.length === 0) {
     return [];
   }
@@ -96,7 +96,7 @@ export function groupAndAggregateSoa(
   }
 
   // Group by PolicyNo-PolicyEndNo-Installment
-  const groupMap = new Map<string, IStatementOfAccountModel[]>();
+  const groupMap = new Map<string, StatementOfAccountModel[]>();
 
   for (const soa of soaData) {
     const groupKey = `${soa.policyNo}-${soa.policyEndNo}-${soa.installment}`;
@@ -108,7 +108,7 @@ export function groupAndAggregateSoa(
   }
 
   // Aggregate each group
-  const aggregatedData: IStatementOfAccountModel[] = [];
+  const aggregatedData: StatementOfAccountModel[] = [];
 
   for (const group of groupMap.values()) {
     if (group.length === 0) {
@@ -143,8 +143,8 @@ export function groupAndAggregateSoa(
 }
 
 export function sortSoaData(
-  soaData: IStatementOfAccountModel[]
-): IStatementOfAccountModel[] {
+  soaData: StatementOfAccountModel[]
+): StatementOfAccountModel[] {
   return [...soaData].sort((a, b) => {
     if (a.policyNo !== b.policyNo) {
       return (a.policyNo || "").localeCompare(b.policyNo || "");
@@ -172,9 +172,9 @@ function colToLetter(col: number): string {
 }
 
 export async function generateExcel(params: {
-  soaData: IStatementOfAccountModel[];
+  soaData: StatementOfAccountModel[];
   customerId: string;
-}): Promise<ISoaFileResult> {
+}): Promise<SoaFileResult> {
   const { soaData, customerId } = params;
   const { writeXlsx } = await hucrePromise;
 

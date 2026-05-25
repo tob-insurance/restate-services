@@ -1,14 +1,14 @@
 import { isDevelopment } from "../constants/environment.js";
 import logger from "../utils/logger.js";
-import { refreshStaging } from "./read/staging";
-import type { ISoaPipelineResult } from "./types";
+import { refreshStaging } from "./read/staging.js";
+import type { SoaPipelineResult } from "./types.js";
 
 // Pipeline: materialize SOA query result into staging table.
 // The SOA workflow reads from the staging table directly — no Parquet intermediary.
 
 export async function generateSoaPipeline(
   asAtDate: Date
-): Promise<ISoaPipelineResult> {
+): Promise<SoaPipelineResult> {
   logger.info({ component: "Pipeline" }, "Starting SOA pipeline");
 
   if (isDevelopment()) {

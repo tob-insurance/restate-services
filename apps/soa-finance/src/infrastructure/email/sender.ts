@@ -4,7 +4,7 @@ import { HttpsProxyAgent } from "https-proxy-agent";
 import { EMAIL_SEND_TIMEOUT_MS } from "../../constants/timeouts.js";
 import { EMAIL_CONFIG } from "../../utils/config/emails.js";
 import logger from "../../utils/logger.js";
-import type { IEmailAttachment, IEmailMessage } from "./types";
+import type { EmailAttachment, EmailMessage } from "./types.js";
 
 interface GraphSendMailBody {
   message: {
@@ -30,7 +30,7 @@ function formatRecipients(emails: string[]) {
   return emails.map((email) => ({ emailAddress: { address: email } }));
 }
 
-function formatAttachments(attachments?: IEmailAttachment[]) {
+function formatAttachments(attachments?: EmailAttachment[]) {
   return (
     attachments?.map((att) => ({
       "@odata.type": "#microsoft.graph.fileAttachment",
@@ -66,7 +66,7 @@ function bodyToBuffer(body: GraphSendMailBody): Buffer {
   return Buffer.from(JSON.stringify(body), "utf8");
 }
 
-export async function sendEmail(message: IEmailMessage): Promise<boolean> {
+export async function sendEmail(message: EmailMessage): Promise<boolean> {
   const initiatorEmail = process.env.AZURE_INITIATOR_EMAIL;
   if (!initiatorEmail) {
     throw new Error("AZURE_INITIATOR_EMAIL environment variable is required");

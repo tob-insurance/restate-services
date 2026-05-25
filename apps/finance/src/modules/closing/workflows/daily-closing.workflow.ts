@@ -148,6 +148,7 @@ export const dailyClosingWorkflow = workflow({
 
       const closingDate = validatedInput.date || workflowId;
       const skipGeniusClosing = validatedInput.skipGeniusClosing;
+      const skipSyncTrialBalance = validatedInput.skipSyncTrialBalance;
       const skipFinancialMetrics = validatedInput.skipFinancialMetrics;
       const userId = validatedInput.userId ?? DEFAULT_USER_ID;
 
@@ -169,7 +170,7 @@ export const dailyClosingWorkflow = workflow({
 
         await processSyncTrialBalanceStep(ctx, {
           closingDate,
-          skip: skipFinancialMetrics,
+          skip: skipSyncTrialBalance,
           geniusJobName: geniusResult?.jobName,
         });
 

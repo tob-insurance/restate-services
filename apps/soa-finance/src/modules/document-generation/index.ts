@@ -1,7 +1,7 @@
-export { generateExcel } from "./excel.generator";
-export { generateAndUploadDocuments } from "./generate-and-upload";
-export { generateSoaPdfHandler } from "./generate-soa-pdf";
+export { generateExcel } from "./excel.generator.js";
+export { generateAndUploadDocuments } from "./generate-and-upload.js";
+export { generateSoaPdfHandler } from "./generate-soa-pdf.js";
 
-export { getFooter, getHeader, getSignature } from "./pdf-assets";
-export { renderLiquidToHtml } from "./pdf-render";
-export { buildPdfTemplateData } from "./pdf-template";
+export { getFooter, getHeader, getSignature } from "./pdf-assets.js";
+export { renderLiquidToHtml } from "./pdf-render.js";
+export { buildPdfTemplateData } from "./pdf-template.js";

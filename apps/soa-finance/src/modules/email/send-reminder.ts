@@ -3,21 +3,21 @@ import {
   isDevelopment,
 } from "../../constants/environment.js";
 import { sendEmail } from "../../infrastructure/email";
-import type { IAccount } from "../../types/customer.type.js";
-import type { IReminderEmailData } from "../reminder/types";
+import type { Account } from "../../types/customer.type.js";
+import type { ReminderEmailData } from "../reminder/types.js";
 import {
   buildEmailAttachments,
   getCcRecipients,
   resolveRecipientEmail,
-} from "./attachments";
+} from "./attachments.js";
 import {
   generateReminderEmailHtml,
   getReminderEmailSubject,
-} from "./templates/reminder";
+} from "./templates/reminder.js";
 
 interface SendReminderEmailParams {
   branch?: string;
-  customer: IAccount;
+  customer: Account;
   date: Date;
   excelFile: { fileName: string; bytes: Buffer; contentType: string };
   isReminder?: boolean;
@@ -48,7 +48,7 @@ export const sendReminderEmail = async (
     date,
   } = params;
 
-  const emailData: IReminderEmailData = {
+  const emailData: ReminderEmailData = {
     customerName: customer.fullName,
     asAtDate: date,
     virtualAccount: customer.virtualAccount || "-",

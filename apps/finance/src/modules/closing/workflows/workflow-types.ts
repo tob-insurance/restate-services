@@ -35,6 +35,7 @@ export interface WorkflowStatus {
 export const DailyClosingInput = z.object({
   date: DateStringSchema,
   skipGeniusClosing: z.boolean().optional().default(false),
+  skipSyncTrialBalance: z.boolean().optional().default(false),
   skipFinancialMetrics: z.boolean().optional().default(false),
   userId: UserIdSchema.optional(),
 });

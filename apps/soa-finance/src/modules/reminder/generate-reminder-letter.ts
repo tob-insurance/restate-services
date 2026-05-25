@@ -2,15 +2,12 @@ import type { ObjectContext } from "@restatedev/restate-sdk";
 import { SENTINEL_ALL } from "../../constants/constants.js";
 import { isDevelopment } from "../../constants/environment.js";
 import { getAccountEmails } from "../../infrastructure/database/queries/customer-query.js";
-import type { IAccount } from "../../types/customer.type.js";
-import type {
-  ISoaItem,
-  IStatementOfAccountModel,
-} from "../../types/soa.type.js";
+import type { Account } from "../../types/customer.type.js";
+import type { SoaItem, StatementOfAccountModel } from "../../types/soa.type.js";
 import { reminderPdfName } from "../../utils/formatter/naming.formatter.js";
 import { generateAndUploadDocuments } from "../document-generation";
-import { sendWithAttachments } from "../email/send-with-attachments";
-import { getUnpaidSoaData } from "../payment/unpaid-data";
+import { sendWithAttachments } from "../email/send-with-attachments.js";
+import { getUnpaidSoaData } from "../payment/unpaid-data.js";
 import {
   assignLetterRecord,
   getLatestSentLetter,
@@ -18,22 +15,22 @@ import {
   type LatestLetter,
   type StoredLetterRecord,
   updateLetterStatus,
-} from "./letter-state";
-import type { IGenerateReminderResult, ISoaReminder } from "./types";
+} from "./letter-state.js";
+import type { GenerateReminderResult, SoaReminder } from "./types.js";
 
 const DEV_TEST_EMAIL = process.env.SOA_DEV_TEST_EMAIL || "dev-test@tob-ins.com";
 
 interface GenerateReminderLetterParams {
   ctx: ObjectContext;
-  customer: IAccount;
-  item: ISoaItem;
-  reminder: ISoaReminder;
+  customer: Account;
+  item: SoaItem;
+  reminder: SoaReminder;
 }
 
 const validateReminderType = (
   ctx: ObjectContext,
-  customer: IAccount,
-  item: ISoaItem,
+  customer: Account,
+  item: SoaItem,
   latestLetter: LatestLetter
 ): number | null => {
   const previousType = latestLetter
@@ -72,25 +69,25 @@ const validateReminderType = (
 
 interface CreateAndSendReminderParams {
   ctx: ObjectContext;
-  customer: IAccount;
-  item: ISoaItem;
+  customer: Account;
+  item: SoaItem;
   latestLetter: LatestLetter;
   letters: StoredLetterRecord[];
-  reminder: ISoaReminder;
+  reminder: SoaReminder;
   reminderCount: number;
-  unpaidItems: IStatementOfAccountModel[];
+  unpaidItems: StatementOfAccountModel[];
 }
 
 interface GenerateUploadSendReminderParams {
   branchName: string;
   ctx: ObjectContext;
-  customer: IAccount;
-  item: ISoaItem;
+  customer: Account;
+  item: SoaItem;
   latestLetter: LatestLetter;
   letterNo: string;
   reminderCount: number;
   type: string;
-  unpaidItems: IStatementOfAccountModel[];
+  unpaidItems: StatementOfAccountModel[];
 }
 
 const generateUploadAndSendReminder = async ({
@@ -140,7 +137,7 @@ const generateUploadAndSendReminder = async ({
 
 const createAndSendReminder = async (
   params: CreateAndSendReminderParams
-): Promise<IGenerateReminderResult> => {
+): Promise<GenerateReminderResult> => {
   const {
     ctx,
     customer,
@@ -194,7 +191,7 @@ const createAndSendReminder = async (
 
 export const generateReminderLetter = async (
   params: GenerateReminderLetterParams
-): Promise<IGenerateReminderResult | null> => {
+): Promise<GenerateReminderResult | null> => {
   const { ctx, customer, reminder, item } = params;
 
   const letters = await getReminderLetters(ctx, reminder);

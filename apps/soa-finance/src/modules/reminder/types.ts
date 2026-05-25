@@ -1,4 +1,4 @@
-export interface IReminderEmailData {
+export interface ReminderEmailData {
   asAtDate: Date;
   branch?: string;
   customerName: string;
@@ -9,20 +9,20 @@ export interface IReminderEmailData {
   virtualAccount: string;
 }
 
-export interface ISoaReminder {
+export interface SoaReminder {
   customerCode: string;
   id: string;
   officeId: string;
   timePeriod: string;
 }
 
-export interface IProcessReminder {
+export interface ProcessReminder {
   dcNotesPaid: string[];
   processed: boolean;
   remindersSent: number;
 }
 
-export interface IGenerateReminderResult {
+export interface GenerateReminderResult {
   dcNotesPaid: string[];
   letterNo?: string | null;
   reason?: "ALL_PAID" | "SENT" | "ERROR";

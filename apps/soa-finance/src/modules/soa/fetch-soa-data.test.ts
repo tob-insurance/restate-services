@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import type { IStatementOfAccountModel } from "../../types/soa.type";
-import { filterAgingData } from "./fetch-soa-data";
+import type { StatementOfAccountModel } from "../../types/soa.type.js";
+import { filterAgingData } from "./fetch-soa-data.js";
 
 function createMockSoa(
-  overrides: Partial<IStatementOfAccountModel> = {}
-): IStatementOfAccountModel {
+  overrides: Partial<StatementOfAccountModel> = {}
+): StatementOfAccountModel {
   return {
     debitAndCreditNoteNo: "",
     branch: "",

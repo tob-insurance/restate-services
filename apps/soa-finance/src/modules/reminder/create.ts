@@ -1,15 +1,15 @@
 import type { ObjectContext } from "@restatedev/restate-sdk";
-import type { IAccount } from "../../types/customer.type.js";
-import type { IStatementOfAccountModel } from "../../types/soa.type.js";
-import type { ReminderDetail, ReminderHeader } from "../soa/objects/state";
-import { stateKeys } from "../soa/objects/state";
+import type { Account } from "../../types/customer.type.js";
+import type { StatementOfAccountModel } from "../../types/soa.type.js";
+import type { ReminderDetail, ReminderHeader } from "../soa/objects/state.js";
+import { stateKeys } from "../soa/objects/state.js";
 
 export interface CreateReminderParams {
   branchCode: string;
   ctx: ObjectContext;
-  customer: IAccount;
+  customer: Account;
   processingDate: string;
-  soaList: IStatementOfAccountModel[];
+  soaList: StatementOfAccountModel[];
   timePeriod: string;
 }
 

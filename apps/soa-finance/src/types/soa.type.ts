@@ -7,7 +7,7 @@ export const SoaTypeLabels = {
 
 export type SoaType = 1 | 2 | 3 | 4;
 
-export interface ISoaItem {
+export interface SoaItem {
   branch: string;
   classOfBusiness: string;
   customerId: string;
@@ -17,7 +17,7 @@ export interface ISoaItem {
   toDate: number;
 }
 
-export interface IStatementOfAccountModel {
+export interface StatementOfAccountModel {
   accountName: string;
   actingCode: string;
   aging: number;
@@ -58,7 +58,7 @@ export interface IStatementOfAccountModel {
   totalSumInsured: number;
 }
 
-export interface IFileData {
+export interface FileData {
   bytes: Buffer;
   contentId?: string;
   contentType: string;

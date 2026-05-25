@@ -3,7 +3,7 @@ import { join } from "node:path";
 import juice from "juice";
 import { Liquid } from "liquidjs";
 
-import { ASSETS_DIR } from "../paths";
+import { ASSETS_DIR } from "../paths.js";
 
 const TEMPLATES_DIR = join(ASSETS_DIR, "email/templates");
 

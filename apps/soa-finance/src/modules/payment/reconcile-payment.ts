@@ -1,4 +1,4 @@
-import type { ReminderDetail } from "../soa/objects/state";
+import type { ReminderDetail } from "../soa/objects/state.js";
 
 const BULK_PAYMENT_SAFETY_THRESHOLD = 5;
 

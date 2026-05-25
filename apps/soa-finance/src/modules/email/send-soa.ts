@@ -3,22 +3,22 @@ import {
   isDevelopment,
 } from "../../constants/environment.js";
 import { sendEmail } from "../../infrastructure/email";
-import type { IEmailMessage } from "../../infrastructure/email/types";
-import type { IAccount } from "../../types/customer.type.js";
-import type { IFileData } from "../../types/soa.type.js";
+import type { EmailMessage } from "../../infrastructure/email/types.js";
+import type { Account } from "../../types/customer.type.js";
+import type { FileData } from "../../types/soa.type.js";
 import { formatDateDDMMYYYY } from "../../utils/formatter/date.formatter.js";
 import {
   buildEmailAttachments,
   getCcRecipients,
   resolveRecipientEmail,
-} from "./attachments";
-import { generateSoaEmailHtml } from "./templates/soa";
+} from "./attachments.js";
+import { generateSoaEmailHtml } from "./templates/soa.js";
 
 interface SendSoaEmailOptions {
-  customer: IAccount;
+  customer: Account;
   date: Date;
-  excelFile: IFileData;
-  pdfFile: IFileData;
+  excelFile: FileData;
+  pdfFile: FileData;
   toEmail: string;
 }
 
@@ -38,7 +38,7 @@ export const sendSoaEmail = async (
     ? getTestEmailRecipient()
     : resolveRecipientEmail(customer.email || toEmail);
 
-  const message: IEmailMessage = {
+  const message: EmailMessage = {
     to: [recipientEmail],
     cc: isDevelopment()
       ? [getTestEmailRecipient()]

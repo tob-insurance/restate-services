@@ -20,6 +20,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@restate-tob/shared": "workspace:*",
     "pg": "^8.21.0",
     "pg-cursor": "^2.20.0"
   },

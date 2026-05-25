@@ -44,6 +44,27 @@ cd packages/shared && bun run typecheck
 
 Linting uses [ultracite](https://github.com/harbordev/ultracite) (wraps Biome). Lefthook runs `ultracite fix` on pre-commit automatically.
 
+**Key linting notes:**
+- Unused imports are **errors** and **not auto-fixable** — must be removed manually
+- Barrel files (`index.ts` re-exports) are **allowed** — `noBarrelFile` is explicitly disabled in `biome.jsonc`
+- Run `bun run check` to lint, `bun run fix` to auto-fix formatting
+
+### CI/CD Pipeline
+
+- **CI**: GitHub Actions (`ci.yml`), runs on PRs to `main` — typecheck → lint → build → test
+- **Deploy**: Two reusable workflows (`deploy-finance-lambda.yml`, `deploy-soa-finance-lambda.yml`) bundle with `tsdown`, upload to AWS Lambda, register with Restate admin API
+- **Secrets**: Self-hosted Infisical (OIDC auth), converted to Lambda env vars inline
+- **No Docker** for deployment — Lambda-only. `docker-compose.yml` in `apps/soa-finance` is local dev only (Restate + Gotenberg)
+
+### Testing
+
+- **Framework**: Bun's built-in test runner (`bun:test`) — import `{ describe, expect, it } from "bun:test"`
+- **Two patterns**:
+  - Packages: `__tests__/*.test.ts` inside `src/`
+  - Apps: co-located `*.test.ts` next to source files
+- Run tests: `bun run test` (root, apps only) or `bun test src/` (per workspace)
+- Pre-commit does **not** run tests — lint only
+
 ## Architecture
 
 ### Monorepo Structure
@@ -53,6 +74,8 @@ Linting uses [ultracite](https://github.com/harbordev/ultracite) (wraps Biome). 
 - Shared packages in `packages/`:
   - `@restate-tob/postgres`: PostgreSQL database client
   - `@restate-tob/shared`: Shared utilities and types
+  - `@restate-tob/oracle`: (empty — no source yet)
+- **Module resolution split**: Apps (`finance`, `soa-finance`) use `module: "preserve"` + `moduleResolution: "bundler"` (Bun-native). Packages use `module: "nodenext"` (Node ESM). Keep this in mind when adding imports.
 
 ### Restate Framework
 
@@ -153,4 +176,4 @@ Write code that is **accessible, performant, type-safe, and maintainable**. Focu
 - Avoid spread syntax in accumulators within loops
 - Use top-level regex literals instead of creating them in loops
 - Prefer specific imports over namespace imports
-- Avoid barrel files (index files that re-export everything)
+- Barrel files (re-export `index.ts`) are allowed — `noBarrelFile` is disabled in this project

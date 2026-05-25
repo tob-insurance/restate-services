@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { IEmailAttachment } from "../../infrastructure/email/types";
-import type { IFileData } from "../../types/soa.type.js";
+import type { EmailAttachment } from "../../infrastructure/email/types.js";
+import type { FileData } from "../../types/soa.type.js";
 import { EMAIL_CONFIG } from "../../utils/config/emails.js";
 import logger from "../../utils/logger.js";
-import { ASSETS_DIR } from "../../utils/paths";
+import { ASSETS_DIR } from "../../utils/paths.js";
 
 export const FALLBACK_EMAIL = EMAIL_CONFIG.FALLBACK_EMAIL;
 
@@ -16,7 +16,7 @@ export function resolveRecipientEmail(email?: string): string {
   return email || EMAIL_CONFIG.FALLBACK_EMAIL;
 }
 
-function getSignatureAttachment(): IEmailAttachment | null {
+function getSignatureAttachment(): EmailAttachment | null {
   try {
     const signaturePath = join(ASSETS_DIR, "sign.jpeg");
     const bytes = readFileSync(signaturePath);
@@ -45,10 +45,10 @@ function getSignatureAttachment(): IEmailAttachment | null {
 }
 
 export const buildEmailAttachments = (
-  excelFile: IFileData,
-  pdfFile: IFileData
-): IEmailAttachment[] => {
-  const attachments: IEmailAttachment[] = [
+  excelFile: FileData,
+  pdfFile: FileData
+): EmailAttachment[] => {
+  const attachments: EmailAttachment[] = [
     {
       name: excelFile.fileName,
       contentType: excelFile.contentType,

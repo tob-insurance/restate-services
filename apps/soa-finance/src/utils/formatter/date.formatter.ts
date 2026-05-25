@@ -2,7 +2,7 @@
  * Date Formatting Functions
  */
 
-import { SCHEDULE_CONFIG } from "../../constants/schedule";
+import { SCHEDULE_CONFIG } from "../../constants/schedule.js";
 
 const INDONESIAN_MONTHS = [
   "Januari",

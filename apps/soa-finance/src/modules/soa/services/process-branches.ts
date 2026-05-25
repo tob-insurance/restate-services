@@ -2,24 +2,24 @@ import type { ObjectContext } from "@restatedev/restate-sdk";
 import { RestatePromise, TerminalError } from "@restatedev/restate-sdk";
 import { isDevelopment } from "../../../constants/environment.js";
 import { getAllBranches } from "../../../infrastructure/database/queries/branch-query.js";
-import type { IBranch } from "../../../infrastructure/database/types.js";
-import type { IAccount } from "../../../types/customer.type.js";
+import type { Branch } from "../../../infrastructure/database/types.js";
+import type { Account } from "../../../types/customer.type.js";
 import type {
-  ISoaItem,
-  IStatementOfAccountModel,
+  SoaItem,
+  StatementOfAccountModel,
 } from "../../../types/soa.type.js";
 import { letterSoaPdfName } from "../../../utils/formatter/naming.formatter.js";
-import { getStagingSoaData } from "../../data-access/staging-reader";
+import { getStagingSoaData } from "../../data-access/staging-reader.js";
 import { generateAndUploadDocuments } from "../../document-generation";
 import { sendWithAttachments } from "../../email";
 import { createReminder } from "../../reminder";
-import { filterAgingData } from "../fetch-soa-data";
-import { multiBranchCodes } from "../types";
+import { filterAgingData } from "../fetch-soa-data.js";
+import { multiBranchCodes } from "../types.js";
 
 export interface ProcessSoaParams {
   ctx: ObjectContext;
-  customerData: IAccount;
-  params: ISoaItem;
+  customerData: Account;
+  params: SoaItem;
 }
 
 interface BranchResult {
@@ -27,11 +27,11 @@ interface BranchResult {
 }
 
 interface ProcessSingleBranchParams {
-  branch: IBranch;
+  branch: Branch;
   ctx: ObjectContext;
-  customerData: IAccount;
-  params: ISoaItem;
-  rawSoaList: IStatementOfAccountModel[] | null;
+  customerData: Account;
+  params: SoaItem;
+  rawSoaList: StatementOfAccountModel[] | null;
 }
 
 async function processSingleBranch({
@@ -95,9 +95,9 @@ async function processSingleBranch({
 }
 
 async function processBranchWithIsolation(
-  branch: IBranch,
+  branch: Branch,
   index: number,
-  stagingDataList: (IStatementOfAccountModel[] | null)[],
+  stagingDataList: (StatementOfAccountModel[] | null)[],
   soaParams: ProcessSoaParams
 ): Promise<BranchResult> {
   const { ctx, customerData, params } = soaParams;
@@ -121,14 +121,14 @@ async function processBranchWithIsolation(
 }
 
 async function processMultiBranchSoa(
-  branches: IBranch[],
+  branches: Branch[],
   soaParams: ProcessSoaParams
 ): Promise<BranchResult> {
   const { ctx, customerData } = soaParams;
 
   const stagingDataList = await RestatePromise.all(
     branches.map((b) =>
-      ctx.run<IStatementOfAccountModel[] | null>(
+      ctx.run<StatementOfAccountModel[] | null>(
         `read-staging-${b.officeCode}`,
         async () => await getStagingSoaData(customerData.code, b.officeCode)
       )
@@ -150,12 +150,12 @@ async function processMultiBranchSoa(
 }
 
 async function processSingleBranchDirect(
-  branch: IBranch,
+  branch: Branch,
   soaParams: ProcessSoaParams
 ): Promise<BranchResult> {
   const { ctx, customerData, params } = soaParams;
   try {
-    const rawSoaList = await ctx.run<IStatementOfAccountModel[]>(
+    const rawSoaList = await ctx.run<StatementOfAccountModel[]>(
       "read-staging",
       async () => await getStagingSoaData(customerData.code, branch.officeCode)
     );
@@ -185,7 +185,7 @@ export async function processBranchSoa(
   const isMultiBranch =
     !isDevelopment() && multiBranchCodes.includes(customerData.actingCode);
 
-  const branches: IBranch[] = isMultiBranch
+  const branches: Branch[] = isMultiBranch
     ? await ctx.run("get-branches", async () => await getAllBranches())
     : [{ officeCode: params.params.branch, name: params.params.branch }];
 

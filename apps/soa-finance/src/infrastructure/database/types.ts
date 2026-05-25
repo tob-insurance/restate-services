@@ -1,4 +1,4 @@
-export interface IBranch {
+export interface Branch {
   name: string;
   officeCode: string;
 }

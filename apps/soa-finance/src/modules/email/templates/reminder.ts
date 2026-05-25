@@ -2,10 +2,10 @@ import {
   computeDeadline,
   formatDateIndonesian,
 } from "../../../utils/formatter/date.formatter.js";
-import { formatEnDate } from "../../../utils/template/email-formatters";
-import type { EmailTemplateName } from "../../../utils/template/engine";
-import { renderEmail } from "../../../utils/template/engine";
-import type { IReminderEmailData } from "../../reminder/types";
+import { formatEnDate } from "../../../utils/template/email-formatters.js";
+import type { EmailTemplateName } from "../../../utils/template/engine.js";
+import { renderEmail } from "../../../utils/template/engine.js";
+import type { ReminderEmailData } from "../../reminder/types.js";
 
 const currencyFormatter = new Intl.NumberFormat("id-ID", {
   minimumFractionDigits: 2,
@@ -14,7 +14,7 @@ const currencyFormatter = new Intl.NumberFormat("id-ID", {
 
 export async function generateReminderEmailHtml(
   type: string,
-  data: IReminderEmailData,
+  data: ReminderEmailData,
   templateName: EmailTemplateName = "TemplateReminderLetterSOA"
 ): Promise<string> {
   const deadline = computeDeadline(type, data.asAtDate);

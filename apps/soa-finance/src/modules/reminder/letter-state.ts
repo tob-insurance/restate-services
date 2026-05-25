@@ -1,10 +1,10 @@
 import type { ObjectContext } from "@restatedev/restate-sdk";
 import { SENTINEL_ALL } from "../../constants/constants.js";
 import { formatLetterNumber } from "../../utils/formatter/letter.formatter.js";
-import { letterCounter } from "../soa/objects/letter-counter";
-import type { LetterRecord } from "../soa/objects/state";
-import { stateKeys } from "../soa/objects/state";
-import type { ISoaReminder } from "./types";
+import { letterCounter } from "../soa/objects/letter-counter.js";
+import type { LetterRecord } from "../soa/objects/state.js";
+import { stateKeys } from "../soa/objects/state.js";
+import type { SoaReminder } from "./types.js";
 
 export type StoredLetterRecord = Omit<LetterRecord, "status"> & {
   status?: LetterRecord["status"];
@@ -21,7 +21,7 @@ export interface AssignLetterRecordParams {
   dateNow: Date;
   latestLetter: LatestLetter;
   letters: StoredLetterRecord[];
-  reminder: ISoaReminder;
+  reminder: SoaReminder;
   type: string;
 }
 
@@ -31,12 +31,12 @@ interface GetNextLetterNumberParams {
   type: string;
 }
 
-export const getLetterStateKey = (reminder: ISoaReminder): string =>
+export const getLetterStateKey = (reminder: SoaReminder): string =>
   stateKeys.letters(reminder.timePeriod, reminder.officeId || SENTINEL_ALL);
 
 export const getReminderLetters = async (
   ctx: ObjectContext,
-  reminder: ISoaReminder
+  reminder: SoaReminder
 ): Promise<StoredLetterRecord[]> =>
   (await ctx.get<StoredLetterRecord[]>(getLetterStateKey(reminder))) ?? [];
 
@@ -126,7 +126,7 @@ export const assignLetterRecord = async ({
 
 export const updateLetterStatus = async (
   ctx: ObjectContext,
-  reminder: ISoaReminder,
+  reminder: SoaReminder,
   pendingRecord: LetterRecord,
   status: LetterRecord["status"]
 ): Promise<void> => {

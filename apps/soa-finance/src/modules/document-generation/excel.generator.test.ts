@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import type { IStatementOfAccountModel } from "../../types/soa.type";
-import { groupAndAggregateSoa, sortSoaData } from "./excel.generator";
+import type { StatementOfAccountModel } from "../../types/soa.type.js";
+import { groupAndAggregateSoa, sortSoaData } from "./excel.generator.js";
 
 function createMockSoa(
-  overrides: Partial<IStatementOfAccountModel> = {}
-): IStatementOfAccountModel {
+  overrides: Partial<StatementOfAccountModel> = {}
+): StatementOfAccountModel {
   return {
     debitAndCreditNoteNo: "",
     branch: "",

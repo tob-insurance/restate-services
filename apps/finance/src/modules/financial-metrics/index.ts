@@ -1,7 +1,7 @@
 export {
   calculateFinancialMetrics,
   getCalculationRunStatus,
-} from "./services/index.js";
+} from "./services/metrics.service.js";
 export type {
   CalculationRunStatus,
   FinancialMetricsResult,

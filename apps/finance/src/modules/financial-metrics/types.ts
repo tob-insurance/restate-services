@@ -1,20 +1,20 @@
 import type { DateTime } from "luxon";
 
-export type FinancialMetricsResult = {
-  success: boolean;
-  startTime: DateTime;
-  endTime: DateTime;
+export interface FinancialMetricsResult {
   duration: number;
-  rowsAffected?: number;
+  endTime: DateTime;
   message: string;
+  rowsAffected?: number;
   runId?: string;
-};
+  startTime: DateTime;
+  success: boolean;
+}
 
-export type CalculationRunStatus = {
-  status: string;
+export interface CalculationRunStatus {
   completedSteps: number;
-  totalSteps: number;
   errorCount: number;
-  warningCount: number;
   metadata: Record<string, unknown>;
-};
+  status: string;
+  totalSteps: number;
+  warningCount: number;
+}

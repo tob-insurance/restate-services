@@ -1,6 +1,6 @@
 # AWS Lambda Deployment Guide
 
-This guide explains how to deploy the `@finance/closing` Restate service to AWS Lambda with Oracle Instant Client support.
+This guide explains how to deploy the `@restate-tob/finance` Restate service to AWS Lambda with PostgreSQL connectivity.
 
 ## Architecture
 
@@ -9,12 +9,11 @@ This guide explains how to deploy the `@finance/closing` Restate service to AWS 
 │                     AWS Cloud                                │
 │  ┌─────────────────────────────────────────────────────┐    │
 │  │                Lambda Function                       │    │
-│  │  ┌─────────────────┐  ┌───────────────────────────┐ │    │
-│  │  │  Lambda Layer   │  │    Function Code          │ │    │
-│  │  │  (Oracle        │  │    (app.js + deps)        │ │    │
-│  │  │   Instant       │  │                           │ │    │
-│  │  │   Client)       │  │    @finance/closing       │ │    │
-│  │  └─────────────────┘  └───────────────────────────┘ │    │
+│  │  ┌───────────────────────────────────────────────┐  │    │
+│  │  │              Function Code                    │  │    │
+│  │  │              (app.js + deps)                  │  │    │
+│  │  │              @restate-tob/finance             │  │    │
+│  │  └───────────────────────────────────────────────┘  │    │
 │  └─────────────────────────────────────────────────────┘    │
 │                              │                               │
 │                              ▼                               │
@@ -25,16 +24,14 @@ This guide explains how to deploy the `@finance/closing` Restate service to AWS 
                                │
                                ▼
               ┌────────────────────────────────┐
-              │         Oracle Database        │
-              │       (Low version, needs      │
-              │         thick mode)            │
+              │       PostgreSQL Database      │
               └────────────────────────────────┘
 ```
 
 ## Prerequisites
 
 1. **AWS CLI** configured with appropriate credentials
-2. **Docker** (for building the Lambda Layer)
+2. **PostgreSQL database** reachable from the Lambda function
 
 ## CI/CD with GitHub Actions
 
@@ -47,7 +44,7 @@ The workflow at `.github/workflows/deploy-finance-lambda.yml` automates deployme
 | `AWS_DEPLOY_ROLE_ARN` | IAM role ARN for deploying Lambda (with OIDC trust) |
 | `AWS_INVOKE_ROLE_ARN` | IAM role ARN for Restate to invoke Lambda |
 | `RESTATE_ADMIN_URL` | Restate admin URL (from Dashboard) |
-| `RESTATE_AUTH_TOKEN` | Restate API key with Admin role |
+| `RESTATE_BASIC_AUTH` | Restate HTTP Basic Auth credentials (format: `user:password`) |
 
 ### Setup AWS OIDC for GitHub Actions
 
@@ -87,43 +84,10 @@ aws iam create-open-id-connect-provider \
 
 - **Auto deploy**: Push to `main` with changes in `apps/finance/`
 - **Manual deploy**: Use "Run workflow" button in GitHub Actions
-- **Build layer**: Manual trigger only (workflow_dispatch)
 
 ## Manual Deployment
 
-### Step 1: Build the Oracle Instant Client Lambda Layer
-
-### 1.1 Download Oracle Instant Client
-
-Download **Oracle Instant Client Basic Lite** for Linux x86-64 from:
-https://www.oracle.com/database/technologies/instant-client/linux-x86-64-downloads.html
-
-Choose version 19.x for best compatibility. Download the **Basic Light Package (ZIP)**.
-
-### 1.2 Build the Layer
-
-```bash
-# From repository root
-bun run --filter @restate-tob/lambda-layers build:oracle
-
-# Or directly
-cd packages/lambda-layers
-bun run build:oracle
-```
-
-### 1.3 Publish the Layer to AWS
-
-```bash
-aws lambda publish-layer-version \
-  --layer-name oracle-instantclient \
-  --zip-file fileb://packages/lambda-layers/oracle/output/oracle-instantclient-layer.zip \
-  --compatible-runtimes nodejs18.x nodejs20.x nodejs22.x \
-  --compatible-architectures x86_64
-```
-
-Save the `LayerVersionArn` from the output.
-
-## Step 2: Build the Lambda Function
+### Step 1: Build the Lambda Function
 
 ```bash
 cd apps/finance
@@ -137,9 +101,9 @@ bun run bundle:lambda
 
 This creates `dist-lambda/lambda.zip` containing the bundled function code.
 
-## Step 3: Create the Lambda Function
+### Step 2: Create the Lambda Function
 
-### 3.1 Create IAM Role
+#### 2.1 Create IAM Role
 
 ```bash
 # Create trust policy
@@ -168,13 +132,13 @@ aws iam attach-role-policy \
   --role-name finance-closing-lambda-role \
   --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 
-# If using VPC (for RDS/Oracle access)
+# If using VPC for PostgreSQL access
 aws iam attach-role-policy \
   --role-name finance-closing-lambda-role \
   --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
 ```
 
-### 3.2 Create Lambda Function
+#### 2.2 Create Lambda Function
 
 ```bash
 aws lambda create-function \
@@ -183,18 +147,17 @@ aws lambda create-function \
   --handler app.handler \
   --role arn:aws:iam::<ACCOUNT_ID>:role/finance-closing-lambda-role \
   --zip-file fileb://dist-lambda/lambda.zip \
-  --layers <ORACLE_LAYER_ARN> \
   --timeout 900 \
   --memory-size 1024 \
-  --environment "Variables={PG_HOST=xxx,PG_PORT=5432,PG_DATABASE=xxx,PG_USER=xxx,PG_PASSWORD=xxx,PG_SCHEMA=xxx,ORACLE_USER=xxx,ORACLE_PASSWORD=xxx,ORACLE_CONNECT_STRING=xxx}"
+  --environment "Variables={POSTGRES_URL=postgresql://user:password@host:5432/database?schema=financial_report}"
 ```
 
 **Important settings:**
 - `timeout`: 900 seconds (15 minutes max for Lambda)
-- `memory-size`: 1024 MB minimum recommended for Oracle connections
-- `layers`: Attach the Oracle Instant Client layer ARN
+- `memory-size`: 1024 MB recommended for database-backed workflows
+- No database client Lambda layer is required; the service is PostgreSQL-only.
 
-### 3.3 Configure Function URL (Optional)
+#### 2.3 Configure Function URL (Optional)
 
 If not using API Gateway:
 
@@ -204,20 +167,20 @@ aws lambda create-function-url-config \
   --auth-type NONE
 ```
 
-## Step 4: Register with Restate
+### Step 3: Register with Restate
 
-### Option A: Self-hosted Restate Server
+#### Option A: Self-hosted Restate Server
 
 ```bash
 restate deployments register <LAMBDA_FUNCTION_URL>
 ```
 
-### Option B: Restate Cloud
+#### Option B: Restate Cloud
 
 ```bash
 # Set environment variables
 export RESTATE_ADMIN_URL=<your-restate-admin-url>
-export RESTATE_AUTH_TOKEN=<your-auth-token>
+export RESTATE_BASIC_AUTH=<user:password>
 
 # Create IAM role for Restate to invoke Lambda
 # Get the role ARN from Restate Dashboard → Developers → Security → AWS Lambda
@@ -228,7 +191,7 @@ npx @restatedev/restate deployment register \
   --assume-role-arn <RESTATE_INVOKE_ROLE_ARN>
 ```
 
-## Step 5: Update Deployments
+### Step 4: Update Deployments
 
 For subsequent deployments:
 
@@ -244,50 +207,48 @@ aws lambda update-function-code \
 
 ## Environment Variables
 
+The Lambda function uses PostgreSQL only. Configure the database with the application connection string:
+
 | Variable | Description |
 |----------|-------------|
-| `PG_HOST` | PostgreSQL host |
-| `PG_PORT` | PostgreSQL port |
-| `PG_DATABASE` | PostgreSQL database name |
-| `PG_USER` | PostgreSQL username |
-| `PG_PASSWORD` | PostgreSQL password |
-| `PG_SCHEMA` | PostgreSQL schema |
-| `ORACLE_USER` | Oracle username |
-| `ORACLE_PASSWORD` | Oracle password |
-| `ORACLE_CONNECT_STRING` | Oracle connection string (e.g., `host:port/service`) |
+| `POSTGRES_URL` | PostgreSQL connection string, including schema when required |
+
+Example:
+
+```env
+POSTGRES_URL=postgresql://postgres:your_password@localhost:5432/finance?schema=financial_report
+```
 
 ## Important Considerations
 
 ### Lambda Timeout Limitation
 
-AWS Lambda has a **maximum timeout of 15 minutes**. Your Genius Oracle closing procedure can take up to 6 hours.
+AWS Lambda has a **maximum timeout of 15 minutes**. Some finance closing operations may take longer than a single Lambda invocation.
 
 **Solution**: Restate handles this through durable execution. The workflow will:
-1. Start the Oracle procedure
-2. Lambda times out (Restate marks it as suspended)
-3. Restate retries, and the procedure continues from checkpoint
+1. Start PostgreSQL-backed work inside `ctx.run()` steps
+2. Lambda times out if the invocation exceeds the configured limit
+3. Restate retries from the latest checkpoint
 4. Eventually completes across multiple Lambda invocations
 
-This works because Restate's `ctx.run()` is idempotent and checkpoints progress.
+This works because Restate's `ctx.run()` checkpoints durable progress.
 
 ### Cold Start Performance
 
-First invocation may be slow (5-10 seconds) due to:
-- Loading Oracle Instant Client libraries
-- Establishing database connections
+First invocation may be slow due to loading the function bundle and establishing database connections.
 
 **Mitigations:**
-- Increase memory to 1024MB+ (faster CPU allocation)
+- Increase memory to 1024MB+ for faster CPU allocation
 - Use provisioned concurrency for predictable latency
 - Keep functions warm with scheduled pings
 
 ### VPC Configuration
 
-If your Oracle database is in a private VPC:
+If your PostgreSQL database is in a private VPC:
 
 1. Configure Lambda VPC settings
-2. Add security group allowing outbound to Oracle (port 1521)
-3. Ensure NAT Gateway for external access (if needed)
+2. Add security group rules allowing outbound access to PostgreSQL
+3. Ensure NAT Gateway for external access if needed
 
 ## File Structure
 
@@ -296,18 +257,12 @@ apps/finance/
 ├── src/
 │   ├── app.lambda.ts      # Lambda handler entry point
 │   ├── app.local.ts       # Local development entry point
-│   ├── infrastructure/    # Database clients
+│   ├── infrastructure/    # PostgreSQL database client
 │   ├── modules/           # Business logic modules
 │   └── workflows/
 │       └── daily-closing.ts
 ├── dist-lambda/           # Lambda bundle output
 │   └── lambda.zip
-└── package.json
-
-packages/lambda-layers/
-├── oracle/
-│   ├── build-layer.sh     # Layer build script
-│   └── output/            # Built layer zip
 └── package.json
 ```
 
@@ -317,27 +272,18 @@ packages/lambda-layers/
 |--------|-------------|
 | `bun run dev` | Local development with hot reload |
 | `bun run bundle:lambda` | Bundle for Lambda deployment |
-| `bun run build:layer` | Build Oracle Instant Client layer |
 
 ## Troubleshooting
 
-### DPI-1047: Cannot locate Oracle Client library
-
-The Lambda Layer is not attached or libraries are missing.
-
-1. Verify layer is attached to function
-2. Check layer contains `lib/*.so*` files
-3. Ensure `libaio.so.1` is in the layer
-
-### Connection timeout to Oracle
+### PostgreSQL connection timeout
 
 1. Check VPC configuration
-2. Verify security groups allow outbound port 1521
-3. Confirm Oracle connection string is correct
+2. Verify security groups allow outbound access to PostgreSQL
+3. Confirm `POSTGRES_URL` points to a reachable database endpoint
 
 ### Out of memory
 
-Increase Lambda memory allocation. Oracle connections require significant memory.
+Increase Lambda memory allocation if the bundled service needs more runtime memory.
 
 ```bash
 aws lambda update-function-configuration \

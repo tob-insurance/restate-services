@@ -70,9 +70,10 @@ describe("filterAgingData", () => {
     });
     const older = createMockSoa({ aging: 90, debitAndCreditNoteNo: "DC-90" });
 
-    expect(JSON.stringify(filterAgingData([included, excluded, older]))).toBe(
-      JSON.stringify([included, older])
-    );
+    expect(filterAgingData([included, excluded, older])).toStrictEqual([
+      included,
+      older,
+    ]);
   });
 
   it("returns items in original order", () => {
@@ -80,9 +81,11 @@ describe("filterAgingData", () => {
     const second = createMockSoa({ aging: 60, debitAndCreditNoteNo: "DC-2" });
     const third = createMockSoa({ aging: 75, debitAndCreditNoteNo: "DC-3" });
 
-    expect(JSON.stringify(filterAgingData([first, second, third]))).toBe(
-      JSON.stringify([first, second, third])
-    );
+    expect(filterAgingData([first, second, third])).toStrictEqual([
+      first,
+      second,
+      third,
+    ]);
   });
 
   it("handles mixed aging values", () => {
@@ -93,17 +96,17 @@ describe("filterAgingData", () => {
       createMockSoa({ aging: 100, debitAndCreditNoteNo: "DC-100" }),
     ];
 
-    expect(
-      JSON.stringify(
-        filterAgingData(soaList)?.map((soa) => soa.debitAndCreditNoteNo)
-      )
-    ).toBe(JSON.stringify(["DC-61", "DC-100"]));
+    const agingResult = filterAgingData(soaList);
+    expect(agingResult?.map((soa) => soa.debitAndCreditNoteNo)).toStrictEqual([
+      "DC-61",
+      "DC-100",
+    ]);
   });
 
   it("includes one item exactly at aging 60", () => {
     const soa = createMockSoa({ aging: 60 });
 
-    expect(JSON.stringify(filterAgingData([soa]))).toBe(JSON.stringify([soa]));
+    expect(filterAgingData([soa])).toStrictEqual([soa]);
   });
 
   it("excludes items at aging 59", () => {

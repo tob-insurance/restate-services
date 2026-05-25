@@ -5,26 +5,26 @@ import type {
 
 // ── State value types ──────────────────────────────────────────
 
-export type ReminderHeader = {
-  customerCode: string;
-  timePeriod: string;
-  officeId: string;
+export interface ReminderHeader {
   createdAt: string;
-};
+  customerCode: string;
+  officeId: string;
+  timePeriod: string;
+}
 
-export type ReminderDetail = {
+export interface ReminderDetail {
   dcNoteId: string;
-  reminderId: string; // composite: "{timePeriod}:{officeId}"
   isPaid: boolean;
-};
+  reminderId: string; // composite: "{timePeriod}:{officeId}"
+}
 
-export type LetterRecord = {
-  type: string;
+export interface LetterRecord {
   letterNo: string;
   referenceLetterNo?: string;
   sentDate: string;
   status: "pending" | "sent" | "failed";
-};
+  type: string;
+}
 
 /**
  * dcNoteIndex maps DC_NOTE_ID to reminderId ("{timePeriod}:{officeId}").
@@ -55,29 +55,3 @@ export async function readDcNoteIndex(
     (await ctx.get<DcNoteIndex>(stateKeys.dcNoteIndex(currentTimePeriod))) ?? {}
   );
 }
-
-// ── Context type alias for SoaCustomer handlers ─────────────────
-
-export type CustomerContext = ObjectContext;
-export type CustomerSharedContext = ObjectSharedContext;
-
-// ── Handler parameter types ─────────────────────────────────────
-
-export type CreateReminderInput = {
-  timePeriod: string;
-  officeId: string;
-  dcNotes: Array<{ dcNoteId: string }>;
-};
-
-export type AddLetterInput = {
-  timePeriod: string;
-  officeId: string;
-  type: string;
-  letterNo: string;
-  referenceLetterNo?: string;
-  sentDate: string;
-};
-
-export type MarkDcNotesPaidInput = {
-  dcNoteIds: string[];
-};

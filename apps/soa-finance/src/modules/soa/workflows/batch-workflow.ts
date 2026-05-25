@@ -1,4 +1,7 @@
-import type { WorkflowContext } from "@restatedev/restate-sdk";
+import type {
+  WorkflowContext,
+  WorkflowSharedContext,
+} from "@restatedev/restate-sdk";
 import {
   RestatePromise,
   rpc,
@@ -50,22 +53,22 @@ const DEV_TEST_CUSTOMER_CODES = parseEnvList("SOA_TEST_CUSTOMERS") ?? [
 const MAX_WORKERS = parseEnvInt("SOA_MAX_WORKERS", 5);
 const INACTIVITY_TIMEOUT_HOURS = parseEnvInt("SOA_INACTIVITY_TIMEOUT_HOURS", 6);
 
-type WorkerResult = {
+interface WorkerResult {
   accountId: string;
-  failed: boolean;
   error?: string;
-};
+  failed: boolean;
+}
 
-type IBatchWorkflowResult = {
-  message: string;
-  totalAccounts: number;
+export interface IBatchWorkflowResult {
   failedAccountCount: number;
   failedAccounts: Array<{
     accountId: string;
     error: string;
   }>;
+  message: string;
   status: "Completed";
-};
+  totalAccounts: number;
+}
 
 /**
  * BatchWorkflow - Main workflow for processing Statement of Account (SOA) in batch.
@@ -115,9 +118,10 @@ export const batchWorkflow = workflow({
       };
 
       // STEP 2: Fetch Customer Accounts
+      ctx.set("status", "started");
+
       const allAccounts = await ctx.run(
         "get-all-accounts",
-        { timeout: 60_000 },
         async (): Promise<IAccount[]> => {
           const accounts = await getAllAccounts();
           if (!accounts || accounts.length === 0) {
@@ -140,6 +144,13 @@ export const batchWorkflow = workflow({
       }
 
       const totalAccounts = accountsToProcess.length;
+
+      ctx.set("status", "fetching");
+      ctx.set("progress", {
+        processed: 0,
+        total: totalAccounts,
+        failed: 0,
+      });
 
       ctx.console.log(`Starting batch with ${totalAccounts} accounts`);
 
@@ -195,6 +206,12 @@ export const batchWorkflow = workflow({
           }
         }
 
+        ctx.set("progress", {
+          processed: processedAccountCount,
+          total: totalAccounts,
+          failed: failedAccountCount,
+        });
+
         ctx.console.log(
           `[Batch] Progress: ${processedAccountCount}/${totalAccounts}`
         );
@@ -209,13 +226,35 @@ export const batchWorkflow = workflow({
         `Batch completed: ${processedAccountCount - failedAccountCount} succeeded, ${failedAccountCount} failed, out of ${totalAccounts} accounts`
       );
 
-      return {
+      const MAX_REPORTED_FAILURES = 10;
+      const compactFailedAccounts = failedAccounts.slice(
+        0,
+        MAX_REPORTED_FAILURES
+      );
+
+      ctx.set("status", "completed");
+
+      const batchResult = {
         message: "SOA batch processing completed successfully",
         totalAccounts,
         failedAccountCount,
-        failedAccounts,
-        status: "Completed",
+        totalFailedCount: failedAccountCount,
+        failedAccounts: compactFailedAccounts,
+        status: "Completed" as const,
       };
+
+      return batchResult;
+    },
+
+    getStatus: async (ctx: WorkflowSharedContext) => {
+      const status = (await ctx.get<string>("status")) ?? "unknown";
+      const progress = await ctx.get<{
+        processed: number;
+        total: number;
+        failed: number;
+      }>("progress");
+
+      return { status, progress: progress ?? null };
     },
   },
 });

@@ -1,5 +1,5 @@
 import type { ObjectContext } from "@restatedev/restate-sdk";
-import { RestatePromise } from "@restatedev/restate-sdk";
+import { RestatePromise, TerminalError } from "@restatedev/restate-sdk";
 import { isDevelopment } from "../../../constants/environment.js";
 import { getAllBranches } from "../../../infrastructure/database/queries/branch-query.js";
 import type { IBranch } from "../../../infrastructure/database/types.js";
@@ -16,23 +16,23 @@ import { createReminder } from "../../reminder";
 import { filterAgingData } from "../fetch-soa-data";
 import { multiBranchCodes } from "../types";
 
-export type ProcessSoaParams = {
+export interface ProcessSoaParams {
   ctx: ObjectContext;
   customerData: IAccount;
   params: ISoaItem;
-};
+}
 
-type BranchResult = {
+interface BranchResult {
   hasDocuments: boolean;
-};
+}
 
-type ProcessSingleBranchParams = {
+interface ProcessSingleBranchParams {
+  branch: IBranch;
   ctx: ObjectContext;
   customerData: IAccount;
   params: ISoaItem;
-  branch: IBranch;
   rawSoaList: IStatementOfAccountModel[] | null;
-};
+}
 
 async function processSingleBranch({
   ctx,
@@ -60,32 +60,27 @@ async function processSingleBranch({
     `SOA generated for ${customerData.code} branch ${branch.officeCode}: ${soaData.length} records`
   );
 
-  // Generate, upload to S3 (archival), and send email — all in one ctx.run
-  // so binary data stays inside the callback and is not journaled
-  await ctx.run(
-    `generate-upload-send-${branch.officeCode}`,
-    { timeout: 180_000 },
-    async () => {
-      const files = await generateAndUploadDocuments({
-        soaData,
-        customerData,
-        params,
-        branchName: branch.name,
-        letterNo: "",
-        latestLetter: null,
-        pdfFileName: letterSoaPdfName(customerData.code),
-      });
+  const dateNow = new Date(params.processingDate);
 
-      const dateNow = new Date(params.processingDate);
-      await sendWithAttachments({
-        customerData,
-        date: dateNow,
-        isReminder: false,
-        excelFile: files.excelFile,
-        pdfFile: files.pdfFile,
-      });
-    }
-  );
+  await ctx.run(`generate-upload-send-${branch.officeCode}`, async () => {
+    const generated = await generateAndUploadDocuments({
+      soaData,
+      customerData,
+      params,
+      branchName: branch.name,
+      letterNo: "",
+      latestLetter: null,
+      pdfFileName: letterSoaPdfName(customerData.code),
+    });
+
+    await sendWithAttachments({
+      customerData,
+      date: dateNow,
+      isReminder: false,
+      excelFile: generated.excelFile,
+      pdfFile: generated.pdfFile,
+    });
+  });
 
   await createReminder({
     customer: customerData,
@@ -99,82 +94,108 @@ async function processSingleBranch({
   return { hasDocuments: true };
 }
 
-export async function processBranchSoa({
-  ctx,
-  customerData,
-  params,
-}: ProcessSoaParams): Promise<BranchResult> {
-  const isMultiBranch =
-    !isDevelopment() && multiBranchCodes.includes(customerData.actingCode);
-
-  const branches: IBranch[] = isMultiBranch
-    ? await ctx.run(
-        "get-branches",
-        { timeout: 30_000 },
-        async () => await getAllBranches()
-      )
-    : [{ officeCode: params.branch, name: params.branch }];
-
-  if (isMultiBranch) {
-    ctx.console.log(`Processing ${branches.length} branches`);
-  } else if (multiBranchCodes.includes(customerData.actingCode)) {
+async function processBranchWithIsolation(
+  branch: IBranch,
+  index: number,
+  stagingDataList: (IStatementOfAccountModel[] | null)[],
+  soaParams: ProcessSoaParams
+): Promise<BranchResult> {
+  const { ctx, customerData, params } = soaParams;
+  try {
+    return await processSingleBranch({
+      ctx,
+      customerData,
+      params,
+      branch,
+      rawSoaList: stagingDataList[index],
+    });
+  } catch (error: unknown) {
+    if (error instanceof TerminalError) {
+      throw error;
+    }
     ctx.console.log(
-      `[Dev] Skipping multi-branch loop for ${customerData.code}, using branch ALL`
+      `[Branch] Failed processing ${branch.officeCode}: ${error instanceof Error ? error.message : "Unknown error"}`
     );
+    return { hasDocuments: false };
   }
+}
 
-  if (branches.length > 1) {
-    // Multi-branch: parallel with RestatePromise.all
-    const branchResults = await RestatePromise.all(
-      branches.map((b) =>
-        ctx
-          .run<IStatementOfAccountModel[]>(
-            `read-staging-${b.officeCode}`,
-            { timeout: 30_000 },
-            async () => await getStagingSoaData(customerData.code, b.officeCode)
-          )
-          .map((stagingData, failure): Promise<BranchResult> => {
-            if (failure) {
-              ctx.console.log(
-                `[Branch] Failed staging read for ${b.officeCode}: ${failure.message}`
-              );
-              return Promise.resolve({ hasDocuments: false });
-            }
+async function processMultiBranchSoa(
+  branches: IBranch[],
+  soaParams: ProcessSoaParams
+): Promise<BranchResult> {
+  const { ctx, customerData } = soaParams;
 
-            return processSingleBranch({
-              ctx,
-              customerData,
-              params,
-              branch: b,
-              rawSoaList: stagingData as IStatementOfAccountModel[] | null,
-            });
-          })
+  const stagingDataList = await RestatePromise.all(
+    branches.map((b) =>
+      ctx.run<IStatementOfAccountModel[] | null>(
+        `read-staging-${b.officeCode}`,
+        async () => await getStagingSoaData(customerData.code, b.officeCode)
       )
-    );
+    )
+  );
 
-    return { hasDocuments: branchResults.some((r) => r.hasDocuments) };
+  const branchResults: BranchResult[] = [];
+  for (const [index, b] of branches.entries()) {
+    const result = await processBranchWithIsolation(
+      b,
+      index,
+      stagingDataList,
+      soaParams
+    );
+    branchResults.push(result);
   }
 
-  // Single-branch: direct execution (no RestatePromise.all overhead)
-  const branch = branches[0];
+  return { hasDocuments: branchResults.some((r) => r.hasDocuments) };
+}
+
+async function processSingleBranchDirect(
+  branch: IBranch,
+  soaParams: ProcessSoaParams
+): Promise<BranchResult> {
+  const { ctx, customerData, params } = soaParams;
   try {
     const rawSoaList = await ctx.run<IStatementOfAccountModel[]>(
-      `read-staging-${branch.officeCode}`,
-      { timeout: 30_000 },
+      "read-staging",
       async () => await getStagingSoaData(customerData.code, branch.officeCode)
     );
 
-    return processSingleBranch({
+    return await processSingleBranch({
       ctx,
       customerData,
       params,
       branch,
       rawSoaList,
     });
-  } catch (error) {
+  } catch (error: unknown) {
+    if (error instanceof TerminalError) {
+      throw error;
+    }
     ctx.console.log(
       `[Branch] Failed staging read for ${branch.officeCode}: ${error instanceof Error ? error.message : "Unknown error"}`
     );
     return { hasDocuments: false };
   }
+}
+
+export async function processBranchSoa(
+  params: ProcessSoaParams
+): Promise<BranchResult> {
+  const { ctx, customerData } = params;
+  const isMultiBranch =
+    !isDevelopment() && multiBranchCodes.includes(customerData.actingCode);
+
+  const branches: IBranch[] = isMultiBranch
+    ? await ctx.run("get-branches", async () => await getAllBranches())
+    : [{ officeCode: params.params.branch, name: params.params.branch }];
+
+  if (isMultiBranch) {
+    ctx.console.log(`Processing ${branches.length} branches`);
+  }
+
+  if (branches.length > 1) {
+    return processMultiBranchSoa(branches, params);
+  }
+
+  return processSingleBranchDirect(branches[0], params);
 }

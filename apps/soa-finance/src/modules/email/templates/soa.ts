@@ -2,11 +2,11 @@ import { formatDateIndonesian } from "../../../utils/formatter/date.formatter.js
 import { formatEnDate } from "../../../utils/template/email-formatters";
 import { renderEmail } from "../../../utils/template/engine";
 
-export type SoaEmailData = {
-  customerName: string;
+export interface SoaEmailData {
   asAtDate: Date;
+  customerName: string;
   virtualAccount: string;
-};
+}
 
 export async function generateSoaEmailHtml(
   data: SoaEmailData

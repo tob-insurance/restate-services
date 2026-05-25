@@ -7,20 +7,20 @@ import {
 } from "../../constants/constants.js";
 import type { IStatementOfAccountModel } from "../../types/soa.type.js";
 
-export type IExcelColumn = {
+export interface IExcelColumn {
+  format?: "number" | "currency" | "date" | "text";
   header: string;
   key: ExcelColumnKey;
   width?: number;
-  format?: "number" | "currency" | "date" | "text";
-};
+}
 
 type ExcelColumnKey = keyof IStatementOfAccountModel;
 
-export type ISoaFileResult = {
-  fileName: string;
-  contentType: string;
+export interface ISoaFileResult {
   bytes: Buffer;
-};
+  contentType: string;
+  fileName: string;
+}
 
 export const excelColumns: IExcelColumn[] = [
   { header: "DC Note", key: "debitAndCreditNoteNo", width: 18 },
@@ -158,13 +158,15 @@ export function sortSoaData(
 
 type CellValue = string | number | boolean | Date | null;
 
+const ALPHABET_LENGTH = 26;
+
 function colToLetter(col: number): string {
   const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   let result = "";
   let n = col;
   do {
-    result = CHARS[n % 26] + result;
-    n = Math.floor(n / 26) - 1;
+    result = CHARS[n % ALPHABET_LENGTH] + result;
+    n = Math.floor(n / ALPHABET_LENGTH) - 1;
   } while (n >= 0);
   return result;
 }

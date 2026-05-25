@@ -11,20 +11,20 @@ import { generateExcel } from "./excel.generator";
 import { generateSoaPdfHandler } from "./generate-soa-pdf";
 import { buildPdfTemplateData } from "./pdf-template";
 
-type GenerateAndUploadParams = {
-  soaData: IStatementOfAccountModel[];
-  customerData: IAccount;
-  params: ISoaItem;
+interface GenerateAndUploadParams {
   branchName: string;
-  letterNo: string;
+  customerData: IAccount;
   latestLetter: { letterNo: string; sentDate: Date } | null;
+  letterNo: string;
+  params: ISoaItem;
   pdfFileName: string;
-};
+  soaData: IStatementOfAccountModel[];
+}
 
-type GenerateAndUploadResult = {
+interface GenerateAndUploadResult {
   excelFile: IFileData;
   pdfFile: IFileData;
-};
+}
 
 export async function generateAndUploadDocuments(
   options: GenerateAndUploadParams

@@ -12,15 +12,15 @@ import {
   getCcRecipients,
   resolveRecipientEmail,
 } from "./attachments";
-import { generateSoaEmailHtml } from "./templates";
+import { generateSoaEmailHtml } from "./templates/soa";
 
-type SendSoaEmailOptions = {
+interface SendSoaEmailOptions {
   customer: IAccount;
-  toEmail: string;
+  date: Date;
   excelFile: IFileData;
   pdfFile: IFileData;
-  date: Date;
-};
+  toEmail: string;
+}
 
 export const sendSoaEmail = async (
   options: SendSoaEmailOptions

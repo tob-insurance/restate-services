@@ -50,7 +50,7 @@ function createMockSoa(
 
 describe("groupAndAggregateSoa", () => {
   it("returns empty array for empty input", () => {
-    expect(JSON.stringify(groupAndAggregateSoa([]))).toBe(JSON.stringify([]));
+    expect(groupAndAggregateSoa([])).toStrictEqual([]);
   });
 
   it("groups items by policyNo-policyEndNo-installment key", () => {
@@ -61,9 +61,7 @@ describe("groupAndAggregateSoa", () => {
     ]);
 
     expect(result.length).toBe(2);
-    expect(JSON.stringify(result.map((soa) => soa.policyNo))).toBe(
-      JSON.stringify(["P-1", "P-2"])
-    );
+    expect(result.map((soa) => soa.policyNo)).toStrictEqual(["P-1", "P-2"]);
   });
 
   it("aggregates financial fields across grouped items", () => {
@@ -149,9 +147,7 @@ describe("groupAndAggregateSoa", () => {
       }),
     ];
 
-    expect(JSON.stringify(groupAndAggregateSoa(soaList))).toBe(
-      JSON.stringify(soaList)
-    );
+    expect(groupAndAggregateSoa(soaList)).toStrictEqual(soaList);
   });
 
   it("handles a single item", () => {
@@ -217,9 +213,7 @@ describe("groupAndAggregateSoa", () => {
     ]);
 
     expect(result.length).toBe(3);
-    expect(JSON.stringify(result.map((soa) => soa.netPremium))).toBe(
-      JSON.stringify([10, 20, 30])
-    );
+    expect(result.map((soa) => soa.netPremium)).toStrictEqual([10, 20, 30]);
   });
 });
 
@@ -231,9 +225,11 @@ describe("sortSoaData", () => {
       createMockSoa({ policyNo: "POL-B" }),
     ]);
 
-    expect(JSON.stringify(result.map((soa) => soa.policyNo))).toBe(
-      JSON.stringify(["POL-A", "POL-B", "POL-C"])
-    );
+    expect(result.map((soa) => soa.policyNo)).toStrictEqual([
+      "POL-A",
+      "POL-B",
+      "POL-C",
+    ]);
   });
 
   it("sorts by policyEndNo when policyNo matches", () => {
@@ -243,9 +239,7 @@ describe("sortSoaData", () => {
       createMockSoa({ policyNo: "POL-A", policyEndNo: "1" }),
     ]);
 
-    expect(JSON.stringify(result.map((soa) => soa.policyEndNo))).toBe(
-      JSON.stringify(["0", "1", "2"])
-    );
+    expect(result.map((soa) => soa.policyEndNo)).toStrictEqual(["0", "1", "2"]);
   });
 
   it("sorts by installment when policyNo and policyEndNo match", () => {
@@ -255,13 +249,11 @@ describe("sortSoaData", () => {
       createMockSoa({ policyNo: "POL-A", policyEndNo: "0", installment: "2" }),
     ]);
 
-    expect(JSON.stringify(result.map((soa) => soa.installment))).toBe(
-      JSON.stringify(["1", "2", "3"])
-    );
+    expect(result.map((soa) => soa.installment)).toStrictEqual(["1", "2", "3"]);
   });
 
   it("returns empty array for empty input", () => {
-    expect(JSON.stringify(sortSoaData([]))).toBe(JSON.stringify([]));
+    expect(sortSoaData([])).toStrictEqual([]);
   });
 
   it("handles null or undefined fields gracefully", () => {
@@ -279,8 +271,10 @@ describe("sortSoaData", () => {
       createMockSoa({ policyNo: "POL-A", policyEndNo: "0", installment: "1" }),
     ]);
 
-    expect(JSON.stringify(result.map((soa) => soa.policyNo))).toBe(
-      JSON.stringify([null, "POL-A", "POL-B"])
-    );
+    expect(result.map((soa) => soa.policyNo)).toStrictEqual([
+      null,
+      "POL-A",
+      "POL-B",
+    ]);
   });
 });

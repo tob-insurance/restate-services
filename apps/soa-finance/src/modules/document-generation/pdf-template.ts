@@ -15,16 +15,16 @@ type LatestLetterInfo = {
   sentDate: Date;
 } | null;
 
-type BuildPdfTemplateDataParams = {
-  isReminder: boolean;
-  toDate: Date;
-  customerData: IAccount;
+interface BuildPdfTemplateDataParams {
   branchName: string;
-  soaData: IStatementOfAccountModel[];
+  customerData: IAccount;
+  isReminder: boolean;
+  latestLetter?: LatestLetterInfo;
   letterNo: string;
   reminderCount: string;
-  latestLetter?: LatestLetterInfo;
-};
+  soaData: IStatementOfAccountModel[];
+  toDate: Date;
+}
 
 export async function buildPdfTemplateData(
   params: BuildPdfTemplateDataParams

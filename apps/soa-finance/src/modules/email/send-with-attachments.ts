@@ -8,19 +8,19 @@ import type { IFileData } from "../../types/soa.type.js";
 import { sendReminderEmail } from "./send-reminder";
 import { sendSoaEmail } from "./send-soa";
 
-export type SendWithAttachmentsParams = {
+export interface SendWithAttachmentsParams {
+  branch?: string;
   customerData: IAccount;
   date: Date;
-  isReminder?: boolean;
-  reminderType?: string;
-  letterNo?: string;
-  previousLetterNo?: string;
-  previousLetterDate?: Date;
-  branch?: string;
-  totalPremium?: number;
   excelFile: IFileData;
+  isReminder?: boolean;
+  letterNo?: string;
   pdfFile: IFileData;
-};
+  previousLetterDate?: Date;
+  previousLetterNo?: string;
+  reminderType?: string;
+  totalPremium?: number;
+}
 
 export async function sendWithAttachments(
   params: SendWithAttachmentsParams

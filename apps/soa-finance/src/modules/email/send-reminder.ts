@@ -13,22 +13,22 @@ import {
 import {
   generateReminderEmailHtml,
   getReminderEmailSubject,
-} from "./templates";
+} from "./templates/reminder";
 
-type SendReminderEmailParams = {
-  customer: IAccount;
-  toEmail: string;
-  reminderType: string;
-  letterNo: string;
-  previousLetterNo?: string;
-  previousLetterDate?: Date;
+interface SendReminderEmailParams {
   branch?: string;
-  totalPremium?: number;
-  excelFile: { fileName: string; bytes: Buffer; contentType: string };
-  pdfFile: { fileName: string; bytes: Buffer; contentType: string };
-  isReminder?: boolean;
+  customer: IAccount;
   date: Date;
-};
+  excelFile: { fileName: string; bytes: Buffer; contentType: string };
+  isReminder?: boolean;
+  letterNo: string;
+  pdfFile: { fileName: string; bytes: Buffer; contentType: string };
+  previousLetterDate?: Date;
+  previousLetterNo?: string;
+  reminderType: string;
+  toEmail: string;
+  totalPremium?: number;
+}
 
 export const sendReminderEmail = async (
   params: SendReminderEmailParams

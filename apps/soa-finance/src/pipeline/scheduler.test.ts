@@ -96,7 +96,7 @@ describe("computeNextRun", () => {
     let message = "";
     try {
       computeNextRun(now, []);
-    } catch (error) {
+    } catch (error: unknown) {
       message = error instanceof Error ? error.message : String(error);
     }
     expect(message).toBe("No valid future schedule could be computed");

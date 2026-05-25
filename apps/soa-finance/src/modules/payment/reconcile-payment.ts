@@ -1,20 +1,17 @@
-import type { ObjectContext } from "@restatedev/restate-sdk";
 import type { ReminderDetail } from "../soa/objects/state";
-import { stateKeys } from "../soa/objects/state";
 
-export const reconcilePayment = async (
-  ctx: ObjectContext,
-  reminderId: string,
+const BULK_PAYMENT_SAFETY_THRESHOLD = 5;
+
+export const reconcilePayment = (
+  details: Record<string, ReminderDetail> | null,
   currentDcNotes: string[]
-): Promise<string[]> => {
-  const [timePeriod, officeId] = reminderId.split(":");
-
-  const details = await ctx.get<Record<string, ReminderDetail>>(
-    stateKeys.details(timePeriod, officeId)
-  );
-
+): {
+  paidDcNoteIds: string[];
+  updatedDetails: Record<string, ReminderDetail>;
+  bulkPaymentSkipped: boolean;
+} => {
   if (!details) {
-    return [];
+    return { paidDcNoteIds: [], updatedDetails: {}, bulkPaymentSkipped: false };
   }
 
   const currentDcNotesSet = new Set(
@@ -27,25 +24,25 @@ export const reconcilePayment = async (
   );
 
   if (paidDcNotes.length === 0) {
-    return [];
+    return { paidDcNoteIds: [], updatedDetails: {}, bulkPaymentSkipped: false };
   }
 
   // Safety: don't mark ALL reminders as paid at once (likely data issue)
   if (
     paidDcNotes.length === Object.keys(details).length &&
-    paidDcNotes.length > 5
+    paidDcNotes.length > BULK_PAYMENT_SAFETY_THRESHOLD
   ) {
-    ctx.console.log(
-      `[Payment] Skipping bulk payment: ${paidDcNotes.length}/${Object.keys(details).length} would be marked paid — possible data issue`
-    );
-    return [];
+    return { paidDcNoteIds: [], updatedDetails: {}, bulkPaymentSkipped: true };
   }
 
   const updatedDetails = { ...details };
   for (const paid of paidDcNotes) {
     updatedDetails[paid.dcNoteId] = { ...paid, isPaid: true };
   }
-  ctx.set(stateKeys.details(timePeriod, officeId), updatedDetails);
 
-  return paidDcNotes.map((d) => d.dcNoteId);
+  return {
+    paidDcNoteIds: paidDcNotes.map((d) => d.dcNoteId),
+    updatedDetails,
+    bulkPaymentSkipped: false,
+  };
 };

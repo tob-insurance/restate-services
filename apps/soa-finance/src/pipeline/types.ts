@@ -1,3 +1,3 @@
-export type ISoaPipelineResult = {
+export interface ISoaPipelineResult {
   success: boolean;
-};
+}

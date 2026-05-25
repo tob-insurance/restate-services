@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "description": "SOA Finance service running with Restate",
   "main": "dist/app.local.js",
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "build": "tsc --noEmitOnError",
     "typecheck": "tsc --noEmit",
@@ -13,35 +13,32 @@
     "dev": "tsx watch ./src/app.local.ts",
     "test": "bun test src/",
     "clean": "rm -rf dist dist-lambda",
-    "prebundle": "rm -rf dist",
-    "bundle": "esbuild src/app.local.ts --bundle --minify --sourcemap --platform=node --target=es2020 --outfile=dist/app.js",
-    "postbundle": "cd dist && zip -r index.zip app.js*",
-    "prebundle:lambda": "rm -rf dist-lambda",
-    "bundle:lambda": "esbuild src/app.lambda.ts --bundle --minify --sourcemap --platform=node --target=es2020 --outfile=dist-lambda/app.js",
-    "postbundle:lambda": "cd dist-lambda && mkdir -p assets && cp -r ../src/assets/* assets/ && zip -r lambda.zip app.js* assets"
+    "bundle": "tsdown src/app.local.ts --minify --sourcemap --platform node --target node22 --outDir dist --clean --no-dts",
+    "postbundle": "cd dist && zip -r index.zip app.local.mjs*",
+    "bundle:lambda": "tsdown",
+    "postbundle:lambda": "cd dist-lambda && zip -r lambda.zip app.mjs* assets"
   },
   "dependencies": {
-    "@azure/identity": "^4.13.0",
-    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "@aws-sdk/client-s3": "^3.1053.0",
+    "@azure/identity": "^4.13.1",
     "@restate-tob/postgres": "workspace:*",
-    "@restatedev/restate-sdk": "^1.9.1",
-    "@restatedev/restate-sdk-zod": "^1.9.1",
+    "@restate-tob/shared": "workspace:*",
+    "@restatedev/restate-sdk": "^1.14.4",
     "https-proxy-agent": "^9.0.0",
-    "hucre": "^0.4.0",
+    "hucre": "^0.5.1",
     "juice": "^11.1.1",
-    "liquidjs": "^10.24.0",
+    "liquidjs": "^10.27.0",
     "luxon": "^3.7.2",
-    "@aws-sdk/client-s3": "^3.600.0",
     "pino": "^10.3.1",
-    "uuid": "^13.0.0",
-    "zod": "^4.1.0"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "varlock": "^0.3.0",
-    "@types/node": "^20.14.2",
+    "@types/bun": "^1.3.14",
     "@types/luxon": "^3.7.1",
-    "esbuild": "^0.25.4",
-    "tsx": "^4.19.2",
-    "typescript": "^5.4.5"
+    "@types/node": "^20.14.2",
+    "tsdown": "^0.22.0",
+    "tsx": "^4.22.3",
+    "typescript": "^6.0.3",
+    "varlock": "^1.2.0"
   }
 }

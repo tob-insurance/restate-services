@@ -1,7 +1,1 @@
-import pino from "pino";
-
-const logger = pino({
-  level: process.env.LOG_LEVEL || "info",
-});
-
-export default logger;
+export { logger as default } from "@restate-tob/shared/utils";

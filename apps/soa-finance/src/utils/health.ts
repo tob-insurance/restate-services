@@ -8,7 +8,7 @@ export async function checkS3BucketAccess(): Promise<boolean> {
     const bucket = getBucketName();
     await client.send(new HeadBucketCommand({ Bucket: bucket }));
     return true;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.warn(
       { component: "HealthCheck", bucket: getBucketName(), err: error },
       "S3 bucket check failed — continuing"
@@ -28,7 +28,7 @@ export async function checkGotenbergConnectivity(): Promise<boolean> {
     });
     clearTimeout(timeout);
     return response.ok;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.warn(
       { component: "HealthCheck", err: error },
       "Gotenberg connectivity check failed — continuing"

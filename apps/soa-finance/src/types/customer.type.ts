@@ -1,8 +1,8 @@
-export type IAccount = {
-  code: string;
-  name?: string;
-  fullName: string;
+export interface IAccount {
   actingCode: string;
+  code: string;
   email?: string;
+  fullName: string;
+  name?: string;
   virtualAccount?: string;
-};
+}

@@ -13,8 +13,14 @@ function parseEnvCcList(): string[] | null {
 const GLOBAL_CC = parseEnvCcList();
 
 export const EMAIL_CONFIG = {
-  FALLBACK_EMAIL: process.env.SOA_FALLBACK_EMAIL || "collection@tob-ins.com",
-  SHARED_MAILBOX: process.env.AZURE_SHARED_MAILBOX || "collection@tob-ins.com",
+  FALLBACK_EMAIL: process.env.SOA_FALLBACK_EMAIL as string,
+  SHARED_MAILBOX: (() => {
+    const val = process.env.AZURE_SHARED_MAILBOX;
+    if (!val) {
+      throw new Error("AZURE_SHARED_MAILBOX environment variable is required");
+    }
+    return val;
+  })(),
   getCcRecipients(actingCode: string): string[] {
     if (GLOBAL_CC) {
       return GLOBAL_CC;

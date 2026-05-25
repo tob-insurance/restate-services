@@ -1,4 +1,6 @@
-export const TIMEZONE = "Asia/Jakarta";
+import { CONTENT_TYPES } from "@restate-tob/shared";
+
+export { CONTENT_TYPES, TIMEZONE } from "@restate-tob/shared";
 
 export const ROMAN_MONTHS = [
   "I",
@@ -29,15 +31,6 @@ export const AZURE_UPLOAD = {
 
 export const PIPELINE = {
   LARGE_DATASET_WARN_THRESHOLD: 100_000,
-} as const;
-
-export const CONTENT_TYPES = {
-  PDF: "application/pdf",
-  XLSX: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  XLS: "application/vnd.ms-excel",
-  HTML: "text/html",
-  CSV: "text/csv",
-  OCTET_STREAM: "application/octet-stream",
 } as const;
 
 export const NUMBER_FORMATS = {
@@ -132,5 +125,4 @@ export function getContentType(filename: string): string {
 }
 
 export type NumberFormat = (typeof NUMBER_FORMATS)[keyof typeof NUMBER_FORMATS];
-export type ContentType = (typeof CONTENT_TYPES)[keyof typeof CONTENT_TYPES];
 export type RomanMonth = (typeof ROMAN_MONTHS)[number];

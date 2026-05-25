@@ -5,7 +5,6 @@
 | Resource | Description | Creation |
 |---|---|---|
 | Lambda function | `soa-finance` (Node.js 20, x86_64, 1024MB, 900s timeout) | First time via CLI, updated by CI/CD |
-| Oracle Instant Client Layer | `oracle-instantclient` Lambda layer | CI/CD pipeline |
 | VPC | Private subnet with S3 Gateway Endpoint | Once manually |
 | S3 bucket | Pipeline Parquet + SOA document storage | Once manually |
 | Squid proxy | t4g.nano EC2 in public subnet for HTTPS egress | Once manually |
@@ -58,8 +57,7 @@ aws lambda create-function --function-name soa-finance --runtime nodejs20.x \
   --role arn:aws:iam::xxx:role/Restate-LambdaInvoke \
   --handler app.handler --zip-file fileb://dist-lambda/lambda.zip \
   --memory-size 1024 --timeout 900 \
-  --vpc-config '{"SubnetIds":["subnet-xxx"],"SecurityGroupIds":["sg-xxx"]}' \
-  --layers arn:aws:lambda:ap-southeast-3:xxx:layer:oracle-instantclient:8
+  --vpc-config '{"SubnetIds":["subnet-xxx"],"SecurityGroupIds":["sg-xxx"]}'
 
 # 5. Tag function (required for Restate invoke permission via IAM condition)
 aws lambda tag-resource \
@@ -77,7 +75,7 @@ aws lambda add-permission --function-name soa-finance \
 
 ```
 Lambda (VPC private subnet, no internet route)
-├── Oracle DB ── 172.31.0.188:1521 (VPC local route)
+├── PostgreSQL DB ── VPC private IP (VPC local route)
 ├── S3 ── Gateway Endpoint vpce-xxx (free)
 ├── Gotenberg PDF ── https-proxy-agent → Squid t4g.nano (HTTPS)
 └── Microsoft Graph API ── https-proxy-agent → Squid t4g.nano (HTTPS)
@@ -86,7 +84,7 @@ Lambda (VPC private subnet, no internet route)
 **Key points:**
 - Lambda has NO `0.0.0.0/0` route — only VPC local and S3 Gateway Endpoint
 - External HTTPS traffic (Gotenberg, Graph API) routes through Squid proxy via `https-proxy-agent`
-- Oracle is accessed by VPC private IP (172.31.0.188)
+- PostgreSQL is accessed by VPC private IP
 - S3 is accessed via Gateway Endpoint (free, no NAT needed)
 - All external HTTPS calls use `https-proxy-agent` package, not `fetch()` proxy
 
@@ -123,7 +121,7 @@ done
 
 | Variable | Source | Description |
 |---|---|---|
-| `ORACLE_URL` | Infisical | Oracle connection string (VPC private IP) |
+| `DATABASE_URL` | Infisical | PostgreSQL connection string |
 | `GOTENBERG_URL` | Infisical | Gotenberg Lambda function URL |
 | `S3_BUCKET` | Infisical | S3 bucket name for pipeline + SOA docs |
 | `HTTPS_PROXY` | Infisical | Squid proxy URL for external HTTPS |

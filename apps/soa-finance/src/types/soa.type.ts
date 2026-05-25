@@ -7,61 +7,61 @@ export const SoaTypeLabels = {
 
 export type SoaType = 1 | 2 | 3 | 4;
 
-export type ISoaItem = {
-  customerId: string;
-  timePeriod: string;
-  processingDate: string;
+export interface ISoaItem {
+  branch: string;
   classOfBusiness: string;
-  branch: string;
-  toDate: number;
+  customerId: string;
+  processingDate: string;
   processingType: SoaType;
-};
+  timePeriod: string;
+  toDate: number;
+}
 
-export type IStatementOfAccountModel = {
-  debitAndCreditNoteNo: string;
-  branch: string;
-  policyNo: string;
-  policyEndNo: string;
-  contractNo: string;
-  plateNo: string;
-  coInFacRefNo: string;
-  fireConjunctionPolicy: string;
-  lob: string;
-  sourceOfBusiness: string;
+export interface IStatementOfAccountModel {
   accountName: string;
-  insuredName: string;
+  actingCode: string;
+  aging: number;
+  branch: string;
+  coInFacRefNo: string;
+  commission: number;
+  contractNo: string;
+  cost: number;
+  currency: string;
+  debitAndCreditNoteNo: string;
+  discount: number;
+  distributionCode: string;
   distributionName: string;
   distributionNameSecond: string;
-  qualitateQuaName: string;
+  dueDate: string;
   endEffDate: string;
   endExpDate: string;
-  postDate: string;
-  dueDate: string;
-  aging: number;
-  currency: string;
-  exchangeRate: number;
   endReason: string;
-  actingCode: string;
-  totalSumInsured: number;
+  exchangeRate: number;
+  fireConjunctionPolicy: string;
   grossPremium: number;
-  discount: number;
-  commission: number;
-  ppn: number;
-  pph21: number;
-  pph23: number;
-  cost: number;
-  stmp: number;
+  installment: string;
+  insuredName: string;
+  lob: string;
   netPremium: number;
   netPremiumIdr: number;
-  installment: string;
   origAmount: number;
-  distributionCode: string;
-};
+  plateNo: string;
+  policyEndNo: string;
+  policyNo: string;
+  postDate: string;
+  pph21: number;
+  pph23: number;
+  ppn: number;
+  qualitateQuaName: string;
+  sourceOfBusiness: string;
+  stmp: number;
+  totalSumInsured: number;
+}
 
-export type IFileData = {
-  fileName: string;
+export interface IFileData {
   bytes: Buffer;
-  contentType: string;
-  isInline?: boolean;
   contentId?: string;
-};
+  contentType: string;
+  fileName: string;
+  isInline?: boolean;
+}

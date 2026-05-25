@@ -1,11 +1,11 @@
 import type { SoaType } from "../types/soa.type.js";
 
-export type IScheduleConfig = {
-  type: "SOA" | "RL1" | "RL2" | "WL";
-  soaType: SoaType;
-  sendDay: number;
+export interface IScheduleConfig {
   graceDays: number;
-};
+  sendDay: number;
+  soaType: SoaType;
+  type: "SOA" | "RL1" | "RL2" | "WL";
+}
 
 function parseScheduleDays(): number[] {
   const raw = process.env.SOA_SCHEDULE_DAYS;
@@ -20,8 +20,9 @@ function parseScheduleDays(): number[] {
   ) {
     return days;
   }
-  // Invalid overrides fall back to the business default schedule days.
-  return [4, 11, 19, 25];
+  throw new Error(
+    `Invalid SOA_SCHEDULE_DAYS: "${raw}". Expected 4 comma-separated day numbers (1-31). Example: "4,11,19,25"`
+  );
 }
 
 const [soaDay, rl1Day, rl2Day, wlDay] = parseScheduleDays();

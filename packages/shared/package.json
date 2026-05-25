@@ -2,7 +2,7 @@
   "name": "@restate-tob/shared",
   "version": "0.0.1",
   "description": "Shared utilities and types for Restate services",
-  "type": "commonjs",
+  "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -11,12 +11,6 @@
       "import": "./dist/index.js",
       "require": "./dist/index.js",
       "default": "./dist/index.js"
-    },
-    "./types": {
-      "types": "./dist/types/index.d.ts",
-      "import": "./dist/types/index.js",
-      "require": "./dist/types/index.js",
-      "default": "./dist/types/index.js"
     },
     "./utils": {
       "types": "./dist/utils/index.d.ts",
@@ -32,10 +26,12 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "zod": "^4.1.0"
+    "pino": "^10.3.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/bun": "^1.3.14",
     "@types/node": "^20.14.2",
-    "typescript": "^5.4.5"
+    "typescript": "^6.0.3"
   }
 }

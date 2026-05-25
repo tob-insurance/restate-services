@@ -5,6 +5,14 @@ import {
   dailyClosingWorkflow,
 } from "./modules/closing/index.js";
 
+process.on("unhandledRejection", (reason) => {
+  console.error("[FATAL] Unhandled Rejection:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("[FATAL] Uncaught Exception:", error);
+});
+
 initPostgresClient();
 
 export const handler = createEndpointHandler({

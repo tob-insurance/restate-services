@@ -1,7 +1,7 @@
 # Finance App
 
 Implements daily closing workflow orchestrating:
-1. Genius Oracle closing (stored procedure, up to 6 hours)
+1. Genius PostgreSQL closing
 2. PostgreSQL financial metrics calculation
 
 ## Build & Development
@@ -47,7 +47,7 @@ src/
 ├── app.local.ts              # Local development entry point
 ├── constants.ts              # Configuration constants
 ├── infrastructure/
-│   └── database.ts           # Database clients (Oracle + PostgreSQL)
+│   └── database.ts           # PostgreSQL database client
 └── modules/
     ├── closing/              # Daily closing workflow
     ├── financial-metrics/    # PostgreSQL metrics calculation
@@ -57,12 +57,10 @@ src/
 ## Environment Variables
 
 ```env
-# Database Connection Strings
-POSTGRES_URL=postgresql://postgres:your_password@localhost:5432/finance?schema=financial_report
-ORACLE_URL=oracle://your_oracle_user:your_oracle_password@localhost:1521/ORCL
-
-# Optional: Oracle Instant Client Path (for macOS/Windows)
-ORACLE_INSTANT_CLIENT_PATH=/path/to/instantclient
+# Database Connection String
+# Primary: DATABASE_URL (standard across all apps)
+# Fallback: POSTGRES_URL (backward compat)
+DATABASE_URL=postgresql://postgres:your_password@localhost:5432/finance?schema=financial_report
 
 # Scheduler Configuration (Jakarta Time)
 DAILY_CLOSING_SCHEDULE_TIME=00:00    # Default: 00:00 (midnight)

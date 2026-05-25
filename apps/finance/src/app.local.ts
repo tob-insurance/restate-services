@@ -5,10 +5,12 @@ import {
   DailyClosingScheduler,
   dailyClosingWorkflow,
 } from "./modules/closing/index.js";
+import logger from "./utils/logger.js";
 
 testConnection().then((postgres) => {
   if (!postgres) {
-    console.error(
+    logger.error(
+      { component: "App" },
       "⚠️  PostgreSQL connection failed, but server will continue..."
     );
   }
@@ -18,7 +20,14 @@ testConnection().then((postgres) => {
     port: 9080,
   });
 
-  console.log("✅ Server started on port 9080");
-  console.log("   - DailyClosing Workflow");
-  console.log("   - DailyClosing Scheduler (Virtual Object)");
+  logger.info({ component: "App", port: 9080 }, "Server started");
+  logger.info({ component: "App" }, "Registered services");
+  logger.info(
+    { component: "App", service: "DailyClosing" },
+    "Registered service"
+  );
+  logger.info(
+    { component: "App", service: "DailyClosingScheduler" },
+    "Registered service"
+  );
 });

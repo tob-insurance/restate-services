@@ -6,18 +6,18 @@ import { readDcNoteIndex, stateKeys } from "../soa/objects/state";
 import { generateReminderLetter } from "./generate-reminder-letter";
 import type { IProcessReminder } from "./types";
 
-type ProcessReminderParams = {
+interface ProcessReminderParams {
   ctx: ObjectContext;
   customer: IAccount;
   item: ISoaItem;
-};
+}
 
-type SoaReminder = {
-  id: string;
+interface SoaReminder {
   customerCode: string;
-  timePeriod: string;
+  id: string;
   officeId: string;
-};
+  timePeriod: string;
+}
 
 export const processReminderLetter = async (
   params: ProcessReminderParams

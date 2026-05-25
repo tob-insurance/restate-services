@@ -4,14 +4,14 @@ import type { IStatementOfAccountModel } from "../../types/soa.type.js";
 import type { ReminderDetail, ReminderHeader } from "../soa/objects/state";
 import { stateKeys } from "../soa/objects/state";
 
-export type CreateReminderParams = {
+export interface CreateReminderParams {
+  branchCode: string;
   ctx: ObjectContext;
   customer: IAccount;
-  timePeriod: string;
-  branchCode: string;
   processingDate: string;
   soaList: IStatementOfAccountModel[];
-};
+  timePeriod: string;
+}
 
 export const createReminder = async (
   params: CreateReminderParams

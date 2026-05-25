@@ -1,31 +1,27 @@
 import { withConnection } from "@restate-tob/postgres";
-import { parseDateParts } from "@restate-tob/shared";
+import {
+  DateStringSchema,
+  parseDateParts,
+  UserIdSchema,
+} from "@restate-tob/shared";
 import { TerminalError } from "@restatedev/restate-sdk";
 import { DateTime } from "luxon";
 import type { PoolClient } from "pg";
 import { z } from "zod";
-import {
-  DateStringSchema,
-  getPostgresClient,
-  UserIdSchema,
-} from "../../../infrastructure/index.js";
+import { getPostgresClient } from "../../../infrastructure/index.js";
 import type { GeniusClosingJobSubmit } from "../types.js";
-
-const YEAR_REGEX = /^\d{4}$/;
-const MONTH_REGEX = /^\d{2}$/;
-const USER_ID_REGEX = /^[a-zA-Z0-9_]+$/;
 
 const SubmitJobInputSchema = z.object({
   closingDate: DateStringSchema,
   userId: UserIdSchema,
-  currentTimeMillis: z.number().optional(),
+  currentTimeMillis: z.number(),
 });
 
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 export async function submitGeniusClosingJob(
   closingDate: string,
-  userId = "adm",
-  currentTimeMillis?: number
+  currentTimeMillis: number,
+  userId = "adm"
 ): Promise<GeniusClosingJobSubmit> {
   let validated: z.infer<typeof SubmitJobInputSchema>;
   try {
@@ -34,7 +30,7 @@ export async function submitGeniusClosingJob(
       userId,
       currentTimeMillis,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       throw new TerminalError(
         `Validation error: ${error.issues.map((e: z.ZodIssue) => e.message).join(", ")}`,
@@ -44,17 +40,12 @@ export async function submitGeniusClosingJob(
     throw error;
   }
 
-  const startTime = validated.currentTimeMillis
-    ? DateTime.fromMillis(validated.currentTimeMillis)
-    : DateTime.now();
+  const startTime = DateTime.fromMillis(validated.currentTimeMillis);
 
   const { year, month } = parseDateParts(validated.closingDate);
   const shortYear = String(year).slice(-2);
   const uniqueSuffix = startTime.toMillis().toString(36).toUpperCase();
   const jobName = `GNS_${shortYear}${month}_${uniqueSuffix}`;
-
-  console.log(`🚀 Submitting Genius closing job: ${jobName}`);
-  console.log(`   Year: ${year}, Month: ${month}, UserId: ${validated.userId}`);
 
   let callIssued = false;
   try {
@@ -91,23 +82,20 @@ export async function submitGeniusClosingJob(
               { errorCode: 500 }
             );
           }
-          console.log(
-            `   Procedure status: ${status}, message: ${errorMessage}`
-          );
         }
       } finally {
         try {
           await client.query("RESET statement_timeout");
           await client.query("RESET search_path");
-        } catch (resetErr) {
+        } catch (error: unknown) {
           console.warn(
-            "RESET session settings failed (connection likely dropped):",
-            resetErr instanceof Error ? resetErr.message : resetErr
+            "Session reset failed after Genius procedure (expected if connection was terminated):",
+            error instanceof Error ? error.message : String(error)
           );
         }
       }
     });
-  } catch (error) {
+  } catch (error: unknown) {
     if (error instanceof TerminalError) {
       throw error;
     }
@@ -120,8 +108,6 @@ export async function submitGeniusClosingJob(
     }
     throw error;
   }
-
-  console.log(`✅ Job ${jobName} completed successfully`);
 
   return {
     submitted: true,

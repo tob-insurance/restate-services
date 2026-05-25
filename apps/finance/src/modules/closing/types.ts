@@ -1,8 +1,8 @@
 import type { DateTime } from "luxon";
 
-export type GeniusClosingJobSubmit = {
-  submitted: boolean;
+export interface GeniusClosingJobSubmit {
   jobName: string;
   message: string;
   startTime: DateTime;
-};
+  submitted: boolean;
+}

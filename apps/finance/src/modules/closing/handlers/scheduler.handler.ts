@@ -1,48 +1,28 @@
-import { type ObjectContext, object } from "@restatedev/restate-sdk";
+import { type ObjectContext, object, rpc } from "@restatedev/restate-sdk";
 import { DateTime } from "luxon";
 import { DAILY_CLOSING_SCHEDULE_TIME, TIMEZONE } from "../../../constants.js";
-import { dailyClosingWorkflow } from "../workflows/index.js";
-
-const TIME_FORMAT_REGEX = /^(\d{1,2}):(\d{2})$/;
+import { dailyClosingWorkflow } from "../workflows/daily-closing.workflow.js";
 
 function getScheduleConfig() {
-  const scheduleTime = DAILY_CLOSING_SCHEDULE_TIME;
-  const timeMatch = scheduleTime.match(TIME_FORMAT_REGEX);
-
-  if (!timeMatch) {
-    throw new Error(
-      `Invalid DAILY_CLOSING_SCHEDULE_TIME: "${scheduleTime}". Expected format: HH:mm (e.g., "02:30", "14:00")`
-    );
-  }
-
-  const hour = Number.parseInt(timeMatch[1], 10);
-  const minute = Number.parseInt(timeMatch[2], 10);
-
-  if (hour < 0 || hour > 23) {
-    throw new Error(
-      `Invalid hour in DAILY_CLOSING_SCHEDULE_TIME: "${scheduleTime}". Hour must be 0-23.`
-    );
-  }
-
-  if (minute < 0 || minute > 59) {
-    throw new Error(
-      `Invalid minute in DAILY_CLOSING_SCHEDULE_TIME: "${scheduleTime}". Minute must be 0-59.`
-    );
-  }
-
-  return { hour, minute };
+  const [hourStr, minuteStr] = DAILY_CLOSING_SCHEDULE_TIME.split(":");
+  return {
+    hour: Number.parseInt(hourStr, 10),
+    minute: Number.parseInt(minuteStr, 10),
+  };
 }
-
-const SCHEDULE_CONFIG = getScheduleConfig();
-
-console.log(
-  `📅 Daily closing scheduled for ${String(SCHEDULE_CONFIG.hour).padStart(2, "0")}:${String(SCHEDULE_CONFIG.minute).padStart(2, "0")} (${TIMEZONE})`
-);
 
 export const DailyClosingScheduler = object({
   name: "DailyClosingScheduler",
   handlers: {
     start: async (ctx: ObjectContext) => {
+      const alreadyStarted = await ctx.get<boolean>("started");
+      if (alreadyStarted) {
+        ctx.console.log(
+          "DailyClosingScheduler already running — skipping duplicate start"
+        );
+        return;
+      }
+      ctx.set("started", true);
       ctx.console.log("🚀 Starting DailyClosingScheduler");
       await scheduleNextRun(ctx);
     },
@@ -55,19 +35,28 @@ export const DailyClosingScheduler = object({
         `⏰ Triggering Daily Closing Workflow for date: ${dateStr}`
       );
 
-      ctx.workflowSendClient(dailyClosingWorkflow, dateStr).run({
-        date: dateStr,
-        skipGeniusClosing: false,
-        skipFinancialMetrics: false,
-        userId: "adm",
-      });
-
       await scheduleNextRun(ctx);
+
+      try {
+        await ctx.workflowSendClient(dailyClosingWorkflow, dateStr).run({
+          date: dateStr,
+          skipGeniusClosing: false,
+          skipFinancialMetrics: false,
+          userId: "adm",
+        });
+        ctx.console.log(`Daily closing workflow enqueued for ${dateStr}`);
+      } catch (error: unknown) {
+        ctx.console.log(
+          `[ERROR] Failed to enqueue daily closing for ${dateStr}: ${error instanceof Error ? error.message : "Unknown error"}`
+        );
+        throw error;
+      }
     },
   },
 });
 
 async function scheduleNextRun(ctx: ObjectContext) {
+  const scheduleConfig = getScheduleConfig();
   const currentTime = await ctx.date.now();
   const now = DateTime.fromMillis(currentTime).setZone(TIMEZONE);
 
@@ -79,8 +68,8 @@ async function scheduleNextRun(ctx: ObjectContext) {
   );
 
   let targetTime = now.set({
-    hour: SCHEDULE_CONFIG.hour,
-    minute: SCHEDULE_CONFIG.minute,
+    hour: scheduleConfig.hour,
+    minute: scheduleConfig.minute,
     second: 0,
     millisecond: 0,
   });
@@ -96,7 +85,14 @@ async function scheduleNextRun(ctx: ObjectContext) {
     `📅 Next run scheduled for: ${targetTimeStr} (in ${Math.round(delayMs / 1000 / 60)} minutes)`
   );
 
-  ctx
-    .objectSendClient(DailyClosingScheduler, "main", { delay: delayMs })
-    .trigger();
+  try {
+    await ctx
+      .objectSendClient(DailyClosingScheduler, "main")
+      .trigger(rpc.sendOpts({ delay: { milliseconds: delayMs } }));
+  } catch (error: unknown) {
+    ctx.console.log(
+      `[ERROR] Failed to schedule next closing run: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
+    throw error;
+  }
 }

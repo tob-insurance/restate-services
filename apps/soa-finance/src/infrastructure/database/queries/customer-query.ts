@@ -6,7 +6,6 @@ export const getAllAccounts = async () => {
   const query = `SELECT 
       CM_CODE AS "code", 
       CM_NAME AS "name",
-      CM_FULLNAME AS "fullName",
       ACTING_CODE AS "actingCode"
     FROM MASTER_CM 
     WHERE IS_CUSTOMER = 'N'
@@ -35,7 +34,9 @@ export const getAccountById = async (
   return result.rows?.[0] ?? null;
 };
 
-type EmailRow = { EMAIL: string };
+interface EmailRow {
+  EMAIL: string;
+}
 
 export const getAccountEmails = async (
   cmCode: string,
@@ -46,6 +47,7 @@ export const getAccountEmails = async (
     FROM MASTER_COLLECTION 
     WHERE CM_CODE = $1 
       AND EMAIL IS NOT NULL
+    ORDER BY EMAIL
   `;
 
   const params: unknown[] = [cmCode];

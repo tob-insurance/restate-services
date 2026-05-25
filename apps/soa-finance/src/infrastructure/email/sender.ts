@@ -1,11 +1,12 @@
 import { request as httpsRequest } from "node:https";
 import { ClientSecretCredential } from "@azure/identity";
 import { HttpsProxyAgent } from "https-proxy-agent";
+import { EMAIL_SEND_TIMEOUT_MS } from "../../constants/timeouts.js";
 import { EMAIL_CONFIG } from "../../utils/config/emails.js";
 import logger from "../../utils/logger.js";
 import type { IEmailAttachment, IEmailMessage } from "./types";
 
-type GraphSendMailBody = {
+interface GraphSendMailBody {
   message: {
     subject: string;
     body: { contentType: string; content: string };
@@ -20,9 +21,10 @@ type GraphSendMailBody = {
     }[];
   };
   saveToSentItems: boolean;
-};
+}
 
 const SHARED_MAILBOX = EMAIL_CONFIG.SHARED_MAILBOX;
+const MAX_ERROR_BODY = 500;
 
 function formatRecipients(emails: string[]) {
   return emails.map((email) => ({ emailAddress: { address: email } }));
@@ -91,34 +93,47 @@ export async function sendEmail(message: IEmailMessage): Promise<boolean> {
     const proxyUrl = process.env.HTTPS_PROXY;
     const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
 
-    const _response = await new Promise<Buffer>((resolve, reject) => {
-      const req = httpsRequest(
-        `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(initiatorEmail)}/sendMail`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-            "Content-Length": body.length.toString(),
+    const response = await new Promise<{ body: string; statusCode: number }>(
+      (resolve, reject) => {
+        const req = httpsRequest(
+          `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(initiatorEmail)}/sendMail`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+              "Content-Length": body.length.toString(),
+            },
+            agent,
+            timeout: EMAIL_SEND_TIMEOUT_MS,
           },
-          agent,
-          timeout: 30_000,
-        },
-        (res) => {
-          const chunks: Buffer[] = [];
-          res.on("data", (c: Buffer) => chunks.push(c));
-          res.on("end", () => resolve(Buffer.concat(chunks)));
-          res.on("error", reject);
-        }
+          (res) => {
+            const chunks: Buffer[] = [];
+            res.on("data", (c: Buffer) => chunks.push(c));
+            res.on("end", () =>
+              resolve({
+                body: Buffer.concat(chunks).toString("utf8"),
+                statusCode: res.statusCode ?? 0,
+              })
+            );
+            res.on("error", reject);
+          }
+        );
+        req.on("timeout", () => {
+          req.destroy();
+          reject(new Error("Request timed out"));
+        });
+        req.on("error", reject);
+        req.write(body);
+        req.end();
+      }
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw new Error(
+        `Email send failed with HTTP ${response.statusCode}: ${response.body.slice(0, MAX_ERROR_BODY)}`
       );
-      req.on("timeout", () => {
-        req.destroy();
-        reject(new Error("Request timed out"));
-      });
-      req.on("error", reject);
-      req.write(body);
-      req.end();
-    });
+    }
 
     logger.info(
       { component: "Email", subject: message.subject, to: message.to },

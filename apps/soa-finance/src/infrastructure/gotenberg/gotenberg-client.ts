@@ -4,16 +4,16 @@ import { HttpsProxyAgent } from "https-proxy-agent";
 import { INFRASTRUCTURE_TIMEOUTS } from "../../constants/constants.js";
 import logger from "../../utils/logger.js";
 
-type PdfOptions = {
-  marginTop?: number;
+interface PdfOptions {
+  landscape?: boolean;
   marginBottom?: number;
   marginLeft?: number;
   marginRight?: number;
-  paperWidth?: number;
+  marginTop?: number;
   paperHeight?: number;
-  landscape?: boolean;
+  paperWidth?: number;
   scale?: number;
-};
+}
 
 export const PaperSizes = {
   A4: { width: 8.27, height: 11.7 },
@@ -72,7 +72,10 @@ export async function generatePdfWithHeaderFooter(
   footerHtml: string,
   options: PdfWithHeaderFooterOptions = {}
 ): Promise<Buffer> {
-  const GOTENBERG_URL = process.env.GOTENBERG_URL || "http://localhost:3000";
+  const GOTENBERG_URL = process.env.GOTENBERG_URL;
+  if (!GOTENBERG_URL) {
+    throw new Error("GOTENBERG_URL environment variable is required");
+  }
 
   try {
     const {

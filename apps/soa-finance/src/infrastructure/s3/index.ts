@@ -3,21 +3,20 @@ import type { IFileData } from "../../types/soa.type.js";
 import logger from "../../utils/logger.js";
 import { getBucketName, getS3Client } from "./s3-client";
 
-type UploadResult = {
-  url: string;
+interface UploadResult {
   key: string;
   success: boolean;
-};
+  url: string;
+}
 
 function generateStoragePath(
   customerCode: string,
   type: "excel" | "pdf",
   fileName: string,
-  date?: Date
+  date: Date
 ): string {
-  const now = date ?? new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
 
   return `SOA/${year}-${month}/${customerCode}/${type}/${fileName}`;
 }
@@ -26,7 +25,7 @@ export async function uploadFile(
   fileData: IFileData,
   customerCode: string,
   type: "excel" | "pdf",
-  date?: Date
+  date: Date
 ): Promise<UploadResult> {
   const client = getS3Client();
   const bucket = getBucketName();

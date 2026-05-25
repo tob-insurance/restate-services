@@ -1,5 +1,6 @@
 import {
-  createPostgresClient,
+  closeGlobalPostgresClient,
+  getGlobalPostgresClient,
   isDataIntegrityError,
   type PostgresClient,
 } from "@restate-tob/postgres";
@@ -7,20 +8,13 @@ import { TerminalError } from "@restatedev/restate-sdk";
 import { isDevelopment } from "../../constants/environment.js";
 import logger from "../../utils/logger.js";
 
-let pgClient: PostgresClient | null = null;
-
-function getDatabaseUrl(): string {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error("DATABASE_URL environment variable is required");
-  }
-  return url;
-}
+let devWarningLogged = false;
 
 function logDevModeWarning(connectionString: string): void {
-  if (!isDevelopment()) {
+  if (!isDevelopment() || devWarningLogged) {
     return;
   }
+  devWarningLogged = true;
 
   try {
     const url = new URL(connectionString);
@@ -41,15 +35,12 @@ function logDevModeWarning(connectionString: string): void {
 }
 
 export function getPostgresClient(): PostgresClient {
-  if (!pgClient) {
-    const connectionString = getDatabaseUrl();
-    logDevModeWarning(connectionString);
-    pgClient = createPostgresClient({ connectionString });
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error("DATABASE_URL environment variable is required");
   }
-  if (!pgClient) {
-    throw new Error("Failed to initialize PostgreSQL client");
-  }
-  return pgClient;
+  logDevModeWarning(connectionString);
+  return getGlobalPostgresClient({ connectionString });
 }
 
 export function initPostgresClient(): void {
@@ -67,7 +58,7 @@ export async function executeQuery<T = Record<string, unknown>>(
   try {
     const result = await getPostgresClient().executeQuery<T>(sql, params);
     return { rows: result.rows, rowCount: result.rowCount };
-  } catch (error) {
+  } catch (error: unknown) {
     const pgError = error as { code?: string; message?: string };
     if (isDataIntegrityError(pgError.code)) {
       throw new TerminalError(
@@ -78,9 +69,6 @@ export async function executeQuery<T = Record<string, unknown>>(
   }
 }
 
-export async function closeConnections(): Promise<void> {
-  if (pgClient) {
-    await pgClient.close();
-    pgClient = null;
-  }
+export function closeConnections(): Promise<void> {
+  return closeGlobalPostgresClient();
 }

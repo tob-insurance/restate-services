@@ -1,20 +1,20 @@
-export type IEmailAttachment = {
-  name: string;
-  contentType: string;
+export interface IEmailAttachment {
   contentBytes: string;
-  isInline?: boolean;
   contentId?: string;
-};
+  contentType: string;
+  isInline?: boolean;
+  name: string;
+}
 
-export type IEmailMessage = {
-  to: string[];
+export interface IEmailMessage {
+  attachments?: IEmailAttachment[];
+  body: string;
   cc?: string[];
   subject: string;
-  body: string;
-  attachments?: IEmailAttachment[];
-};
+  to: string[];
+}
 
-export type ISendEmailResult = {
-  sent: boolean;
+export interface ISendEmailResult {
   reason?: string;
-};
+  sent: boolean;
+}

@@ -1,4 +1,4 @@
-export type IBranch = {
-  officeCode: string;
+export interface IBranch {
   name: string;
-};
+  officeCode: string;
+}

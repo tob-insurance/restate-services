@@ -15,12 +15,6 @@ on:
         description: "Deployment environment"
         type: string
         default: "prod"
-      oracle-layer-name:
-        description: "Oracle Instant Client Lambda layer name (leave empty to clear layers)"
-        type: string
-        required: false
-        default: ""
-
 env:
   AWS_REGION: ap-southeast-3
 
@@ -55,6 +49,12 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Lint check
+        run: bun run check
+
       - name: Build packages
         run: bun run build
 
@@ -66,16 +66,6 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-
-      - name: Look up Oracle Lambda Layer (if configured)
-        id: oracle-layer
-        if: inputs.oracle-layer-name != ''
-        run: |
-          LAYER_ARN=$(aws lambda list-layer-versions \
-            --layer-name ${{ inputs.oracle-layer-name }} \
-            --query 'LayerVersions[0].LayerVersionArn' \
-            --output text)
-          echo "layer-arn=$LAYER_ARN" >> "$GITHUB_OUTPUT"
 
       - name: Deploy Lambda Function
         id: deploy
@@ -109,17 +99,10 @@ jobs:
             fs.writeFileSync('/tmp/env.json', JSON.stringify({ Variables: vars }));
           "
 
-          if [ -n "${{ steps.oracle-layer.outputs.layer-arn }}" ]; then
-            aws lambda update-function-configuration \
-              --function-name ${{ inputs.lambda-name }} \
-              --layers "${{ steps.oracle-layer.outputs.layer-arn }}" \
-              --environment file:///tmp/env.json
-          else
-            aws lambda update-function-configuration \
-              --function-name ${{ inputs.lambda-name }} \
-              --layers '[]' \
-              --environment file:///tmp/env.json
-          fi
+          aws lambda update-function-configuration \
+            --function-name ${{ inputs.lambda-name }} \
+            --layers '[]' \
+            --environment file:///tmp/env.json
 
       - name: Tag Lambda function
         run: |

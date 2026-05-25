@@ -15,10 +15,10 @@ bun run dev
 bun run build
 
 # Run single app in dev mode
-bun run --filter @finance/closing dev
+bun run --filter @restate-tob/finance dev
 
 # Build single app
-bun run --filter @finance/closing build
+bun run --filter @restate-tob/finance build
 ```
 
 ### Linting & Typechecking
@@ -38,7 +38,6 @@ cd apps/finance && bun run typecheck
 cd apps/soa-finance && bun run typecheck
 
 # Typecheck single package
-cd packages/oracle && bun run typecheck
 cd packages/postgres && bun run typecheck
 cd packages/shared && bun run typecheck
 ```
@@ -52,7 +51,6 @@ Linting uses [ultracite](https://github.com/harbordev/ultracite) (wraps Biome). 
 - **Turborepo + Bun workspaces** manage the monorepo
 - Apps live in `apps/` directory, each with independent `package.json`
 - Shared packages in `packages/`:
-  - `@restate-tob/oracle`: Oracle database client with connection pooling
   - `@restate-tob/postgres`: PostgreSQL database client
   - `@restate-tob/shared`: Shared utilities and types
 
@@ -90,7 +88,6 @@ Key concepts:
 
 **Connection Timeouts:**
 - PostgreSQL: 10s connection, 300s statement timeout
-- Oracle: 60s connection, 60s queue timeout
 - All database operations wrapped in connection helpers for proper cleanup
 
 **Workflow State Management:**

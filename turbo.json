@@ -13,6 +13,9 @@
     "//#fix": {
       "cache": false
     },
-    "typecheck": {}
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "test": {}
   }
 }

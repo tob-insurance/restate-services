@@ -60,12 +60,12 @@ This document summarizes all the fixes applied to improve security, reliability,
 - **Fix:** Removed process.exit(), errors are now logged only
 - **Impact:** Service remains available even when individual connections fail
 
-### 8. Oracle Pool Race Condition
+### 8. Oracle Pool Race Condition (Historical)
 **File:** `packages/oracle/src/client.ts`
 
 - **Issue:** Concurrent `getConnection()` calls could create multiple pools
 - **Fix:** Added `poolInitializing` flag to prevent race conditions
-- **Impact:** Ensures single pool creation and prevents resource leaks
+- **Impact:** Ensured single pool creation and prevented resource leaks while Oracle was still part of the finance architecture. The current finance app reads Genius closing data through PostgreSQL.
 
 ## 🟡 Quality Improvements
 
@@ -77,7 +77,7 @@ This document summarizes all the fixes applied to improve security, reliability,
 - **Issue:** No timeout configuration for database connections
 - **Fix:** 
   - PostgreSQL: 10s connection, 300s statement timeout
-  - Oracle: 60s connection, 60s queue timeout
+  - Oracle: 60s connection, 60s queue timeout (historical; Oracle has since been removed from the finance app)
 - **Impact:** Prevents hanging connections and improves error detection
 
 ### 10. Type Safety for Database Results

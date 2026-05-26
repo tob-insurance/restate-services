@@ -1,11 +1,8 @@
 const hucrePromise = import("hucre/xlsx");
 
-import {
-  CONTENT_TYPES,
-  NUMBER_FORMATS,
-  toExcelDate,
-} from "../../constants/constants.js";
+import { CONTENT_TYPES, NUMBER_FORMATS } from "../../constants/constants.js";
 import type { StatementOfAccountModel } from "../../types/soa.type.js";
+import { toExcelDate } from "../../utils/formatter/date.formatter.js";
 
 export interface ExcelColumn {
   format?: "number" | "currency" | "date" | "text";

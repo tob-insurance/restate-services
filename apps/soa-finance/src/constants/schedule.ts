@@ -1,4 +1,4 @@
-import type { SoaType } from "../types/soa.type.js";
+import { SoaType } from "../types/soa.type.js";
 
 export interface ScheduleConfig {
   graceDays: number;
@@ -28,8 +28,8 @@ function parseScheduleDays(): number[] {
 const [soaDay, rl1Day, rl2Day, wlDay] = parseScheduleDays();
 
 export const SCHEDULE_CONFIG: ScheduleConfig[] = [
-  { type: "SOA", soaType: 1, sendDay: soaDay, graceDays: 0 },
-  { type: "RL1", soaType: 2, sendDay: rl1Day, graceDays: 7 },
-  { type: "RL2", soaType: 3, sendDay: rl2Day, graceDays: 5 },
-  { type: "WL", soaType: 4, sendDay: wlDay, graceDays: 3 },
+  { type: "SOA", soaType: SoaType.SOA, sendDay: soaDay, graceDays: 0 },
+  { type: "RL1", soaType: SoaType.RL1, sendDay: rl1Day, graceDays: 7 },
+  { type: "RL2", soaType: SoaType.RL2, sendDay: rl2Day, graceDays: 5 },
+  { type: "WL", soaType: SoaType.WL, sendDay: wlDay, graceDays: 3 },
 ];

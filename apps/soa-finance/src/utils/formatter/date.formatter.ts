@@ -133,3 +133,59 @@ export function parseDate(value: unknown): string {
 
   return `${month}/${day}/${year}`;
 }
+
+const DATE_PATTERN = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+
+function parseSlashDate(value: string): Date | null {
+  // Try ISO first
+  let d = new Date(value);
+  if (!Number.isNaN(d.getTime()) && d.getFullYear() > 1900) {
+    return d;
+  }
+
+  const match = DATE_PATTERN.exec(value);
+  if (!match) {
+    return null;
+  }
+
+  const [, first, second, year] = match;
+  const yearNum = Number(year);
+
+  // Try both (first=month, second=day) and (first=day, second=month)
+  for (const [month, day] of [
+    [Number(first), Number(second)],
+    [Number(second), Number(first)],
+  ]) {
+    d = new Date(yearNum, month - 1, day);
+    if (
+      d.getFullYear() === yearNum &&
+      d.getMonth() === month - 1 &&
+      d.getDate() === day
+    ) {
+      return d;
+    }
+  }
+
+  return null;
+}
+
+export function toExcelDate(value: unknown): Date | null {
+  if (value === null || value === undefined || value === "" || value === "-") {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  if (typeof value === "number") {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  if (typeof value === "string") {
+    return parseSlashDate(value);
+  }
+
+  return null;
+}

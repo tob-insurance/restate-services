@@ -9,8 +9,13 @@ import {
   workflow,
 } from "@restatedev/restate-sdk";
 import { SENTINEL_ALL } from "../../../constants/constants.js";
-import { isDevelopment } from "../../../constants/environment.js";
+import {
+  isDevelopment,
+  parseEnvInt,
+  parseEnvList,
+} from "../../../constants/environment.js";
 import { getAgentAccounts } from "../../../infrastructure/database/queries/customer-query.js";
+import { asCorrelationId, asCustomerId } from "../../../types/branded.js";
 import type { Account } from "../../../types/customer.type.js";
 import {
   formatDateToUnixTimestamp,
@@ -18,27 +23,6 @@ import {
 } from "../../../utils/formatter/date.formatter.js";
 import { soaCustomer } from "../objects/soa-customer.js";
 import { soaSchema } from "../types.js";
-
-function parseEnvInt(key: string, defaultVal: number): number {
-  const raw = process.env[key];
-  if (!raw) {
-    return defaultVal;
-  }
-  const val = Number(raw);
-  return Number.isFinite(val) && val > 0 ? val : defaultVal;
-}
-
-function parseEnvList(key: string): string[] | null {
-  const raw = process.env[key];
-  if (!raw) {
-    return null;
-  }
-  const items = raw
-    .split(",")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-  return items.length > 0 ? items : null;
-}
 
 const DEV_TEST_CUSTOMER_CODES = parseEnvList("SOA_TEST_CUSTOMERS") ?? [
   "00004162",
@@ -109,6 +93,9 @@ export const batchWorkflow = workflow({
         toDate: formatDateToUnixTimestamp(currentDate),
         processingDate: currentDate.toISOString(),
       };
+      const correlationId = asCorrelationId(
+        `batch:${processingDates.timePeriod}:${now}`
+      );
 
       const soaProcessingType = parseResult.data.type;
       const soaOptions = {
@@ -171,13 +158,14 @@ export const batchWorkflow = workflow({
             .objectClient(soaCustomer, accountId)
             .process(
               {
-                customerId: accountId,
+                customerId: asCustomerId(account.code),
                 timePeriod: processingDates.timePeriod,
                 processingDate: processingDates.processingDate,
                 classOfBusiness: soaOptions.classOfBusiness,
                 branch: soaOptions.branch,
                 toDate: processingDates.toDate,
                 processingType: soaProcessingType,
+                correlationId,
               },
               rpc.opts({ idempotencyKey })
             )

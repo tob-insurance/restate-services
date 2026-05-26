@@ -7,6 +7,7 @@ import {
 import { PERIODS_TO_KEEP } from "../../../constants/constants.js";
 import { getAccountById } from "../../../infrastructure/database/queries/customer-query.js";
 import type { SoaItem } from "../../../types/soa.type.js";
+import { workflowLog } from "../../../utils/logger.js";
 import { processReminderLetter } from "../../reminder";
 import { processBranchSoa } from "../services/process-branches.js";
 import { readDcNoteIndex } from "./state.js";
@@ -40,7 +41,14 @@ export const soaCustomer = object({
         );
       }
 
-      ctx.console.log(`[SoaCustomer] Starting for customer: ${customerId}`);
+      ctx.console.log(
+        workflowLog({
+          component: "SoaCustomer",
+          correlationId: soaParams.correlationId,
+          workflowId: ctx.key,
+        }),
+        `Starting for customer: ${customerId}`
+      );
       ctx.set("status", "processing");
 
       const customerData = await ctx.run("get-customer-data", () =>
@@ -81,7 +89,14 @@ export const soaCustomer = object({
 
         ctx.set("status", "completed");
 
-        ctx.console.log(`[SoaCustomer] Completed for customer: ${customerId}`);
+        ctx.console.log(
+          workflowLog({
+            component: "SoaCustomer",
+            correlationId: soaParams.correlationId,
+            workflowId: ctx.key,
+          }),
+          `Completed for customer: ${customerId}`
+        );
 
         await cleanupOldPeriodState(ctx, timePeriod);
 

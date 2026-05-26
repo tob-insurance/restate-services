@@ -41,7 +41,7 @@ async function main() {
     );
   }
 
-  const [s3Ok, gotenbergOk] = await Promise.all([
+  const [s3Result, gotenbergResult] = await Promise.all([
     checkS3BucketAccess(),
     checkGotenbergConnectivity(),
   ]);
@@ -49,8 +49,8 @@ async function main() {
     {
       component: "HealthCheck",
       postgres: !!postgres,
-      s3: s3Ok,
-      gotenberg: gotenbergOk,
+      s3: s3Result,
+      gotenberg: gotenbergResult,
     },
     "External service health"
   );

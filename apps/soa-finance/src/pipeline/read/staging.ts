@@ -1,8 +1,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { isDataIntegrityError } from "@restate-tob/postgres";
+import { TerminalError } from "@restatedev/restate-sdk";
 import { getPostgresClient } from "../../infrastructure/database/postgres.js";
 import { formatTimePeriod } from "../../utils/formatter/date.formatter.js";
 import logger from "../../utils/logger.js";
+import { getLastPndAggRefresh, initPndAgg, refreshPndAgg } from "./pnd-agg.js";
 
 const BUILD_TABLE = "soa_pipeline_staging_build";
 const ACTIVE_TABLE = "soa_pipeline_staging";
@@ -15,6 +18,27 @@ const SOA_QUERY_TEMPLATE = readFileSync(
 const buildQuery = (buildTable: string): string =>
   SOA_QUERY_TEMPLATE.replace(/__BUILD_TABLE__/g, buildTable);
 
+async function ensurePndAggFresh(): Promise<void> {
+  await initPndAgg();
+
+  const lastRefresh = await getLastPndAggRefresh();
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  if (!lastRefresh || lastRefresh < oneDayAgo) {
+    logger.info(
+      { component: "Pipeline", lastRefresh },
+      "pnd_agg needs full refresh"
+    );
+    await refreshPndAgg(new Date(0), true);
+  } else {
+    logger.info(
+      { component: "Pipeline", lastRefresh },
+      "pnd_agg is fresh, running incremental refresh"
+    );
+    await refreshPndAgg(lastRefresh, false);
+  }
+}
+
 export async function refreshStaging(asAtDate: Date): Promise<void> {
   const client = getPostgresClient();
   const period = formatTimePeriod(asAtDate);
@@ -23,21 +47,20 @@ export async function refreshStaging(asAtDate: Date): Promise<void> {
   try {
     logger.info({ component: "Pipeline" }, "Refreshing staging table...");
 
+    await ensurePndAggFresh();
+
     await conn.query("SET work_mem = '512MB'");
     await conn.query("SET hash_mem_multiplier = '4.0'");
     await conn.query("SET jit = off");
-    await conn.query("SET max_parallel_workers_per_gather = '1'");
+    await conn.query("SET max_parallel_workers_per_gather = '4'");
+    await conn.query("SET parallel_tuple_cost = 0.01");
+    await conn.query("SET parallel_setup_cost = 100");
 
-    // Recreate build table (it was renamed away in the previous swap)
     await conn.query(`DROP TABLE IF EXISTS ${BUILD_TABLE}`);
     await conn.query(
-      `CREATE UNLOGGED TABLE ${BUILD_TABLE} (LIKE ${ACTIVE_TABLE} INCLUDING DEFAULTS)`
+      `CREATE TABLE ${BUILD_TABLE} (LIKE ${ACTIVE_TABLE} INCLUDING DEFAULTS)`
     );
-    await conn.query(`TRUNCATE TABLE ${BUILD_TABLE}`);
     await conn.query(buildQuery(BUILD_TABLE), [asAtDate, period]);
-
-    // Convert to LOGGED so it survives failover and replicates to standby
-    await conn.query(`ALTER TABLE ${BUILD_TABLE} SET LOGGED`);
 
     await conn.query(
       `CREATE INDEX ON ${BUILD_TABLE} (distribution_code, branch)`
@@ -59,12 +82,28 @@ export async function refreshStaging(asAtDate: Date): Promise<void> {
         "Rollback error"
       );
     });
+
+    const pgError = error as { code?: string; message?: string };
+    if (isDataIntegrityError(pgError.code)) {
+      throw new TerminalError(
+        `Pipeline data integrity error: ${pgError.message ?? "Unknown constraint violation"}`
+      );
+    }
+
     logger.error(
       { component: "Pipeline", err: error },
       "Staging refresh failed"
     );
     throw error;
   } finally {
+    await conn.query("RESET work_mem").catch(() => undefined);
+    await conn.query("RESET hash_mem_multiplier").catch(() => undefined);
+    await conn.query("RESET jit").catch(() => undefined);
+    await conn
+      .query("RESET max_parallel_workers_per_gather")
+      .catch(() => undefined);
+    await conn.query("RESET parallel_tuple_cost").catch(() => undefined);
+    await conn.query("RESET parallel_setup_cost").catch(() => undefined);
     conn.release();
   }
 }

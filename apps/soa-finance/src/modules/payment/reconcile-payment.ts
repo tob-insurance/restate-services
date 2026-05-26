@@ -1,6 +1,7 @@
 import type { ReminderDetail } from "../soa/objects/state.js";
 
-const BULK_PAYMENT_SAFETY_THRESHOLD = 5;
+const BULK_PAYMENT_MIN_COUNT = 5;
+const BULK_PAYMENT_RATIO_THRESHOLD = 0.8;
 
 export const reconcilePayment = (
   details: Record<string, ReminderDetail> | null,
@@ -27,12 +28,18 @@ export const reconcilePayment = (
     return { paidDcNoteIds: [], updatedDetails: {}, bulkPaymentSkipped: false };
   }
 
-  // Safety: don't mark ALL reminders as paid at once (likely data issue)
-  if (
-    paidDcNotes.length === Object.keys(details).length &&
-    paidDcNotes.length > BULK_PAYMENT_SAFETY_THRESHOLD
-  ) {
-    return { paidDcNoteIds: [], updatedDetails: {}, bulkPaymentSkipped: true };
+  // Safety: don't mark most reminders as paid at once (likely data issue)
+  const totalDetails = Object.keys(details).length;
+
+  if (totalDetails > BULK_PAYMENT_MIN_COUNT) {
+    const paidRatio = paidDcNotes.length / totalDetails;
+    if (paidRatio >= BULK_PAYMENT_RATIO_THRESHOLD) {
+      return {
+        paidDcNoteIds: [],
+        updatedDetails: {},
+        bulkPaymentSkipped: true,
+      };
+    }
   }
 
   const updatedDetails = { ...details };

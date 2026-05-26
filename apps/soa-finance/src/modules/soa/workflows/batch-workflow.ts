@@ -12,7 +12,6 @@ import { SENTINEL_ALL } from "../../../constants/constants.js";
 import { isDevelopment } from "../../../constants/environment.js";
 import { getAgentAccounts } from "../../../infrastructure/database/queries/customer-query.js";
 import type { Account } from "../../../types/customer.type.js";
-import type { SoaType } from "../../../types/soa.type.js";
 import {
   formatDateToUnixTimestamp,
   formatTimePeriod,
@@ -111,7 +110,7 @@ export const batchWorkflow = workflow({
         processingDate: currentDate.toISOString(),
       };
 
-      const soaProcessingType = parseResult.data.type as SoaType;
+      const soaProcessingType = parseResult.data.type;
       const soaOptions = {
         classOfBusiness: SENTINEL_ALL,
         branch: SENTINEL_ALL,

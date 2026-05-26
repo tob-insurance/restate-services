@@ -1,5 +1,5 @@
 import { SENTINEL_ALL } from "../../constants/constants.js";
-import { getPostgresClient } from "../../infrastructure/database/postgres.js";
+import { executeQuery } from "../../infrastructure/database/postgres.js";
 import type { StatementOfAccountModel } from "../../types/soa.type.js";
 
 interface StagingRow {
@@ -94,8 +94,7 @@ export async function getStagingSoaData(
   customerCode: string,
   branchCode: string
 ): Promise<StatementOfAccountModel[]> {
-  const client = getPostgresClient();
-  const result = await client.executeQuery<StagingRow>(
+  const result = await executeQuery<StagingRow>(
     `SELECT * FROM soa_pipeline_staging
      WHERE distribution_code = $1
        AND ($2 = $3 OR branch = $2)`,

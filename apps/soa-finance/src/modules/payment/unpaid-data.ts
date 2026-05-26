@@ -18,9 +18,9 @@ export async function getUnpaidSoaData(
 } | null> {
   const branchCode = reminder.officeId || SENTINEL_ALL;
 
-  const soaList = (await ctx.run("read-soa-staging", () =>
+  const soaList = await ctx.run("read-soa-staging", () =>
     getStagingSoaData(customer.code, branchCode)
-  )) as StatementOfAccountModel[];
+  );
 
   if (soaList.length === 0) {
     return null;
@@ -33,10 +33,8 @@ export async function getUnpaidSoaData(
     stateKeys.details(timePeriod, officeId)
   );
 
-  const { paidDcNoteIds, updatedDetails, bulkPaymentSkipped } = await ctx.run(
-    "reconcile-payment",
-    () => reconcilePayment(details, currentDcNotes)
-  );
+  const { paidDcNoteIds, updatedDetails, bulkPaymentSkipped } =
+    reconcilePayment(details, currentDcNotes);
 
   if (bulkPaymentSkipped) {
     const detailsCount = Object.keys(details ?? {}).length;

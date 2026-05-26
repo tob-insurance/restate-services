@@ -83,11 +83,16 @@ export async function refreshStaging(asAtDate: Date): Promise<void> {
       );
     });
 
-    const pgError = error as { code?: string; message?: string };
-    if (isDataIntegrityError(pgError.code)) {
-      throw new TerminalError(
-        `Pipeline data integrity error: ${pgError.message ?? "Unknown constraint violation"}`
-      );
+    const errorCode =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      typeof error.code === "string"
+        ? error.code
+        : undefined;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (isDataIntegrityError(errorCode)) {
+      throw new TerminalError(`Pipeline data integrity error: ${errorMessage}`);
     }
 
     logger.error(

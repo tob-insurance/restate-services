@@ -59,11 +59,16 @@ export async function executeQuery<T = Record<string, unknown>>(
     const result = await getPostgresClient().executeQuery<T>(sql, params);
     return { rows: result.rows, rowCount: result.rowCount };
   } catch (error: unknown) {
-    const pgError = error as { code?: string; message?: string };
-    if (isDataIntegrityError(pgError.code)) {
-      throw new TerminalError(
-        `Database integrity error: ${pgError.message ?? "Unknown constraint violation"}`
-      );
+    const errorCode =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      typeof error.code === "string"
+        ? error.code
+        : undefined;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (isDataIntegrityError(errorCode)) {
+      throw new TerminalError(`Database integrity error: ${errorMessage}`);
     }
     throw error;
   }

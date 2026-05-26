@@ -13,7 +13,16 @@ function parseEnvCcList(): string[] | null {
 const GLOBAL_CC = parseEnvCcList();
 
 export const EMAIL_CONFIG = {
-  FALLBACK_EMAIL: process.env.SOA_FALLBACK_EMAIL as string,
+  get FALLBACK_EMAIL(): string {
+    const val = process.env.SOA_FALLBACK_EMAIL;
+    if (!val) {
+      if (process.env.NODE_ENV === "test") {
+        return "";
+      }
+      throw new Error("SOA_FALLBACK_EMAIL environment variable is required");
+    }
+    return val;
+  },
   SHARED_MAILBOX: (() => {
     const val = process.env.AZURE_SHARED_MAILBOX;
     if (!val) {

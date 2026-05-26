@@ -7,7 +7,7 @@ import type {
   StatementOfAccountModel,
 } from "../../types/soa.type.js";
 import { excelSoaName } from "../../utils/formatter/naming.formatter.js";
-import { generateExcel } from "./excel.generator.js";
+import { generateExcel } from "./excel-generator.js";
 import { generateSoaPdfHandler } from "./generate-soa-pdf.js";
 import { buildPdfTemplateData } from "./pdf-template.js";
 

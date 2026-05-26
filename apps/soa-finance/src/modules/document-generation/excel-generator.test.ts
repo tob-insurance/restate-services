@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { StatementOfAccountModel } from "../../types/soa.type.js";
-import { groupAndAggregateSoa, sortSoaData } from "./excel.generator.js";
+import { groupAndAggregateSoa, sortSoaData } from "./excel-generator.js";
 
 function createMockSoa(
   overrides: Partial<StatementOfAccountModel> = {}

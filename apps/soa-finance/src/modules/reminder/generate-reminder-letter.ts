@@ -193,6 +193,7 @@ export const generateReminderLetter = async (
   params: GenerateReminderLetterParams
 ): Promise<GenerateReminderResult | null> => {
   const { ctx, customer, reminder, item } = params;
+  const startTime = await ctx.date.now();
 
   const letters = await getReminderLetters(ctx, reminder);
   const latestLetter = getLatestSentLetter(letters);
@@ -245,6 +246,12 @@ export const generateReminderLetter = async (
     reminderCount,
     letters,
   });
+
+  const duration = (await ctx.date.now()) - startTime;
+  ctx.console.log(
+    { component: "Reminder", customer: customer.code, durationMs: duration },
+    `Reminder completed in ${duration}ms`
+  );
 
   return { ...result, dcNotesPaid: unpaidData.dcNotesPaid };
 };

@@ -26,6 +26,11 @@ interface BranchResult {
   hasDocuments: boolean;
 }
 
+interface BranchProcessResult {
+  hasDocuments: boolean;
+  soaData: StatementOfAccountModel[] | null;
+}
+
 interface ProcessSingleBranchParams {
   branch: Branch;
   ctx: ObjectContext;
@@ -40,10 +45,10 @@ async function processSingleBranch({
   params,
   branch,
   rawSoaList,
-}: ProcessSingleBranchParams): Promise<BranchResult> {
+}: ProcessSingleBranchParams): Promise<BranchProcessResult> {
   if (!rawSoaList || rawSoaList.length === 0) {
     ctx.console.log(`[Branch] No SOA data for ${branch.officeCode}`);
-    return { hasDocuments: false };
+    return { hasDocuments: false, soaData: null };
   }
 
   ctx.console.log(
@@ -53,8 +58,10 @@ async function processSingleBranch({
   const soaData = filterAgingData(rawSoaList);
   if (!soaData) {
     ctx.console.log(`Skipping ${customerData.code}: No aging records found`);
-    return { hasDocuments: false };
+    return { hasDocuments: false, soaData: null };
   }
+
+  const startTime = await ctx.date.now();
 
   ctx.console.log(
     `SOA generated for ${customerData.code} branch ${branch.officeCode}: ${soaData.length} records`
@@ -82,49 +89,20 @@ async function processSingleBranch({
     });
   });
 
-  await createReminder({
-    customer: customerData,
-    timePeriod: params.timePeriod,
-    branchCode: branch.officeCode,
-    processingDate: params.processingDate,
-    soaList: soaData,
-    ctx,
-  });
+  const duration = (await ctx.date.now()) - startTime;
+  ctx.console.log(
+    { component: "Branch", branch: branch.officeCode, durationMs: duration },
+    `Branch ${branch.officeCode} completed in ${duration}ms`
+  );
 
-  return { hasDocuments: true };
-}
-
-async function processBranchWithIsolation(
-  branch: Branch,
-  index: number,
-  stagingDataList: (StatementOfAccountModel[] | null)[],
-  soaParams: ProcessSoaParams
-): Promise<BranchResult> {
-  const { ctx, customerData, params } = soaParams;
-  try {
-    return await processSingleBranch({
-      ctx,
-      customerData,
-      params,
-      branch,
-      rawSoaList: stagingDataList[index],
-    });
-  } catch (error: unknown) {
-    if (error instanceof TerminalError) {
-      throw error;
-    }
-    ctx.console.log(
-      `[Branch] Failed processing ${branch.officeCode}: ${error instanceof Error ? error.message : "Unknown error"}`
-    );
-    return { hasDocuments: false };
-  }
+  return { hasDocuments: true, soaData };
 }
 
 async function processMultiBranchSoa(
   branches: Branch[],
   soaParams: ProcessSoaParams
 ): Promise<BranchResult> {
-  const { ctx, customerData } = soaParams;
+  const { ctx, customerData, params } = soaParams;
 
   const stagingDataList = await RestatePromise.all(
     branches.map((b) =>
@@ -135,18 +113,47 @@ async function processMultiBranchSoa(
     )
   );
 
-  const branchResults: BranchResult[] = [];
-  for (const [index, b] of branches.entries()) {
-    const result = await processBranchWithIsolation(
-      b,
-      index,
-      stagingDataList,
-      soaParams
-    );
-    branchResults.push(result);
+  const docPromises = branches.map((b, index) =>
+    ctx
+      .run(`process-branch-${b.officeCode}`, () =>
+        processSingleBranch({
+          ctx,
+          customerData,
+          params,
+          branch: b,
+          rawSoaList: stagingDataList[index],
+        })
+      )
+      .map((_value, failure: unknown): BranchProcessResult => {
+        if (failure) {
+          if (failure instanceof TerminalError) {
+            throw failure;
+          }
+          ctx.console.log(
+            `[Branch] Failed ${b.officeCode}: ${failure instanceof Error ? failure.message : "Unknown error"}`
+          );
+          return { hasDocuments: false, soaData: null };
+        }
+        return _value ?? { hasDocuments: false, soaData: null };
+      })
+  );
+
+  const docResults = await RestatePromise.all(docPromises);
+
+  for (const [index, result] of docResults.entries()) {
+    if (result.hasDocuments && result.soaData) {
+      await createReminder({
+        customer: customerData,
+        timePeriod: params.timePeriod,
+        branchCode: branches[index].officeCode,
+        processingDate: params.processingDate,
+        soaList: result.soaData,
+        ctx,
+      });
+    }
   }
 
-  return { hasDocuments: branchResults.some((r) => r.hasDocuments) };
+  return { hasDocuments: docResults.some((r) => r.hasDocuments) };
 }
 
 async function processSingleBranchDirect(
@@ -160,13 +167,26 @@ async function processSingleBranchDirect(
       async () => await getStagingSoaData(customerData.code, branch.officeCode)
     );
 
-    return await processSingleBranch({
+    const result = await processSingleBranch({
       ctx,
       customerData,
       params,
       branch,
       rawSoaList,
     });
+
+    if (result.hasDocuments && result.soaData) {
+      await createReminder({
+        customer: customerData,
+        timePeriod: params.timePeriod,
+        branchCode: branch.officeCode,
+        processingDate: params.processingDate,
+        soaList: result.soaData,
+        ctx,
+      });
+    }
+
+    return { hasDocuments: result.hasDocuments };
   } catch (error: unknown) {
     if (error instanceof TerminalError) {
       throw error;

@@ -2,7 +2,19 @@ import { SENTINEL_ALL } from "../../../constants/constants.js";
 import type { Account } from "../../../types/customer.type.js";
 import { executeQuery } from "../postgres.js";
 
-export const getAllAccounts = async () => {
+/**
+ * Fetch all agent accounts for SOA processing.
+ *
+ * Queries `IS_CUSTOMER = 'N'` — these are agent/broker accounts that receive
+ * SOA statements (4,831 rows out of 13.7M total in MASTER_CM).
+ * Only populates `code`, `name`, and `actingCode`; other Account fields
+ * are `undefined` at runtime.
+ *
+ * Performance: Uses `idx_master_cm_customer_code(is_customer, cm_code)`
+ * index scan. ~11.6ms for 4,831 rows. No sort step needed — index covers
+ * the ORDER BY.
+ */
+export const getAgentAccounts = async (): Promise<Account[]> => {
   const query = `SELECT 
       CM_CODE AS "code", 
       CM_NAME AS "name",

@@ -10,7 +10,7 @@ import {
 } from "@restatedev/restate-sdk";
 import { SENTINEL_ALL } from "../../../constants/constants.js";
 import { isDevelopment } from "../../../constants/environment.js";
-import { getAllAccounts } from "../../../infrastructure/database/queries/customer-query.js";
+import { getAgentAccounts } from "../../../infrastructure/database/queries/customer-query.js";
 import type { Account } from "../../../types/customer.type.js";
 import type { SoaType } from "../../../types/soa.type.js";
 import {
@@ -123,7 +123,7 @@ export const batchWorkflow = workflow({
       const allAccounts = await ctx.run(
         "get-all-accounts",
         async (): Promise<Account[]> => {
-          const accounts = await getAllAccounts();
+          const accounts = await getAgentAccounts();
           if (!accounts || accounts.length === 0) {
             throw new Error("No customer accounts found");
           }

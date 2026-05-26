@@ -1,3 +1,5 @@
+import type { CorrelationId, CustomerId } from "./branded.js";
+
 export const SoaTypeLabels = {
   1: "SOA",
   2: "RL1",
@@ -5,12 +7,19 @@ export const SoaTypeLabels = {
   4: "WL",
 } as const;
 
-export type SoaType = 1 | 2 | 3 | 4;
+export const SoaType = {
+  SOA: 1,
+  RL1: 2,
+  RL2: 3,
+  WL: 4,
+} as const;
+export type SoaType = (typeof SoaType)[keyof typeof SoaType];
 
 export interface SoaItem {
   branch: string;
   classOfBusiness: string;
-  customerId: string;
+  correlationId?: CorrelationId;
+  customerId: CustomerId;
   processingDate: string;
   processingType: SoaType;
   timePeriod: string;

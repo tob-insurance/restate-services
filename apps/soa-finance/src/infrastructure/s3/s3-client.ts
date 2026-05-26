@@ -1,14 +1,5 @@
 import { S3Client } from "@aws-sdk/client-s3";
 
-const AWS_REGION = process.env.AWS_REGION;
-const S3_BUCKET = process.env.S3_BUCKET;
-if (!AWS_REGION) {
-  throw new Error("AWS_REGION environment variable is required for S3 client");
-}
-if (!S3_BUCKET) {
-  throw new Error("S3_BUCKET environment variable is required");
-}
-
 let s3Client: S3Client | null = null;
 
 export function getS3Client(): S3Client {
@@ -16,8 +7,15 @@ export function getS3Client(): S3Client {
     return s3Client;
   }
 
+  const awsRegion = process.env.AWS_REGION;
+  if (!awsRegion) {
+    throw new Error(
+      "AWS_REGION environment variable is required for S3 client"
+    );
+  }
+
   s3Client = new S3Client({
-    region: AWS_REGION,
+    region: awsRegion,
     requestChecksumCalculation: "WHEN_REQUIRED",
   });
 
@@ -25,5 +23,10 @@ export function getS3Client(): S3Client {
 }
 
 export function getBucketName(): string {
-  return S3_BUCKET;
+  const s3Bucket = process.env.S3_BUCKET;
+  if (!s3Bucket) {
+    throw new Error("S3_BUCKET environment variable is required");
+  }
+
+  return s3Bucket;
 }

@@ -20,6 +20,12 @@ describe("reconcilePayment", () => {
     });
   });
 
+  it("should handle empty details gracefully", () => {
+    const result = reconcilePayment({}, ["DC001", "DC002"]);
+    expect(result.paidDcNoteIds).toEqual([]);
+    expect(result.bulkPaymentSkipped).toBe(false);
+  });
+
   it("returns empty when all DC notes are still outstanding", () => {
     const details = {
       "DC-1": createDetail("DC-1"),

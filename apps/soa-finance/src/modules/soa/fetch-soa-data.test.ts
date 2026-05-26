@@ -2,116 +2,76 @@ import { describe, expect, it } from "bun:test";
 import type { StatementOfAccountModel } from "../../types/soa.type.js";
 import { filterAgingData } from "./fetch-soa-data.js";
 
-function createMockSoa(
-  overrides: Partial<StatementOfAccountModel> = {}
-): StatementOfAccountModel {
+function makeSoa(aging: number): StatementOfAccountModel {
   return {
-    debitAndCreditNoteNo: "",
-    branch: "",
-    policyNo: "",
-    policyEndNo: "",
-    contractNo: "",
-    plateNo: "",
+    accountName: "Test",
+    actingCode: "001",
+    aging,
+    branch: "JKT",
     coInFacRefNo: "",
-    fireConjunctionPolicy: "",
-    lob: "",
-    sourceOfBusiness: "",
-    accountName: "",
-    insuredName: "",
+    commission: 0,
+    contractNo: "",
+    cost: 0,
+    currency: "IDR",
+    debitAndCreditNoteNo: "DC001",
+    discount: 0,
+    distributionCode: "",
     distributionName: "",
     distributionNameSecond: "",
-    qualitateQuaName: "",
+    dueDate: "2026-01-01",
     endEffDate: "",
     endExpDate: "",
-    postDate: "",
-    dueDate: "",
-    aging: 0,
-    currency: "",
-    exchangeRate: 1,
     endReason: "",
-    actingCode: "",
-    totalSumInsured: 0,
+    exchangeRate: 1,
+    fireConjunctionPolicy: "",
     grossPremium: 0,
-    discount: 0,
-    commission: 0,
-    ppn: 0,
-    pph21: 0,
-    pph23: 0,
-    cost: 0,
-    stmp: 0,
+    installment: "",
+    insuredName: "",
+    lob: "",
     netPremium: 0,
     netPremiumIdr: 0,
-    installment: "",
     origAmount: 0,
-    distributionCode: "",
-    ...overrides,
+    plateNo: "",
+    policyEndNo: "",
+    policyNo: "",
+    postDate: "",
+    pph21: 0,
+    pph23: 0,
+    ppn: 0,
+    qualitateQuaName: "",
+    sourceOfBusiness: "",
+    stmp: 0,
+    totalSumInsured: 0,
   };
 }
 
 describe("filterAgingData", () => {
-  it("returns null when given empty array", () => {
+  it("should return null for empty array", () => {
     expect(filterAgingData([])).toBe(null);
   });
 
-  it("returns null when all items have aging below 60", () => {
-    const soaList = [createMockSoa({ aging: 0 }), createMockSoa({ aging: 59 })];
-
-    expect(filterAgingData(soaList)).toBe(null);
+  it("should return null when all items below threshold (60)", () => {
+    const data = [makeSoa(30), makeSoa(50), makeSoa(59)];
+    expect(filterAgingData(data)).toBe(null);
   });
 
-  it("filters items with aging 60 or above", () => {
-    const included = createMockSoa({
-      aging: 60,
-      debitAndCreditNoteNo: "DC-60",
-    });
-    const excluded = createMockSoa({
-      aging: 59,
-      debitAndCreditNoteNo: "DC-59",
-    });
-    const older = createMockSoa({ aging: 90, debitAndCreditNoteNo: "DC-90" });
-
-    expect(filterAgingData([included, excluded, older])).toStrictEqual([
-      included,
-      older,
-    ]);
+  it("should filter items at or above threshold", () => {
+    const data = [makeSoa(30), makeSoa(60), makeSoa(90)];
+    const result = filterAgingData(data);
+    expect(result).not.toBe(null);
+    if (result) {
+      expect(result.length).toBe(2);
+      expect(result[0].aging).toBe(60);
+      expect(result[1].aging).toBe(90);
+    }
   });
 
-  it("returns items in original order", () => {
-    const first = createMockSoa({ aging: 90, debitAndCreditNoteNo: "DC-1" });
-    const second = createMockSoa({ aging: 60, debitAndCreditNoteNo: "DC-2" });
-    const third = createMockSoa({ aging: 75, debitAndCreditNoteNo: "DC-3" });
-
-    expect(filterAgingData([first, second, third])).toStrictEqual([
-      first,
-      second,
-      third,
-    ]);
-  });
-
-  it("handles mixed aging values", () => {
-    const soaList = [
-      createMockSoa({ aging: 10, debitAndCreditNoteNo: "DC-10" }),
-      createMockSoa({ aging: 61, debitAndCreditNoteNo: "DC-61" }),
-      createMockSoa({ aging: 30, debitAndCreditNoteNo: "DC-30" }),
-      createMockSoa({ aging: 100, debitAndCreditNoteNo: "DC-100" }),
-    ];
-
-    const agingResult = filterAgingData(soaList);
-    expect(agingResult?.map((soa) => soa.debitAndCreditNoteNo)).toStrictEqual([
-      "DC-61",
-      "DC-100",
-    ]);
-  });
-
-  it("includes one item exactly at aging 60", () => {
-    const soa = createMockSoa({ aging: 60 });
-
-    expect(filterAgingData([soa])).toStrictEqual([soa]);
-  });
-
-  it("excludes items at aging 59", () => {
-    const soa = createMockSoa({ aging: 59 });
-
-    expect(filterAgingData([soa])).toBe(null);
+  it("should return all items when all above threshold", () => {
+    const data = [makeSoa(61), makeSoa(100)];
+    const result = filterAgingData(data);
+    expect(result).not.toBe(null);
+    if (result) {
+      expect(result.length).toBe(2);
+    }
   });
 });

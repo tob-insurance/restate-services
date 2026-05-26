@@ -10,6 +10,7 @@ import {
   formatMonthIndonesian,
   formatTimePeriod,
   parseDate,
+  toExcelDate,
 } from "./date.formatter.js";
 
 describe("formatDateIndonesian", () => {
@@ -126,5 +127,34 @@ describe("parseDate", () => {
 
   it("returns '-' for invalid date", () => {
     expect(parseDate("invalid")).toBe("-");
+  });
+});
+
+describe("toExcelDate", () => {
+  it("should return null for null/undefined/empty/dash", () => {
+    expect(toExcelDate(null)).toBe(null);
+    expect(toExcelDate(undefined)).toBe(null);
+    expect(toExcelDate("")).toBe(null);
+    expect(toExcelDate("-")).toBe(null);
+  });
+
+  it("should return Date for valid Date instance", () => {
+    const d = new Date("2026-01-15");
+    expect(toExcelDate(d)).toEqual(d);
+  });
+
+  it("should parse ISO date strings", () => {
+    const result = toExcelDate("2026-01-15");
+    expect(result).not.toBe(null);
+    expect(typeof result).toBe("object");
+    if (result) {
+      expect(result.getFullYear()).toBe(2026);
+    }
+  });
+
+  it("should parse slash date strings", () => {
+    const result = toExcelDate("15/1/2026");
+    expect(result).not.toBe(null);
+    expect(typeof result).toBe("object");
   });
 });

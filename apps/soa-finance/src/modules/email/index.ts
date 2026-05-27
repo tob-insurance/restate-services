@@ -1,4 +1,6 @@
 export {
-  type SendWithAttachmentsParams,
-  sendWithAttachments,
-} from "./send-with-attachments.js";
+  buildEmailAttachments,
+  getCcRecipients,
+  resolveRecipientEmail,
+} from "./attachments.js";
+export { type SendSoaEmailParams, sendSoaEmail } from "./send-soa-email.js";

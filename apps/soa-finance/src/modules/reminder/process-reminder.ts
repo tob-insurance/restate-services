@@ -3,7 +3,7 @@ import type { Account } from "../../types/customer.type.js";
 import { type SoaItem, SoaTypeLabels } from "../../types/soa.type.js";
 import type { ReminderHeader } from "../soa/objects/state.js";
 import { readDcNoteIndex, stateKeys } from "../soa/objects/state.js";
-import { generateReminderLetter } from "./generate-reminder-letter";
+import { generateReminderLetter } from "./generate-reminder-letter.js";
 import type { ProcessReminder } from "./types.js";
 
 interface ProcessReminderParams {
@@ -82,8 +82,8 @@ export const processReminderLetter = async (
     const result = await generateReminderLetter({
       ctx,
       customer,
-      reminder,
       item,
+      reminder,
     });
 
     if (result) {

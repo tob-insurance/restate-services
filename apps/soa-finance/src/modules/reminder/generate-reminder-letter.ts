@@ -5,8 +5,8 @@ import { getAccountEmails } from "../../infrastructure/database/queries/customer
 import type { Account } from "../../types/customer.type.js";
 import type { SoaItem, StatementOfAccountModel } from "../../types/soa.type.js";
 import { reminderPdfName } from "../../utils/formatter/naming.formatter.js";
-import { generateAndUploadDocuments } from "../document-generation";
-import { sendWithAttachments } from "../email/send-with-attachments.js";
+import { generateAndUploadDocuments } from "../document-generation/index.js";
+import { sendSoaEmail } from "../email/index.js";
 import { getUnpaidSoaData } from "../payment/unpaid-data.js";
 import {
   assignLetterRecord,
@@ -20,7 +20,7 @@ import type { GenerateReminderResult, SoaReminder } from "./types.js";
 
 const DEV_TEST_EMAIL = process.env.SOA_DEV_TEST_EMAIL || "dev-test@tob-ins.com";
 
-interface GenerateReminderLetterParams {
+interface ReminderContext {
   ctx: ObjectContext;
   customer: Account;
   item: SoaItem;
@@ -67,40 +67,29 @@ const validateReminderType = (
   return reminderCount;
 };
 
-interface CreateAndSendReminderParams {
-  ctx: ObjectContext;
-  customer: Account;
-  item: SoaItem;
-  latestLetter: LatestLetter;
-  letters: StoredLetterRecord[];
-  reminder: SoaReminder;
-  reminderCount: number;
-  unpaidItems: StatementOfAccountModel[];
-}
+const generateUploadAndSendReminder = async (
+  reminderCtx: ReminderContext,
+  params: {
+    unpaidItems: StatementOfAccountModel[];
+    latestLetter: LatestLetter;
+    letterNo: string;
+    reminderCount: number;
+    toEmail: string;
+    type: string;
+    branchName: string;
+  }
+): Promise<void> => {
+  const { ctx, customer, item } = reminderCtx;
+  const {
+    unpaidItems,
+    latestLetter,
+    letterNo,
+    reminderCount,
+    toEmail,
+    type,
+    branchName,
+  } = params;
 
-interface GenerateUploadSendReminderParams {
-  branchName: string;
-  ctx: ObjectContext;
-  customer: Account;
-  item: SoaItem;
-  latestLetter: LatestLetter;
-  letterNo: string;
-  reminderCount: number;
-  type: string;
-  unpaidItems: StatementOfAccountModel[];
-}
-
-const generateUploadAndSendReminder = async ({
-  ctx,
-  unpaidItems,
-  customer,
-  item,
-  reminderCount,
-  letterNo,
-  latestLetter,
-  type,
-  branchName,
-}: GenerateUploadSendReminderParams): Promise<void> => {
   const dateNow = new Date(item.processingDate);
   const totalPremium = unpaidItems.reduce(
     (sum, soaItem) => sum + (soaItem.netPremiumIdr || 0),
@@ -119,15 +108,16 @@ const generateUploadAndSendReminder = async ({
       pdfFileName,
     });
 
-    await sendWithAttachments({
+    await sendSoaEmail({
       customerData: customer,
       date: dateNow,
       isReminder: true,
-      reminderType: type,
+      reminderType: type as "1" | "2" | "3",
       letterNo,
       previousLetterNo: latestLetter?.letterNo,
       previousLetterDate: latestLetter?.sentDate,
       branch: branchName,
+      toEmail,
       totalPremium,
       excelFile: files.excelFile,
       pdfFile: files.pdfFile,
@@ -136,23 +126,22 @@ const generateUploadAndSendReminder = async ({
 };
 
 const createAndSendReminder = async (
-  params: CreateAndSendReminderParams
+  reminderCtx: ReminderContext,
+  params: {
+    unpaidItems: StatementOfAccountModel[];
+    latestLetter: LatestLetter;
+    letters: StoredLetterRecord[];
+    reminderCount: number;
+    toEmail: string;
+  }
 ): Promise<GenerateReminderResult> => {
-  const {
-    ctx,
-    customer,
-    reminder,
-    item,
-    unpaidItems,
-    latestLetter,
-    reminderCount,
-    letters,
-  } = params;
+  const { ctx, reminder, item } = reminderCtx;
+  const { unpaidItems, latestLetter, letters, reminderCount, toEmail } = params;
+
   const dateNow = new Date(item.processingDate);
   const type = reminderCount.toString();
   const branchName = unpaidItems.length > 0 ? unpaidItems[0].branch : "";
 
-  // Phase 1: Assign letter record
   const pendingRecord = await assignLetterRecord({
     ctx,
     reminder,
@@ -163,14 +152,12 @@ const createAndSendReminder = async (
   });
 
   try {
-    await generateUploadAndSendReminder({
-      ctx,
+    await generateUploadAndSendReminder(reminderCtx, {
       unpaidItems,
-      customer,
-      item,
-      reminderCount,
-      letterNo: pendingRecord.letterNo,
       latestLetter,
+      letterNo: pendingRecord.letterNo,
+      reminderCount,
+      toEmail,
       type,
       branchName,
     });
@@ -190,9 +177,9 @@ const createAndSendReminder = async (
 };
 
 export const generateReminderLetter = async (
-  params: GenerateReminderLetterParams
+  reminderCtx: ReminderContext
 ): Promise<GenerateReminderResult | null> => {
-  const { ctx, customer, reminder, item } = params;
+  const { ctx, customer, reminder, item } = reminderCtx;
   const startTime = await ctx.date.now();
 
   const letters = await getReminderLetters(ctx, reminder);
@@ -206,7 +193,6 @@ export const generateReminderLetter = async (
 
   let toEmail: string;
   if (isDevelopment()) {
-    // Development-only fallback recipient when SOA_DEV_TEST_EMAIL is not set.
     toEmail = customer.email || DEV_TEST_EMAIL;
   } else {
     const emails = await ctx.run("get-account-emails", () =>
@@ -236,15 +222,12 @@ export const generateReminderLetter = async (
     };
   }
 
-  const result = await createAndSendReminder({
-    ctx,
-    customer,
-    reminder,
-    item,
+  const result = await createAndSendReminder(reminderCtx, {
     unpaidItems: unpaidData.unpaidItems,
     latestLetter,
     reminderCount,
     letters,
+    toEmail,
   });
 
   const duration = (await ctx.date.now()) - startTime;

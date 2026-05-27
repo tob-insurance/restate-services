@@ -1,5 +1,5 @@
 import type { ObjectContext } from "@restatedev/restate-sdk";
-import { RestatePromise, TerminalError } from "@restatedev/restate-sdk";
+import { TerminalError } from "@restatedev/restate-sdk";
 import { isDevelopment } from "../../../constants/environment.js";
 import { getAllBranches } from "../../../infrastructure/database/queries/branch-query.js";
 import type { Branch } from "../../../infrastructure/database/types.js";
@@ -10,9 +10,9 @@ import type {
 } from "../../../types/soa.type.js";
 import { letterSoaPdfName } from "../../../utils/formatter/naming.formatter.js";
 import { getStagingSoaData } from "../../data-access/staging-reader.js";
-import { generateAndUploadDocuments } from "../../document-generation";
-import { sendWithAttachments } from "../../email";
-import { createReminder } from "../../reminder";
+import { generateAndUploadDocuments } from "../../document-generation/index.js";
+import { sendSoaEmail } from "../../email/index.js";
+import { createReminder } from "../../reminder/index.js";
 import { filterAgingData } from "../fetch-soa-data.js";
 import { multiBranchCodes } from "../types.js";
 
@@ -27,28 +27,41 @@ interface BranchResult {
 }
 
 interface BranchProcessResult {
+  branch: Branch;
   hasDocuments: boolean;
   soaData: StatementOfAccountModel[] | null;
 }
 
-interface ProcessSingleBranchParams {
-  branch: Branch;
-  ctx: ObjectContext;
-  customerData: Account;
-  params: SoaItem;
-  rawSoaList: StatementOfAccountModel[] | null;
-}
+/**
+ * Process a single branch: read staging, filter aging, generate docs, send email.
+ * Each external call is wrapped in its own ctx.run() — no nesting.
+ * Returns null on non-terminal failures (branch error isolation).
+ */
+async function processSingleBranch(
+  params: ProcessSoaParams,
+  branch: Branch
+): Promise<BranchProcessResult | null> {
+  const { ctx, customerData, params: soaParams } = params;
 
-async function processSingleBranch({
-  ctx,
-  customerData,
-  params,
-  branch,
-  rawSoaList,
-}: ProcessSingleBranchParams): Promise<BranchProcessResult> {
+  let rawSoaList: StatementOfAccountModel[] | null;
+  try {
+    rawSoaList = await ctx.run<StatementOfAccountModel[] | null>(
+      `read-staging-${branch.officeCode}`,
+      async () => await getStagingSoaData(customerData.code, branch.officeCode)
+    );
+  } catch (error: unknown) {
+    if (error instanceof TerminalError) {
+      throw error;
+    }
+    ctx.console.log(
+      `[Branch] Failed staging read for ${branch.officeCode}: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
+    return null;
+  }
+
   if (!rawSoaList || rawSoaList.length === 0) {
     ctx.console.log(`[Branch] No SOA data for ${branch.officeCode}`);
-    return { hasDocuments: false, soaData: null };
+    return { branch, hasDocuments: false, soaData: null };
   }
 
   ctx.console.log(
@@ -58,36 +71,45 @@ async function processSingleBranch({
   const soaData = filterAgingData(rawSoaList);
   if (!soaData) {
     ctx.console.log(`Skipping ${customerData.code}: No aging records found`);
-    return { hasDocuments: false, soaData: null };
+    return { branch, hasDocuments: false, soaData: null };
   }
 
   const startTime = await ctx.date.now();
+  const dateNow = new Date(soaParams.processingDate);
 
   ctx.console.log(
     `SOA generated for ${customerData.code} branch ${branch.officeCode}: ${soaData.length} records`
   );
 
-  const dateNow = new Date(params.processingDate);
+  try {
+    await ctx.run(`generate-upload-send-${branch.officeCode}`, async () => {
+      const generated = await generateAndUploadDocuments({
+        soaData,
+        customerData,
+        params: soaParams,
+        branchName: branch.name,
+        letterNo: "",
+        latestLetter: null,
+        pdfFileName: letterSoaPdfName(customerData.code),
+      });
 
-  await ctx.run(`generate-upload-send-${branch.officeCode}`, async () => {
-    const generated = await generateAndUploadDocuments({
-      soaData,
-      customerData,
-      params,
-      branchName: branch.name,
-      letterNo: "",
-      latestLetter: null,
-      pdfFileName: letterSoaPdfName(customerData.code),
+      await sendSoaEmail({
+        customerData,
+        date: dateNow,
+        isReminder: false,
+        excelFile: generated.excelFile,
+        pdfFile: generated.pdfFile,
+      });
     });
-
-    await sendWithAttachments({
-      customerData,
-      date: dateNow,
-      isReminder: false,
-      excelFile: generated.excelFile,
-      pdfFile: generated.pdfFile,
-    });
-  });
+  } catch (error: unknown) {
+    if (error instanceof TerminalError) {
+      throw error;
+    }
+    ctx.console.log(
+      `[Branch] Failed generate/send for ${branch.officeCode}: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
+    return null;
+  }
 
   const duration = (await ctx.date.now()) - startTime;
   ctx.console.log(
@@ -95,109 +117,13 @@ async function processSingleBranch({
     `Branch ${branch.officeCode} completed in ${duration}ms`
   );
 
-  return { hasDocuments: true, soaData };
+  return { branch, hasDocuments: true, soaData };
 }
 
-async function processMultiBranchSoa(
-  branches: Branch[],
-  soaParams: ProcessSoaParams
-): Promise<BranchResult> {
-  const { ctx, customerData, params } = soaParams;
-
-  const stagingDataList = await RestatePromise.all(
-    branches.map((b) =>
-      ctx.run<StatementOfAccountModel[] | null>(
-        `read-staging-${b.officeCode}`,
-        async () => await getStagingSoaData(customerData.code, b.officeCode)
-      )
-    )
-  );
-
-  const docPromises = branches.map((b, index) =>
-    ctx
-      .run(`process-branch-${b.officeCode}`, () =>
-        processSingleBranch({
-          ctx,
-          customerData,
-          params,
-          branch: b,
-          rawSoaList: stagingDataList[index],
-        })
-      )
-      .map((_value, failure: unknown): BranchProcessResult => {
-        if (failure) {
-          if (failure instanceof TerminalError) {
-            throw failure;
-          }
-          ctx.console.log(
-            `[Branch] Failed ${b.officeCode}: ${failure instanceof Error ? failure.message : "Unknown error"}`
-          );
-          return { hasDocuments: false, soaData: null };
-        }
-        return _value ?? { hasDocuments: false, soaData: null };
-      })
-  );
-
-  const docResults = await RestatePromise.all(docPromises);
-
-  for (const [index, result] of docResults.entries()) {
-    if (result.hasDocuments && result.soaData) {
-      await createReminder({
-        customer: customerData,
-        timePeriod: params.timePeriod,
-        branchCode: branches[index].officeCode,
-        processingDate: params.processingDate,
-        soaList: result.soaData,
-        ctx,
-      });
-    }
-  }
-
-  return { hasDocuments: docResults.some((r) => r.hasDocuments) };
-}
-
-async function processSingleBranchDirect(
-  branch: Branch,
-  soaParams: ProcessSoaParams
-): Promise<BranchResult> {
-  const { ctx, customerData, params } = soaParams;
-  try {
-    const rawSoaList = await ctx.run<StatementOfAccountModel[]>(
-      "read-staging",
-      async () => await getStagingSoaData(customerData.code, branch.officeCode)
-    );
-
-    const result = await processSingleBranch({
-      ctx,
-      customerData,
-      params,
-      branch,
-      rawSoaList,
-    });
-
-    if (result.hasDocuments && result.soaData) {
-      await createReminder({
-        customer: customerData,
-        timePeriod: params.timePeriod,
-        branchCode: branch.officeCode,
-        processingDate: params.processingDate,
-        soaList: result.soaData,
-        ctx,
-      });
-    }
-
-    return { hasDocuments: result.hasDocuments };
-  } catch (error: unknown) {
-    if (error instanceof TerminalError) {
-      throw error;
-    }
-    ctx.console.log(
-      `[Branch] Failed staging read for ${branch.officeCode}: ${error instanceof Error ? error.message : "Unknown error"}`
-    );
-    return { hasDocuments: false };
-  }
-}
-
+/**
+ * Process SOA for a customer across one or more branches.
+ * Uses try/catch for error isolation — one branch failure doesn't kill the customer.
+ */
 export async function processBranchSoa(
   params: ProcessSoaParams
 ): Promise<BranchResult> {
@@ -213,9 +139,27 @@ export async function processBranchSoa(
     ctx.console.log(`Processing ${branches.length} branches`);
   }
 
-  if (branches.length > 1) {
-    return processMultiBranchSoa(branches, params);
+  const results: BranchProcessResult[] = [];
+
+  for (const branch of branches) {
+    const result = await processSingleBranch(params, branch);
+    if (result) {
+      results.push(result);
+    }
   }
 
-  return processSingleBranchDirect(branches[0], params);
+  for (const result of results) {
+    if (result.hasDocuments && result.soaData) {
+      await createReminder({
+        customer: customerData,
+        timePeriod: params.params.timePeriod,
+        branchCode: result.branch.officeCode,
+        processingDate: params.params.processingDate,
+        soaList: result.soaData,
+        ctx,
+      });
+    }
+  }
+
+  return { hasDocuments: results.some((r) => r.hasDocuments) };
 }

@@ -1,6 +1,7 @@
 import type { ObjectContext } from "@restatedev/restate-sdk";
 import type { Account } from "../../types/customer.type.js";
 import type { StatementOfAccountModel } from "../../types/soa.type.js";
+import { parseDcNoteIds } from "../../utils/dc-note.js";
 import type { ReminderDetail, ReminderHeader } from "../soa/objects/state.js";
 import { stateKeys } from "../soa/objects/state.js";
 
@@ -35,10 +36,7 @@ export const createReminder = async (
   const newIndexEntries: Record<string, string> = {};
 
   for (const soa of soaList) {
-    const dcNoteIds = (soa.debitAndCreditNoteNo || "")
-      .split(",")
-      .map((id) => id.trim())
-      .filter((id) => id.length > 0);
+    const dcNoteIds = parseDcNoteIds(soa.debitAndCreditNoteNo);
     for (const dcNoteId of dcNoteIds) {
       detailsMap[dcNoteId] = { dcNoteId, reminderId, isPaid: false };
       newIndexEntries[dcNoteId] = reminderId;

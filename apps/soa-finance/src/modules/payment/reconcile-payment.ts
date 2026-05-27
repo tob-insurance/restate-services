@@ -1,3 +1,4 @@
+import { parseDcNoteIds } from "../../utils/dc-note.js";
 import type { ReminderDetail } from "../soa/objects/state.js";
 
 const BULK_PAYMENT_MIN_COUNT = 5;
@@ -16,15 +17,16 @@ export const reconcilePayment = (
   }
 
   const currentDcNotesSet = new Set(
-    currentDcNotes.map((dc) => dc.toLowerCase())
+    currentDcNotes.flatMap((dc) => parseDcNoteIds(dc))
   );
 
-  const paidDcNotes = Object.values(details).filter(
+  // Notes that disappeared from staging = newly detected as paid
+  const newlyDetectedPaid = Object.values(details).filter(
     (detail) =>
       !(detail.isPaid || currentDcNotesSet.has(detail.dcNoteId.toLowerCase()))
   );
 
-  if (paidDcNotes.length === 0) {
+  if (newlyDetectedPaid.length === 0) {
     return { paidDcNoteIds: [], updatedDetails: {}, bulkPaymentSkipped: false };
   }
 
@@ -32,7 +34,7 @@ export const reconcilePayment = (
   const totalDetails = Object.keys(details).length;
 
   if (totalDetails > BULK_PAYMENT_MIN_COUNT) {
-    const paidRatio = paidDcNotes.length / totalDetails;
+    const paidRatio = newlyDetectedPaid.length / totalDetails;
     if (paidRatio >= BULK_PAYMENT_RATIO_THRESHOLD) {
       return {
         paidDcNoteIds: [],
@@ -43,12 +45,12 @@ export const reconcilePayment = (
   }
 
   const updatedDetails = { ...details };
-  for (const paid of paidDcNotes) {
+  for (const paid of newlyDetectedPaid) {
     updatedDetails[paid.dcNoteId] = { ...paid, isPaid: true };
   }
 
   return {
-    paidDcNoteIds: paidDcNotes.map((d) => d.dcNoteId),
+    paidDcNoteIds: newlyDetectedPaid.map((d) => d.dcNoteId),
     updatedDetails,
     bulkPaymentSkipped: false,
   };

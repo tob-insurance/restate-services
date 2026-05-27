@@ -2,6 +2,7 @@ import type { ObjectContext } from "@restatedev/restate-sdk";
 import { SENTINEL_ALL } from "../../constants/constants.js";
 import type { Account } from "../../types/customer.type.js";
 import type { StatementOfAccountModel } from "../../types/soa.type.js";
+import { areAllDcNotesPaid } from "../../utils/dc-note.js";
 import { getStagingSoaData } from "../data-access/staging-reader.js";
 import type { SoaReminder } from "../reminder/types.js";
 import type { ReminderDetail } from "../soa/objects/state.js";
@@ -28,7 +29,11 @@ export async function getUnpaidSoaData(
 
   const currentDcNotes = soaList.map((s) => s.debitAndCreditNoteNo);
 
-  const [timePeriod, officeId] = reminder.id.split(":");
+  const parts = reminder.id.split(":");
+  if (parts.length !== 2) {
+    throw new Error(`Invalid reminder ID format: ${reminder.id}`);
+  }
+  const [timePeriod, officeId] = parts;
   const details = await ctx.get<Record<string, ReminderDetail>>(
     stateKeys.details(timePeriod, officeId)
   );
@@ -39,7 +44,7 @@ export async function getUnpaidSoaData(
   if (bulkPaymentSkipped) {
     const detailsCount = Object.keys(details ?? {}).length;
     ctx.console.log(
-      `[Payment] Skipping bulk payment: ${detailsCount}/${detailsCount} would be marked paid — possible data issue`
+      `[Payment] Skipping bulk payment: all ${detailsCount} details would be marked paid — possible data issue`
     );
   }
 
@@ -47,45 +52,23 @@ export async function getUnpaidSoaData(
     ctx.set(stateKeys.details(timePeriod, officeId), updatedDetails);
   }
 
-  const dcNotesPaid = paidDcNoteIds;
+  const paidSet = new Set(paidDcNoteIds.map((dc) => dc.toLowerCase()));
 
-  const paidSet = new Set(dcNotesPaid.map((dc) => dc.toLowerCase()));
+  // Filter unpaid items directly using the helper — handles comma-separated DC notes correctly
+  const unpaidItems = soaList.filter(
+    (soaItem) => !areAllDcNotesPaid(soaItem.debitAndCreditNoteNo, paidSet)
+  );
 
-  const unpaidDcNotes = currentDcNotes.filter((dc) => {
-    const noteIds = (dc || "")
-      .split(",")
-      .map((id) => id.trim())
-      .filter((id) => id.length > 0);
-    const isProcessed =
-      noteIds.length > 0 &&
-      noteIds.every((id) => paidSet.has(id.toLowerCase()));
-
-    return !isProcessed;
-  });
-
-  if (unpaidDcNotes.length === 0) {
+  if (unpaidItems.length === 0) {
     ctx.console.log(
-      `[Reminder] Skipping ${customer.code}: all ${dcNotesPaid.length} DC notes paid`
+      `[Reminder] Skipping ${customer.code}: all ${paidDcNoteIds.length} DC notes paid`
     );
-    return { unpaidItems: [], dcNotesPaid };
+    return { unpaidItems: [], dcNotesPaid: paidDcNoteIds };
   }
 
   ctx.console.log(
-    `[Reminder] DC notes for ${customer.code}: ${dcNotesPaid.length} paid, ${unpaidDcNotes.length} unpaid`
+    `[Reminder] DC notes for ${customer.code}: ${paidDcNoteIds.length} paid, ${unpaidItems.length} items unpaid`
   );
 
-  const unpaidSet = new Set(unpaidDcNotes.map((dc) => dc.toLowerCase()));
-  const unpaidItems = soaList.filter((soaItem) => {
-    const noteIds = (soaItem.debitAndCreditNoteNo || "")
-      .split(",")
-      .map((id) => id.trim())
-      .filter((id) => id.length > 0);
-    const isProcessed =
-      noteIds.length > 0 &&
-      noteIds.every((id) => unpaidSet.has(id.toLowerCase()));
-
-    return isProcessed;
-  });
-
-  return { unpaidItems, dcNotesPaid };
+  return { unpaidItems, dcNotesPaid: paidDcNoteIds };
 }

@@ -8,7 +8,6 @@ export function createHeader(logoBase64: string): string {
     .header-table {
       width: 88%;
       border-collapse: collapse;
-      margin-top: -6px;
       margin-left: auto;
       margin-right: auto;
     }

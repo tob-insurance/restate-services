@@ -100,6 +100,9 @@ export async function refreshPndAgg(
   try {
     const startTime = Date.now();
 
+    // Increase statement timeout for pipeline operations (60 minutes)
+    await conn.query("SET statement_timeout = '3600000'");
+
     if (fullRefresh) {
       logger.info({ component: "Pipeline" }, "Full refresh of pnd_agg...");
       await conn.query("TRUNCATE TABLE pnd_agg");

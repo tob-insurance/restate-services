@@ -47,6 +47,9 @@ export async function refreshStaging(asAtDate: Date): Promise<void> {
   try {
     logger.info({ component: "Pipeline" }, "Refreshing staging table...");
 
+    // Increase statement timeout for pipeline operations (60 minutes)
+    await conn.query("SET statement_timeout = '3600000'");
+
     await ensurePndAggFresh();
 
     await conn.query("SET work_mem = '512MB'");

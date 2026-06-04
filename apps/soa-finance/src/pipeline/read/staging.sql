@@ -30,13 +30,7 @@ SELECT
   dn.orig_amount, pm.distribution_code,
   $2
 FROM DCNOTE dn
-LEFT JOIN (
-  SELECT dc_office, dc_year, dc_month, dc_mode, dc_seq,
-    SUM(fn_orig_amt) AS amt
-  FROM financial_settle
-  WHERE post_date < $1::date + INTERVAL '1 day'
-  GROUP BY dc_office, dc_year, dc_month, dc_mode, dc_seq
-) fst ON dn.dc_office = fst.dc_office AND dn.dc_year = fst.dc_year
+LEFT JOIN soa_fin_settle_agg fst ON dn.dc_office = fst.dc_office AND dn.dc_year = fst.dc_year
   AND dn.dc_month = fst.dc_month AND dn.dc_mode = fst.dc_mode AND dn.dc_seq = fst.dc_seq
 JOIN pnd_agg pnd ON
   dn.pol_office = pnd.pol_office AND dn.pol_subclass = pnd.pol_subclass

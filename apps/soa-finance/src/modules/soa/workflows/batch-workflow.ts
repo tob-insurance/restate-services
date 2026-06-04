@@ -24,14 +24,7 @@ import {
 import { soaCustomer } from "../objects/soa-customer.js";
 import { soaSchema } from "../types.js";
 
-const DEV_TEST_CUSTOMER_CODES = parseEnvList("SOA_TEST_CUSTOMERS") ?? [
-  "00004162",
-  "00004829",
-  "00005017",
-  "00003758",
-  "00003390",
-  "00002844",
-];
+const DEV_TEST_CUSTOMER_CODES = parseEnvList("SOA_TEST_CUSTOMERS") ?? [];
 
 const MAX_WORKERS = parseEnvInt("SOA_MAX_WORKERS", 5);
 const INACTIVITY_TIMEOUT_HOURS = parseEnvInt("SOA_INACTIVITY_TIMEOUT_HOURS", 6);
@@ -119,7 +112,7 @@ export const batchWorkflow = workflow({
       );
 
       let accountsToProcess: Account[];
-      if (isDevelopment()) {
+      if (isDevelopment() && DEV_TEST_CUSTOMER_CODES.length > 0) {
         const testCodes = new Set(DEV_TEST_CUSTOMER_CODES);
         accountsToProcess = allAccounts.filter((a) => testCodes.has(a.code));
         ctx.console.log(

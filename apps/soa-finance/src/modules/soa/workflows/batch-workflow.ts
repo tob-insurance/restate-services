@@ -16,7 +16,6 @@ import {
 } from "../../../constants/environment.js";
 import { getAgentAccounts } from "../../../infrastructure/database/queries/customer-query.js";
 import { asCorrelationId, asCustomerId } from "../../../types/branded.js";
-import type { Account } from "../../../types/customer.type.js";
 import {
   formatDateToUnixTimestamp,
   formatTimePeriod,
@@ -99,30 +98,28 @@ export const batchWorkflow = workflow({
       // STEP 2: Fetch Customer Accounts
       ctx.set("status", "started");
 
-      const allAccounts = await ctx.run(
-        "get-all-accounts",
-        async (): Promise<Account[]> => {
+      const accountCodes = await ctx.run(
+        "get-all-account-codes",
+        async (): Promise<string[]> => {
           const accounts = await getAgentAccounts();
           if (!accounts || accounts.length === 0) {
             throw new Error("No customer accounts found");
           }
 
-          return accounts;
+          // Return only codes — not full Account objects
+          let codes = accounts.map((a) => a.code);
+
+          // Filter to test customers in development
+          if (isDevelopment() && DEV_TEST_CUSTOMER_CODES.length > 0) {
+            const testCodes = new Set(DEV_TEST_CUSTOMER_CODES);
+            codes = codes.filter((code) => testCodes.has(code));
+          }
+
+          return codes;
         }
       );
 
-      let accountsToProcess: Account[];
-      if (isDevelopment() && DEV_TEST_CUSTOMER_CODES.length > 0) {
-        const testCodes = new Set(DEV_TEST_CUSTOMER_CODES);
-        accountsToProcess = allAccounts.filter((a) => testCodes.has(a.code));
-        ctx.console.log(
-          `[Dev] Filtered ${allAccounts.length} accounts to ${accountsToProcess.length} test customers`
-        );
-      } else {
-        accountsToProcess = allAccounts;
-      }
-
-      const totalAccounts = accountsToProcess.length;
+      const totalAccounts = accountCodes.length;
 
       ctx.set("status", "fetching");
       ctx.set("progress", {
@@ -140,18 +137,17 @@ export const batchWorkflow = workflow({
       const failedAccounts: BatchWorkflowResult["failedAccounts"] = [];
       let processedAccountCount = 0;
 
-      for (let i = 0; i < accountsToProcess.length; i += MAX_WORKERS) {
-        const chunk = accountsToProcess.slice(i, i + MAX_WORKERS);
+      for (let i = 0; i < accountCodes.length; i += MAX_WORKERS) {
+        const chunk = accountCodes.slice(i, i + MAX_WORKERS);
 
-        const chunkPromises = chunk.map((account) => {
-          const accountId = account.code;
+        const chunkPromises = chunk.map((accountId) => {
           const idempotencyKey = `${accountId}:${processingDates.timePeriod}:${soaProcessingType}`;
 
           return ctx
             .objectClient(soaCustomer, accountId)
             .process(
               {
-                customerId: asCustomerId(account.code),
+                customerId: asCustomerId(accountId),
                 timePeriod: processingDates.timePeriod,
                 processingDate: processingDates.processingDate,
                 classOfBusiness: soaOptions.classOfBusiness,

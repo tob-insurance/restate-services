@@ -5,7 +5,6 @@ import {
   markDcNotesAsPaid,
 } from "../../infrastructure/database/queries/reminder-query.js";
 import type { Account } from "../../types/customer.type.js";
-import type { StatementOfAccountModel } from "../../types/soa.type.js";
 import { areAllDcNotesPaid } from "../../utils/dc-note.js";
 import { getStagingSoaData } from "../data-access/staging-reader.js";
 import type { SoaReminder } from "../reminder/types.js";
@@ -16,68 +15,71 @@ export async function getUnpaidSoaData(
   customer: Account,
   reminder: SoaReminder
 ): Promise<{
-  unpaidItems: StatementOfAccountModel[];
-  dcNotesPaid: string[];
+  branchName: string;
+  unpaidCount: number;
 } | null> {
   const branchCode = reminder.officeId || SENTINEL_ALL;
 
-  const soaList = await ctx.run("read-soa-staging", () =>
-    getStagingSoaData(customer.code, branchCode)
-  );
-
-  if (soaList.length === 0) {
-    return null;
-  }
-
-  const currentDcNotes = soaList.map((s) => s.debitAndCreditNoteNo);
-
+  // Parse reminder ID once
   const parts = reminder.id.split(":");
   if (parts.length !== 2) {
     throw new Error(`Invalid reminder ID format: ${reminder.id}`);
   }
   const [timePeriod, officeId] = parts;
 
-  // Get reminder details from PostgreSQL
-  const details = await ctx.run("get-reminder-details", () =>
-    getReminderDetails(customer.code, timePeriod, officeId)
-  );
+  // All processing inside ctx.run() — return only minimal result to avoid journal bloat
+  const result = await ctx.run("process-unpaid-data", async () => {
+    const [soaList, details] = await Promise.all([
+      getStagingSoaData(customer.code, branchCode),
+      getReminderDetails(customer.code, timePeriod, officeId),
+    ]);
 
-  const { paidDcNoteIds, bulkPaymentSkipped } = reconcilePayment(
-    details,
-    currentDcNotes
-  );
+    if (soaList.length === 0) {
+      return null;
+    }
 
-  if (bulkPaymentSkipped) {
-    const detailsCount = details.length;
+    const currentDcNotes = soaList.map((s) => s.debitAndCreditNoteNo);
+    const { paidDcNoteIds, bulkPaymentSkipped } = reconcilePayment(
+      details,
+      currentDcNotes
+    );
+
+    if (bulkPaymentSkipped) {
+      // Log inside callback — won't appear in journal but helps debugging
+      console.warn(`[Payment] Skipping bulk payment for ${customer.code}`);
+    }
+
+    // Update paid status in PostgreSQL
+    if (paidDcNoteIds.length > 0) {
+      await markDcNotesAsPaid(customer.code, paidDcNoteIds);
+    }
+
+    const paidSet = new Set(paidDcNoteIds.map((dc) => dc.toLowerCase()));
+    const unpaidItems = soaList.filter(
+      (soaItem) => !areAllDcNotesPaid(soaItem.debitAndCreditNoteNo, paidSet)
+    );
+
+    // Return only minimal data — not full soaList
+    const branchName = unpaidItems.length > 0 ? unpaidItems[0].branch : "";
+    return {
+      branchName,
+      unpaidCount: unpaidItems.length,
+    };
+  });
+
+  if (!result) {
+    return null;
+  }
+
+  const { branchName, unpaidCount } = result;
+
+  if (unpaidCount === 0) {
+    ctx.console.log(`[Reminder] Skipping ${customer.code}: all DC notes paid`);
+  } else {
     ctx.console.log(
-      `[Payment] Skipping bulk payment: all ${detailsCount} details would be marked paid — possible data issue`
+      `[Reminder] DC notes for ${customer.code}: ${unpaidCount} items unpaid`
     );
   }
 
-  // Update paid status in PostgreSQL
-  if (paidDcNoteIds.length > 0) {
-    await ctx.run("mark-dc-notes-paid", () =>
-      markDcNotesAsPaid(customer.code, paidDcNoteIds)
-    );
-  }
-
-  const paidSet = new Set(paidDcNoteIds.map((dc) => dc.toLowerCase()));
-
-  // Filter unpaid items directly using the helper — handles comma-separated DC notes correctly
-  const unpaidItems = soaList.filter(
-    (soaItem) => !areAllDcNotesPaid(soaItem.debitAndCreditNoteNo, paidSet)
-  );
-
-  if (unpaidItems.length === 0) {
-    ctx.console.log(
-      `[Reminder] Skipping ${customer.code}: all ${paidDcNoteIds.length} DC notes paid`
-    );
-    return { unpaidItems: [], dcNotesPaid: paidDcNoteIds };
-  }
-
-  ctx.console.log(
-    `[Reminder] DC notes for ${customer.code}: ${paidDcNoteIds.length} paid, ${unpaidItems.length} items unpaid`
-  );
-
-  return { unpaidItems, dcNotesPaid: paidDcNoteIds };
+  return { branchName, unpaidCount };
 }

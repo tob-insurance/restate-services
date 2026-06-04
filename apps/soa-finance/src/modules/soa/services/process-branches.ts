@@ -25,15 +25,14 @@ interface BranchResult {
 
 interface BranchProcessResult {
   branch: Branch;
-  dcNoteNos: string[];
   hasDocuments: boolean;
 }
 
 /**
  * Process a single branch: read staging, filter aging, generate docs, send email.
  * Uses two ctx.run() calls to minimize journal size:
- *   1. Generate + upload (returns S3 keys + dcNoteNos)
- *   2. Download + send email
+ *   1. Generate + upload + create reminder
+ *   2. Send email
  * Returns null on non-terminal failures (branch error isolation).
  */
 async function processSingleBranch(
@@ -50,7 +49,6 @@ async function processSingleBranch(
     excelUrl: string;
     pdfFileName: string;
     pdfUrl: string;
-    dcNoteNos: string[];
     count: number;
   } | null;
   try {
@@ -81,14 +79,24 @@ async function processSingleBranch(
           pdfFileName: letterSoaPdfName(customerData.code),
         });
 
+        // Create reminder inside callback — dcNoteNos never leaves this scope
         const dcNoteNos = soaData.map((s) => s.debitAndCreditNoteNo);
+        if (dcNoteNos.length > 0) {
+          await createReminder({
+            customer: customerData,
+            timePeriod: soaParams.timePeriod,
+            branchCode: branch.officeCode,
+            processingDate: soaParams.processingDate,
+            dcNoteNos,
+            ctx,
+          });
+        }
 
         return {
           excelFileName: result.excelFileName,
           excelUrl: result.excelUrl,
           pdfFileName: result.pdfFileName,
           pdfUrl: result.pdfUrl,
-          dcNoteNos,
           count: soaData.length,
         };
       }
@@ -105,7 +113,7 @@ async function processSingleBranch(
 
   if (!generated) {
     ctx.console.log(`[Branch] No SOA data for ${branch.officeCode}`);
-    return { branch, dcNoteNos: [], hasDocuments: false };
+    return { branch, hasDocuments: false };
   }
 
   ctx.console.log(
@@ -141,7 +149,7 @@ async function processSingleBranch(
     `Branch ${branch.officeCode} completed in ${duration}ms`
   );
 
-  return { branch, dcNoteNos: generated.dcNoteNos, hasDocuments: true };
+  return { branch, hasDocuments: true };
 }
 
 /**
@@ -169,19 +177,6 @@ export async function processBranchSoa(
     const result = await processSingleBranch(params, branch);
     if (result) {
       results.push(result);
-    }
-  }
-
-  for (const result of results) {
-    if (result.hasDocuments && result.dcNoteNos.length > 0) {
-      await createReminder({
-        customer: customerData,
-        timePeriod: params.params.timePeriod,
-        branchCode: result.branch.officeCode,
-        processingDate: params.params.processingDate,
-        dcNoteNos: result.dcNoteNos,
-        ctx,
-      });
     }
   }
 

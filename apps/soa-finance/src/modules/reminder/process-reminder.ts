@@ -32,22 +32,24 @@ export const processReminderLetter = async (
     }`
   );
 
-  // Get reminder IDs from PostgreSQL
-  const reminderIdsForPeriod = await ctx.run("get-reminder-ids", () =>
-    getReminderIdsForPeriod(customer.code, item.timePeriod)
+  // Combined read: reminder IDs + headers in single ctx.run()
+  const { reminderIds, reminderHeaders } = await ctx.run(
+    "get-reminder-ids-and-headers",
+    async () => {
+      const [ids, headers] = await Promise.all([
+        getReminderIdsForPeriod(customer.code, item.timePeriod),
+        getReminderHeadersForPeriod(customer.code, item.timePeriod),
+      ]);
+      return { reminderIds: ids, reminderHeaders: headers };
+    }
   );
 
-  if (reminderIdsForPeriod.length === 0) {
+  if (reminderIds.length === 0) {
     ctx.console.log(
       `[Reminder] Skipping ${customer.code}: no reminders for period ${item.timePeriod}`
     );
-    return { processed: false, remindersSent: 0, dcNotesPaid: [] };
+    return { processed: false, remindersSent: 0 };
   }
-
-  // Get reminder headers from PostgreSQL
-  const reminderHeaders = await ctx.run("get-reminder-headers", () =>
-    getReminderHeadersForPeriod(customer.code, item.timePeriod)
-  );
 
   const reminders: SoaReminder[] = reminderHeaders.map((header) => ({
     id: `${header.time_period}:${header.office_id}`,
@@ -60,10 +62,9 @@ export const processReminderLetter = async (
     ctx.console.log(
       `[Reminder] Skipping ${customer.code}: no reminder headers found`
     );
-    return { processed: false, remindersSent: 0, dcNotesPaid: [] };
+    return { processed: false, remindersSent: 0 };
   }
 
-  const allDcNotesPaid: string[] = [];
   let remindersSent = 0;
 
   for (const reminder of reminders) {
@@ -74,15 +75,10 @@ export const processReminderLetter = async (
       reminder,
     });
 
-    if (result) {
-      if (result.sent) {
-        remindersSent += 1;
-      }
-      if (result.dcNotesPaid?.length > 0) {
-        allDcNotesPaid.push(...result.dcNotesPaid);
-      }
+    if (result?.sent) {
+      remindersSent += 1;
     }
   }
 
-  return { processed: true, remindersSent, dcNotesPaid: allDcNotesPaid };
+  return { processed: true, remindersSent };
 };

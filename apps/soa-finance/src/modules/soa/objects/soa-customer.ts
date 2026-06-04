@@ -46,17 +46,21 @@ export const soaCustomer = object({
       );
       ctx.set("status", "processing");
 
-      const customerData = await ctx.run("get-customer-data", () =>
-        getAccountById(customerId)
+      // Combined read: customer data + reminder check in single ctx.run()
+      const { customerData, hasExistingReminder } = await ctx.run(
+        "get-customer-and-reminders",
+        async () => {
+          const [customer, hasReminder] = await Promise.all([
+            getAccountById(customerId),
+            hasRemindersForPeriodDb(ctx.key, timePeriod),
+          ]);
+          return { customerData: customer, hasExistingReminder: hasReminder };
+        }
       );
 
       if (!customerData) {
         throw new TerminalError(`Customer ${customerId} not found`);
       }
-
-      ctx.set("status", "fetched-customer");
-
-      const hasExistingReminder = await hasRemindersForPeriod(ctx, timePeriod);
 
       ctx.set("status", "branch-processing");
 
@@ -105,12 +109,3 @@ export const soaCustomer = object({
 });
 
 export type SoaCustomer = typeof soaCustomer;
-
-async function hasRemindersForPeriod(
-  ctx: ObjectContext,
-  timePeriod: string
-): Promise<boolean> {
-  return await ctx.run("check-reminders", () =>
-    hasRemindersForPeriodDb(ctx.key, timePeriod)
-  );
-}

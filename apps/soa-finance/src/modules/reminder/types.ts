@@ -17,13 +17,11 @@ export interface SoaReminder {
 }
 
 export interface ProcessReminder {
-  dcNotesPaid: string[];
   processed: boolean;
   remindersSent: number;
 }
 
 export interface GenerateReminderResult {
-  dcNotesPaid: string[];
   letterNo?: string | null;
   reason?: "ALL_PAID" | "SENT" | "ERROR";
   sent: boolean;

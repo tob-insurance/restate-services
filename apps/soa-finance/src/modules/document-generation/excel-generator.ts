@@ -1,6 +1,6 @@
 const hucrePromise = import("hucre/xlsx");
 
-import { CONTENT_TYPES, NUMBER_FORMATS } from "../../constants/constants.js";
+import { CONTENT_TYPES } from "../../constants/constants.js";
 import type { StatementOfAccountModel } from "../../types/soa.type.js";
 import { toExcelDate } from "../../utils/formatter/date.formatter.js";
 
@@ -130,9 +130,6 @@ export function groupAndAggregateSoa(
       base.netPremiumIdr += record.netPremiumIdr;
     }
 
-    // Clear DC Note (as per C# logic)
-    base.debitAndCreditNoteNo = "";
-
     aggregatedData.push(base);
   }
 
@@ -155,27 +152,13 @@ export function sortSoaData(
 
 type CellValue = string | number | boolean | Date | null;
 
-const ALPHABET_LENGTH = 26;
-
-function colToLetter(col: number): string {
-  const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  let result = "";
-  let n = col;
-  do {
-    result = CHARS[n % ALPHABET_LENGTH] + result;
-    n = Math.floor(n / ALPHABET_LENGTH) - 1;
-  } while (n >= 0);
-  return result;
-}
-
 export async function generateExcel(params: {
   soaData: StatementOfAccountModel[];
-  customerId: string;
 }): Promise<SoaFileResult> {
-  const { soaData, customerId } = params;
+  const { soaData } = params;
   const { writeXlsx } = await hucrePromise;
 
-  const fileName = `Outstanding-SOA--${customerId}.xlsx`;
+  const fileName = "Outstanding-SOA.xlsx";
 
   let processedData = groupAndAggregateSoa(soaData);
   processedData = sortSoaData(processedData);
@@ -192,27 +175,7 @@ export async function generateExcel(params: {
     return row;
   });
 
-  const lastCol = colToLetter(excelColumns.length - 1);
-  const lastRow = rows.length + 1;
-  const tableRange = `A1:${lastCol}${lastRow}`;
-
-  const numberFormats = new Set(["number", "currency"]);
-  const sumColumns = new Set<ExcelColumnKey>([
-    "totalSumInsured",
-    "grossPremium",
-    "discount",
-    "commission",
-    "ppn",
-    "pph21",
-    "pph23",
-    "cost",
-    "stmp",
-    "netPremium",
-    "netPremiumIdr",
-  ]);
-
   const buffer = await writeXlsx({
-    defaultFont: { name: "Calibri", size: 11 },
     sheets: [
       {
         name: "Statement of Account",
@@ -220,36 +183,8 @@ export async function generateExcel(params: {
           header: col.header,
           key: col.key,
           width: col.width,
-          numFmt: col.format ? NUMBER_FORMATS[col.format] : undefined,
-          style:
-            col.format && numberFormats.has(col.format)
-              ? { alignment: { horizontal: "right" } }
-              : undefined,
         })),
         data: rows,
-        freezePane: { rows: 1 },
-        pageSetup: {
-          paperSize: "a4",
-          orientation: "landscape",
-          fitToPage: true,
-          fitToWidth: 1,
-          fitToHeight: 0,
-          printTitlesRow: "$1:$1",
-        },
-        tables: [
-          {
-            name: "SOA_Table",
-            columns: excelColumns.map((col) => ({
-              name: col.header,
-              totalFunction: sumColumns.has(col.key) ? "sum" : undefined,
-            })),
-            range: tableRange,
-            style: "TableStyleMedium2",
-            showRowStripes: true,
-            showAutoFilter: true,
-            showTotalRow: true,
-          },
-        ],
       },
     ],
   });

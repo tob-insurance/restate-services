@@ -5,6 +5,7 @@ import { ASSETS_DIR } from "../../utils/paths.js";
 let cachedSignature: string | null = null;
 let cachedHeader: string | null = null;
 let cachedFooter: string | null = null;
+let cachedLogo: string | null = null;
 
 function getAssetAsBase64(filename: string): string {
   const filePath = join(ASSETS_DIR, filename);
@@ -37,4 +38,12 @@ export function getFooter(): string {
   }
 
   return cachedFooter;
+}
+
+export function getLogo(): string {
+  if (cachedLogo === null) {
+    cachedLogo = getAssetAsBase64("logo-tob.png");
+  }
+
+  return cachedLogo;
 }

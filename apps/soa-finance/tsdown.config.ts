@@ -10,5 +10,23 @@ export default defineConfig({
   outDir: "dist-lambda",
   clean: true,
   dts: false,
+  deps: {
+    alwaysBundle: [
+      /@restatedev\//,
+      /@restate-tob\//,
+      /@azure\//,
+      /@aws-sdk\//,
+      /pino/,
+      /liquidjs/,
+      /luxon/,
+      /zod/,
+      /juice/,
+      /hucre/,
+    ],
+    onlyBundle: false,
+  },
+  outputOptions: {
+    codeSplitting: false,
+  },
   copy: "src/assets",
 });

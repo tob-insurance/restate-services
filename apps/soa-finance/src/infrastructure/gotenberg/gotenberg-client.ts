@@ -1,6 +1,5 @@
 import { request as httpRequest, type IncomingMessage } from "node:http";
 import { request as httpsRequest } from "node:https";
-import { HttpsProxyAgent } from "https-proxy-agent";
 import { INFRASTRUCTURE_TIMEOUTS } from "../../constants/constants.js";
 import logger from "../../utils/logger.js";
 
@@ -80,7 +79,7 @@ export async function generatePdfWithHeaderFooter(
   try {
     const {
       marginTop = 1,
-      marginBottom = 0.5,
+      marginBottom = 0.7,
       marginLeft = 0.5,
       marginRight = 0.5,
       paperWidth = PaperSizes.A4.width,
@@ -137,10 +136,6 @@ export async function generatePdfWithHeaderFooter(
     const isHttps = url.protocol === "https:";
     const requestFn = isHttps ? httpsRequest : httpRequest;
 
-    const proxyUrl = process.env.HTTPS_PROXY;
-    const agent =
-      proxyUrl && isHttps ? new HttpsProxyAgent(proxyUrl) : undefined;
-
     const response = await new Promise<IncomingMessage>((resolve, reject) => {
       const req = requestFn(
         url,
@@ -150,7 +145,6 @@ export async function generatePdfWithHeaderFooter(
             "Content-Type": `multipart/form-data; boundary=${boundary}`,
             "Content-Length": body.length.toString(),
           },
-          agent,
           timeout: INFRASTRUCTURE_TIMEOUTS.GOTENBERG_PDF_MS,
         },
         resolve

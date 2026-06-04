@@ -1,6 +1,5 @@
 import { request as httpsRequest } from "node:https";
 import { ClientSecretCredential } from "@azure/identity";
-import { HttpsProxyAgent } from "https-proxy-agent";
 import { EMAIL_SEND_TIMEOUT_MS } from "../../constants/timeouts.js";
 import { EMAIL_CONFIG } from "../../utils/config/emails.js";
 import logger from "../../utils/logger.js";
@@ -92,9 +91,6 @@ export async function sendEmail(message: EmailMessage): Promise<boolean> {
       bodyToBuffer(mailBody),
     ]);
 
-    const proxyUrl = process.env.HTTPS_PROXY;
-    const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
-
     const response = await new Promise<{ body: string; statusCode: number }>(
       (resolve, reject) => {
         const req = httpsRequest(
@@ -106,7 +102,6 @@ export async function sendEmail(message: EmailMessage): Promise<boolean> {
               "Content-Type": "application/json",
               "Content-Length": body.length.toString(),
             },
-            agent,
             timeout: EMAIL_SEND_TIMEOUT_MS,
           },
           (res) => {

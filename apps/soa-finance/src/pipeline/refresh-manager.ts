@@ -410,7 +410,7 @@ async function refreshPipelineStaging(
       pm.fire_conjunction_pol,
       rl.lob_desc as lob,
       pm.source_of_business as sob,
-      CASE WHEN pm.distribution_type = 'DI' THEN dn.dc_account_full_name ELSE '' END as dc_account_full_name,
+      dn.dc_account_full_name,
       pm.insured_name,
       pm.distribution_name,
       pm.distribution_name2,

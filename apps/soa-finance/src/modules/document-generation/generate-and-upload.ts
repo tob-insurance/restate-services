@@ -40,7 +40,6 @@ export async function generateAndUploadDocuments(
   const isReminder = params.processingType > 1;
   const toDate = new Date(params.toDate * 1000);
   const reminderCount = (params.processingType - 1).toString();
-  const dateNow = new Date(params.processingDate);
 
   // Excel and PDF generation are independent — run in parallel
   const templateName = isReminder
@@ -48,8 +47,8 @@ export async function generateAndUploadDocuments(
     : "TemplateOutstandingStatementOfAccount";
 
   const [excelFile, pdfFile] = await Promise.all([
-    generateExcel({ soaData, customerId: customerData.code }).then((excel) => {
-      excel.fileName = excelSoaName(customerData.code, dateNow);
+    generateExcel({ soaData }).then((excel) => {
+      excel.fileName = excelSoaName();
       return excel;
     }),
     buildPdfTemplateData({

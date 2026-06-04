@@ -157,9 +157,17 @@ async function runPipelineAndBatch(
 
   const pipelineStartTime = await ctx.date.now();
 
-  const pipelineResult = await ctx
-    .run("generate-soa-pipeline", () => generateSoaPipeline(now.toJSDate()))
-    .orTimeout({ milliseconds: PIPELINE_TIMEOUT_MS });
+  // Use Promise.race for timeout
+  const pipelineResult = await Promise.race([
+    generateSoaPipeline(ctx, now.toJSDate()),
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error("Pipeline timeout")),
+        PIPELINE_TIMEOUT_MS
+      )
+    ),
+  ]);
+
   if (!pipelineResult.success) {
     throw new Error(
       `Pipeline returned success: false — aborting batch for ${schedule.type}`

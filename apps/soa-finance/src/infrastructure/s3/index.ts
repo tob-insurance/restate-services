@@ -13,7 +13,7 @@ function generateStoragePath(fileName: string, date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
 
-  return `SOA/${year}-${month}/${fileName}`;
+  return `CollectionLetters/${year}-${month}/${fileName}`;
 }
 
 export async function uploadFile(

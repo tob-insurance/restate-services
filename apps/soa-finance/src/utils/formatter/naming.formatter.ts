@@ -6,13 +6,11 @@ import { randomUUID } from "node:crypto";
  */
 const randomSuffix = (): string => randomUUID().slice(0, 8);
 
-export const reminderPdfName = (reminderCount: number | string): string =>
-  `soa-reminder-${reminderCount}-${randomSuffix()}.pdf`;
+export const reminderPdfName = (_reminderCount: number | string): string =>
+  `Reminder-Letter-${randomSuffix()}.pdf`;
 
 export const letterSoaPdfName = (customerCode: string): string =>
-  `soa-${customerCode}-${randomSuffix()}.pdf`;
+  `Collection-Letter-${customerCode}-${randomSuffix()}.pdf`;
 
-export const excelSoaName = (
-  customerCode: string,
-  _date: Date = new Date()
-): string => `soa-${customerCode}-${randomSuffix()}.xlsx`;
+export const excelSoaName = (): string =>
+  `Outstanding-SOA-${randomSuffix()}.xlsx`;

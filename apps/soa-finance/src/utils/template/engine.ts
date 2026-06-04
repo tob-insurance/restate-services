@@ -12,6 +12,8 @@ const TEMPLATE_KEYS = [
   "_partials/bank-accounts-id",
   "_partials/bank-accounts-en",
   "_partials/signature",
+  "_partials/signature-id",
+  "_partials/signature-en",
   "_partials/contact-info",
   "TemplateOutstandingStatementOfAccount",
   "TemplateReminderLetterSOA",

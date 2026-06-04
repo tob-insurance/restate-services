@@ -1,8 +1,10 @@
 import type { ObjectContext } from "@restatedev/restate-sdk";
+import {
+  getReminderHeadersForPeriod,
+  getReminderIdsForPeriod,
+} from "../../infrastructure/database/queries/reminder-query.js";
 import type { Account } from "../../types/customer.type.js";
 import { type SoaItem, SoaTypeLabels } from "../../types/soa.type.js";
-import type { ReminderHeader } from "../soa/objects/state.js";
-import { readDcNoteIndex, stateKeys } from "../soa/objects/state.js";
 import { generateReminderLetter } from "./generate-reminder-letter.js";
 import type { ProcessReminder } from "./types.js";
 
@@ -30,43 +32,29 @@ export const processReminderLetter = async (
     }`
   );
 
-  const dcNoteIndex = await readDcNoteIndex(ctx, item.timePeriod);
-
-  if (Object.keys(dcNoteIndex).length === 0) {
-    ctx.console.log(
-      `[Reminder] Skipping ${customer.code}: no previous reminder records`
-    );
-    return { processed: false, remindersSent: 0, dcNotesPaid: [] };
-  }
-
-  const reminderIdsForPeriod = new Set(
-    Object.values(dcNoteIndex).filter((id) =>
-      id.startsWith(`${item.timePeriod}:`)
-    )
+  // Get reminder IDs from PostgreSQL
+  const reminderIdsForPeriod = await ctx.run("get-reminder-ids", () =>
+    getReminderIdsForPeriod(customer.code, item.timePeriod)
   );
 
-  if (reminderIdsForPeriod.size === 0) {
+  if (reminderIdsForPeriod.length === 0) {
     ctx.console.log(
       `[Reminder] Skipping ${customer.code}: no reminders for period ${item.timePeriod}`
     );
     return { processed: false, remindersSent: 0, dcNotesPaid: [] };
   }
 
-  const reminders: SoaReminder[] = [];
-  for (const reminderId of reminderIdsForPeriod) {
-    const [officeId] = reminderId.split(":").slice(1);
-    const header = await ctx.get<ReminderHeader>(
-      stateKeys.header(item.timePeriod, officeId)
-    );
-    if (header) {
-      reminders.push({
-        id: reminderId,
-        customerCode: header.customerCode,
-        timePeriod: header.timePeriod,
-        officeId: header.officeId,
-      });
-    }
-  }
+  // Get reminder headers from PostgreSQL
+  const reminderHeaders = await ctx.run("get-reminder-headers", () =>
+    getReminderHeadersForPeriod(customer.code, item.timePeriod)
+  );
+
+  const reminders: SoaReminder[] = reminderHeaders.map((header) => ({
+    id: `${header.time_period}:${header.office_id}`,
+    customerCode: header.customer_code,
+    timePeriod: header.time_period,
+    officeId: header.office_id,
+  }));
 
   if (reminders.length === 0) {
     ctx.console.log(

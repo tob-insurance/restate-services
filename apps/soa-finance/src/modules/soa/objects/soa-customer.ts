@@ -3,17 +3,12 @@ import {
   object,
   TerminalError,
 } from "@restatedev/restate-sdk";
-
-import { PERIODS_TO_KEEP } from "../../../constants/constants.js";
 import { getAccountById } from "../../../infrastructure/database/queries/customer-query.js";
+import { hasRemindersForPeriod as hasRemindersForPeriodDb } from "../../../infrastructure/database/queries/reminder-query.js";
 import type { SoaItem } from "../../../types/soa.type.js";
 import { workflowLog } from "../../../utils/logger.js";
 import { processReminderLetter } from "../../reminder";
 import { processBranchSoa } from "../services/process-branches.js";
-import { readDcNoteIndex } from "./state.js";
-
-const PERIOD_STATE_KEY_REGEX = /^[^:]+:(\d{4}-\d{2})(?::|$)/;
-
 export interface SoaCustomerResult {
   customerId: string;
   status: "completed" | "failed";
@@ -98,7 +93,7 @@ export const soaCustomer = object({
           `Completed for customer: ${customerId}`
         );
 
-        await cleanupOldPeriodState(ctx, timePeriod);
+        // Cleanup is now handled by PostgreSQL (no Restate state to clean)
 
         return { customerId, status: "completed" };
       } catch (error) {
@@ -115,35 +110,7 @@ async function hasRemindersForPeriod(
   ctx: ObjectContext,
   timePeriod: string
 ): Promise<boolean> {
-  const dcNoteIndex = await readDcNoteIndex(ctx, timePeriod);
-
-  return Object.values(dcNoteIndex).some((reminderId) =>
-    reminderId.startsWith(`${timePeriod}:`)
+  return await ctx.run("check-reminders", () =>
+    hasRemindersForPeriodDb(ctx.key, timePeriod)
   );
-}
-
-async function cleanupOldPeriodState(
-  ctx: ObjectContext,
-  currentTimePeriod: string
-): Promise<void> {
-  const cutoffPeriodIndex =
-    getPeriodIndex(currentTimePeriod) - PERIODS_TO_KEEP + 1;
-  const keys = await ctx.stateKeys();
-
-  for (const key of keys) {
-    const match = key.match(PERIOD_STATE_KEY_REGEX);
-    if (!match) {
-      continue;
-    }
-
-    const periodIndex = getPeriodIndex(match[1]);
-    if (periodIndex < cutoffPeriodIndex) {
-      ctx.clear(key);
-    }
-  }
-}
-
-function getPeriodIndex(timePeriod: string): number {
-  const [year, month] = timePeriod.split("-").map(Number);
-  return year * 12 + month;
 }

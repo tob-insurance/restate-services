@@ -1,16 +1,18 @@
-import { DOTNET_TICKS_EPOCH_OFFSET } from "../../constants/constants.js";
+import { randomUUID } from "node:crypto";
+
+/**
+ * Generate a random suffix for file names to prevent URL guessing.
+ * Uses UUID v4 for cryptographically random strings.
+ */
+const randomSuffix = (): string => randomUUID().slice(0, 8);
 
 export const reminderPdfName = (reminderCount: number | string): string =>
-  `Reminder_${reminderCount}.pdf`;
+  `soa-reminder-${reminderCount}-${randomSuffix()}.pdf`;
 
 export const letterSoaPdfName = (customerCode: string): string =>
-  `Collection_Letter_${customerCode}.pdf`;
+  `soa-${customerCode}-${randomSuffix()}.pdf`;
 
 export const excelSoaName = (
   customerCode: string,
-  date: Date = new Date()
-): string => {
-  // .NET DateTime.Ticks are measured from 0001-01-01, not the Unix epoch.
-  const ticks = date.getTime() * 10_000 + DOTNET_TICKS_EPOCH_OFFSET;
-  return `Outstanding-SOA--${customerCode}-${ticks}.xlsx`;
-};
+  _date: Date = new Date()
+): string => `soa-${customerCode}-${randomSuffix()}.xlsx`;

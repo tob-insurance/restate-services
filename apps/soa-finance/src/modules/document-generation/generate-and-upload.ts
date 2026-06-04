@@ -1,11 +1,7 @@
 import { CONTENT_TYPES } from "../../constants/constants.js";
-import { uploadFile } from "../../infrastructure/s3";
+import { getObjectUrl, uploadFile } from "../../infrastructure/s3";
 import type { Account } from "../../types/customer.type.js";
-import type {
-  FileData,
-  SoaItem,
-  StatementOfAccountModel,
-} from "../../types/soa.type.js";
+import type { SoaItem, StatementOfAccountModel } from "../../types/soa.type.js";
 import { excelSoaName } from "../../utils/formatter/naming.formatter.js";
 import { generateExcel } from "./excel-generator.js";
 import { generateSoaPdfHandler } from "./generate-soa-pdf.js";
@@ -22,8 +18,10 @@ interface GenerateAndUploadParams {
 }
 
 interface GenerateAndUploadResult {
-  excelFile: FileData;
-  pdfFile: FileData;
+  excelFileName: string;
+  excelUrl: string;
+  pdfFileName: string;
+  pdfUrl: string;
 }
 
 export async function generateAndUploadDocuments(
@@ -73,15 +71,19 @@ export async function generateAndUploadDocuments(
   ]);
 
   // Upload both files to S3 for archival (parallel)
-  await Promise.all([
-    uploadFile(
-      { ...excelFile, contentType: CONTENT_TYPES.XLSX },
-      customerData.code,
-      "excel",
-      toDate
-    ),
-    uploadFile(pdfFile, customerData.code, "pdf", toDate),
+  const [excelUpload, pdfUpload] = await Promise.all([
+    uploadFile({ ...excelFile, contentType: CONTENT_TYPES.XLSX }, toDate),
+    uploadFile(pdfFile, toDate),
   ]);
 
-  return { excelFile, pdfFile };
+  // Generate object URLs (permanent public URLs)
+  const excelUrl = getObjectUrl(excelUpload.key);
+  const pdfUrl = getObjectUrl(pdfUpload.key);
+
+  return {
+    excelFileName: excelFile.fileName,
+    excelUrl,
+    pdfFileName: pdfFile.fileName,
+    pdfUrl,
+  };
 }

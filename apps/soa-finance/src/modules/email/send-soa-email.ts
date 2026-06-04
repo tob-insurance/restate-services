@@ -4,8 +4,8 @@ import {
 } from "../../constants/environment.js";
 import { sendEmail } from "../../infrastructure/email/index.js";
 import type { SendEmailResult } from "../../infrastructure/email/types.js";
+import { downloadFile } from "../../infrastructure/s3";
 import type { Account } from "../../types/customer.type.js";
-import type { FileData } from "../../types/soa.type.js";
 import { formatDateDDMMYYYY } from "../../utils/formatter/date.formatter.js";
 import {
   buildEmailAttachments,
@@ -22,10 +22,12 @@ export interface SendSoaEmailParams {
   branch?: string;
   customerData: Account;
   date: Date;
-  excelFile: FileData;
+  excelFileName: string;
+  excelUrl: string;
   isReminder?: boolean;
   letterNo?: string;
-  pdfFile: FileData;
+  pdfFileName: string;
+  pdfUrl: string;
   previousLetterDate?: Date;
   previousLetterNo?: string;
   reminderType?: "1" | "2" | "3";
@@ -52,8 +54,8 @@ export async function sendSoaEmail(
     branch,
     toEmail,
     totalPremium,
-    excelFile,
-    pdfFile,
+    excelUrl,
+    pdfUrl,
   } = params;
 
   const customerEmail = toEmail || customerData.email || "";
@@ -104,6 +106,12 @@ export async function sendSoaEmail(
   if (recipients.length === 0) {
     throw new Error(`No recipients for ${customerData.code}`);
   }
+
+  // Download files from S3 object URLs
+  const [excelFile, pdfFile] = await Promise.all([
+    downloadFile(excelUrl),
+    downloadFile(pdfUrl),
+  ]);
 
   const sent = await sendEmail({
     to: recipients,

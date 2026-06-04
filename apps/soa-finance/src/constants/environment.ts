@@ -33,6 +33,14 @@ export function parseEnvInt(key: string, defaultVal: number): number {
   return Number.isFinite(val) && val > 0 ? val : defaultVal;
 }
 
+export function parseEnvBool(key: string): boolean {
+  const raw = process.env[key];
+  if (!raw) {
+    return false;
+  }
+  return raw.toLowerCase() === "true" || raw === "1";
+}
+
 export function parseEnvList(key: string): string[] | null {
   const raw = process.env[key];
   if (!raw) {

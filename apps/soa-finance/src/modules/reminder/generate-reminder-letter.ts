@@ -119,8 +119,10 @@ const generateUploadAndSendReminder = async (
       branch: branchName,
       toEmail,
       totalPremium,
-      excelFile: files.excelFile,
-      pdfFile: files.pdfFile,
+      excelFileName: files.excelFileName,
+      excelUrl: files.excelUrl,
+      pdfFileName: files.pdfFileName,
+      pdfUrl: files.pdfUrl,
     });
   });
 };

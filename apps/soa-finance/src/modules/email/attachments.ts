@@ -25,7 +25,7 @@ function getSignatureAttachment(): EmailAttachment | null {
       contentType: "image/jpeg",
       contentBytes: bytes.toString("base64"),
       isInline: true,
-      contentId: "mgr-signature",
+      contentId: "<mgr-signature>",
     };
   } catch (error: unknown) {
     if (

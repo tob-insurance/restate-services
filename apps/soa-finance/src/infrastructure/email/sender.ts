@@ -37,6 +37,8 @@ function formatAttachments(attachments?: EmailAttachment[]) {
       name: att.name,
       contentType: att.contentType,
       contentBytes: att.contentBytes,
+      isInline: att.isInline ?? false,
+      contentId: att.contentId,
     })) ?? []
   );
 }

@@ -1,7 +1,8 @@
+import { withConnection } from "@restate-tob/postgres";
 import { type ObjectContext, object } from "@restatedev/restate-sdk";
 import { DateTime } from "luxon";
 import { TIMEZONE } from "../../../constants/constants.js";
-import { executeQuery } from "../../../infrastructure/database/postgres.js";
+import { getPostgresClient } from "../../../infrastructure/database/postgres.js";
 import logger from "../../../utils/logger.js";
 
 /**
@@ -56,27 +57,41 @@ export const reminderCleanup = object({
 async function deleteOldRemindersByDate(
   cutoffDate: string
 ): Promise<{ deletedCount: number }> {
-  // Delete details first (foreign key)
-  const detailsResult = await executeQuery(
-    "DELETE FROM soa_reminder_details WHERE created_at < $1::date",
-    [cutoffDate]
-  );
+  const client = getPostgresClient();
+  return await withConnection(client, async (conn) => {
+    try {
+      await conn.query("BEGIN");
 
-  // Delete headers
-  const headersResult = await executeQuery(
-    "DELETE FROM soa_reminder_headers WHERE created_at < $1::date",
-    [cutoffDate]
-  );
+      // Delete details first (foreign key)
+      const detailsResult = await conn.query(
+        "DELETE FROM soa_reminder_details WHERE created_at < $1::date",
+        [cutoffDate]
+      );
 
-  const deletedCount =
-    (detailsResult.rowCount ?? 0) + (headersResult.rowCount ?? 0);
+      // Delete headers
+      const headersResult = await conn.query(
+        "DELETE FROM soa_reminder_headers WHERE created_at < $1::date",
+        [cutoffDate]
+      );
 
-  logger.info(
-    { component: "ReminderCleanup", cutoffDate, deletedCount },
-    "Reminder cleanup completed"
-  );
+      await conn.query("COMMIT");
 
-  return { deletedCount };
+      const deletedCount =
+        (detailsResult.rowCount ?? 0) + (headersResult.rowCount ?? 0);
+
+      logger.info(
+        { component: "ReminderCleanup", cutoffDate, deletedCount },
+        "Reminder cleanup completed"
+      );
+
+      return { deletedCount };
+    } catch (error: unknown) {
+      await conn.query("ROLLBACK").catch(() => {
+        /* intentional: ignore rollback errors */
+      });
+      throw error;
+    }
+  });
 }
 
 async function scheduleNextCleanup(ctx: ObjectContext): Promise<void> {

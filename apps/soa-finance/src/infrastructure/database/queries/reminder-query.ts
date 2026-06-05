@@ -1,4 +1,5 @@
-import { executeQuery } from "../postgres.js";
+import { withConnection } from "@restate-tob/postgres";
+import { executeQuery, getPostgresClient } from "../postgres.js";
 
 export interface ReminderHeaderRow {
   created_at: string;
@@ -175,15 +176,26 @@ export async function deleteOldReminders(
   customerCode: string,
   beforeTimePeriod: string
 ): Promise<void> {
-  await executeQuery(
-    `DELETE FROM soa_reminder_details 
-     WHERE customer_code = $1 AND time_period < $2`,
-    [customerCode, beforeTimePeriod]
-  );
-
-  await executeQuery(
-    `DELETE FROM soa_reminder_headers 
-     WHERE customer_code = $1 AND time_period < $2`,
-    [customerCode, beforeTimePeriod]
-  );
+  const client = getPostgresClient();
+  await withConnection(client, async (conn) => {
+    try {
+      await conn.query("BEGIN");
+      await conn.query(
+        `DELETE FROM soa_reminder_details 
+         WHERE customer_code = $1 AND time_period < $2`,
+        [customerCode, beforeTimePeriod]
+      );
+      await conn.query(
+        `DELETE FROM soa_reminder_headers 
+         WHERE customer_code = $1 AND time_period < $2`,
+        [customerCode, beforeTimePeriod]
+      );
+      await conn.query("COMMIT");
+    } catch (error: unknown) {
+      await conn.query("ROLLBACK").catch(() => {
+        /* intentional: ignore rollback errors */
+      });
+      throw error;
+    }
+  });
 }

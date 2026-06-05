@@ -56,7 +56,6 @@ async function executeRefresh(
       rowsAffected: 0,
       durationMs: 0,
     };
-    ctx.set("state", state);
 
     const step1Result = await ctx.run("refresh-fin-settle-agg", () =>
       refreshFinSettleAgg(lastRefresh)
@@ -70,7 +69,6 @@ async function executeRefresh(
 
     // Step 2: Refresh soa_pnd_agg
     state.steps.pnd_agg = { status: "running", rowsAffected: 0, durationMs: 0 };
-    ctx.set("state", state);
 
     const step2Result = await ctx.run("refresh-pnd-agg", () =>
       refreshPndAgg(lastRefresh)
@@ -88,7 +86,6 @@ async function executeRefresh(
       rowsAffected: 0,
       durationMs: 0,
     };
-    ctx.set("state", state);
 
     const step3Result = await ctx.run("refresh-staging-unpaid", () =>
       refreshStagingUnpaid(lastRefresh)
@@ -106,7 +103,6 @@ async function executeRefresh(
       rowsAffected: 0,
       durationMs: 0,
     };
-    ctx.set("state", state);
 
     const step4Result = await ctx.run("refresh-staging-unpaid-pnd", () =>
       refreshStagingUnpaidPnd(lastRefresh)
@@ -124,7 +120,6 @@ async function executeRefresh(
       rowsAffected: 0,
       durationMs: 0,
     };
-    ctx.set("state", state);
 
     const step5Result = await ctx.run("refresh-pipeline-staging", () =>
       refreshPipelineStaging(lastRefresh)

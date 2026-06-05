@@ -17,6 +17,7 @@ export function getS3Client(): S3Client {
   s3Client = new S3Client({
     region: awsRegion,
     requestChecksumCalculation: "WHEN_REQUIRED",
+    maxAttempts: 3,
   });
 
   return s3Client;

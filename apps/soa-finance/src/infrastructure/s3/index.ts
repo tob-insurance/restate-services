@@ -1,5 +1,6 @@
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
-import type { FileData } from "../../types/soa.type.js";
+import type { BufferFileData, FileData } from "../../types/soa.type.js";
+import { isBufferFileData } from "../../types/soa.type.js";
 import logger from "../../utils/logger.js";
 import { getBucketName, getS3Client } from "./s3-client.js";
 
@@ -20,10 +21,23 @@ export async function uploadFile(
   fileData: FileData,
   date: Date
 ): Promise<UploadResult> {
+  if (!isBufferFileData(fileData)) {
+    throw new Error("uploadFile requires BufferFileData with bytes");
+  }
+  return await uploadBufferFile(fileData, date);
+}
+
+async function uploadBufferFile(
+  fileData: BufferFileData,
+  date: Date
+): Promise<UploadResult> {
   const client = getS3Client();
   const bucket = getBucketName();
   const key = generateStoragePath(fileData.fileName, date);
 
+  if (!fileData.bytes) {
+    throw new Error("uploadFile requires fileData.bytes to be set");
+  }
   const fileSize = fileData.bytes.length;
   logger.info(
     {
@@ -60,6 +74,38 @@ export async function uploadFile(
 }
 
 export async function downloadFile(urlOrKey: string): Promise<FileData> {
+  const maxRetries = 3;
+  const baseDelayMs = 1000;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (attempt > 0) {
+      const delayMs = baseDelayMs * 2 ** (attempt - 1);
+      logger.info(
+        { component: "S3", attempt, delayMs, key: urlOrKey },
+        "Retrying S3 download after delay"
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+
+    try {
+      return await downloadFileAttempt(urlOrKey);
+    } catch (error) {
+      const isLastAttempt = attempt === maxRetries;
+      if (isLastAttempt) {
+        throw error;
+      }
+      logger.warn(
+        { component: "S3", attempt, key: urlOrKey, err: error },
+        "S3 download attempt failed, may retry"
+      );
+    }
+  }
+
+  // Unreachable, but TypeScript needs it
+  throw new Error(`Failed to download ${urlOrKey} after ${maxRetries} retries`);
+}
+
+async function downloadFileAttempt(urlOrKey: string): Promise<FileData> {
   // If it's an object URL (starts with https://), fetch it directly
   if (urlOrKey.startsWith("https://")) {
     logger.info(
@@ -92,36 +138,26 @@ export async function downloadFile(urlOrKey: string): Promise<FileData> {
     "Downloading file from S3"
   );
 
-  try {
-    const response = await client.send(
-      new GetObjectCommand({
-        Bucket: bucket,
-        Key: urlOrKey,
-      })
-    );
+  const response = await client.send(
+    new GetObjectCommand({
+      Bucket: bucket,
+      Key: urlOrKey,
+    })
+  );
 
-    if (!response.Body) {
-      throw new Error(`Empty response body for key: ${urlOrKey}`);
-    }
-
-    const bytes = Buffer.from(await response.Body.transformToByteArray());
-    const contentType = response.ContentType || "application/octet-stream";
-    const fileName = urlOrKey.split("/").pop() || "download";
-
-    logger.info(
-      { component: "S3", key: urlOrKey },
-      "Downloaded file successfully"
-    );
-    return { bytes, contentType, fileName };
-  } catch (error: unknown) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    logger.error(
-      { component: "S3", err: error, errorMessage, key: urlOrKey },
-      "Failed to download file"
-    );
-    throw error;
+  if (!response.Body) {
+    throw new Error(`Empty response body for key: ${urlOrKey}`);
   }
+
+  const bytes = Buffer.from(await response.Body.transformToByteArray());
+  const contentType = response.ContentType || "application/octet-stream";
+  const fileName = urlOrKey.split("/").pop() || "download";
+
+  logger.info(
+    { component: "S3", key: urlOrKey },
+    "Downloaded file successfully"
+  );
+  return { bytes, contentType, fileName };
 }
 
 export function getObjectUrl(key: string): string {

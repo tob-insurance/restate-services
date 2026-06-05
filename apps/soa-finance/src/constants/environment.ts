@@ -21,7 +21,9 @@ export function getPipelinePathPrefix(): string {
 }
 
 export function getTestEmailRecipient(): string {
-  return process.env.TEST_EMAIL_RECIPIENT || "";
+  return (
+    process.env.TEST_EMAIL_RECIPIENT || process.env.SOA_DEV_TEST_EMAIL || ""
+  );
 }
 
 export function parseEnvInt(key: string, defaultVal: number): number {

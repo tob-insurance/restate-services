@@ -67,10 +67,30 @@ export interface StatementOfAccountModel {
   totalSumInsured: number;
 }
 
-export interface FileData {
+export type FileData = S3FileData | BufferFileData;
+
+export interface S3FileData {
+  contentId?: string;
+  contentType: string;
+  fileName: string;
+  isInline?: boolean;
+  s3Key: string;
+}
+
+export interface BufferFileData {
   bytes: Buffer;
   contentId?: string;
   contentType: string;
   fileName: string;
   isInline?: boolean;
+}
+
+/** Type guard to check if FileData has S3 key */
+export function isS3FileData(file: FileData): file is S3FileData {
+  return "s3Key" in file && typeof file.s3Key === "string";
+}
+
+/** Type guard to check if FileData has bytes */
+export function isBufferFileData(file: FileData): file is BufferFileData {
+  return "bytes" in file && Buffer.isBuffer(file.bytes);
 }

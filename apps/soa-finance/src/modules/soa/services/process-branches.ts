@@ -1,16 +1,16 @@
 import type { ObjectContext } from "@restatedev/restate-sdk";
 import { TerminalError } from "@restatedev/restate-sdk";
+import { AGING_THRESHOLD } from "../../../constants/constants.js";
 import { isDevelopment } from "../../../constants/environment.js";
 import { getAllBranches } from "../../../infrastructure/database/queries/branch-query.js";
 import type { Branch } from "../../../infrastructure/database/types.js";
 import type { Account } from "../../../types/customer.type.js";
-import type { SoaItem } from "../../../types/soa.type.js";
+import type { FileData, SoaItem } from "../../../types/soa.type.js";
 import { letterSoaPdfName } from "../../../utils/formatter/naming.formatter.js";
 import { getStagingSoaData } from "../../data-access/staging-reader.js";
 import { generateAndUploadDocuments } from "../../document-generation/index.js";
 import { sendSoaEmail } from "../../email/index.js";
 import { createReminder } from "../../reminder/index.js";
-import { filterAgingData } from "../fetch-soa-data.js";
 import { multiBranchCodes } from "../types.js";
 
 export interface ProcessSoaParams {
@@ -33,35 +33,34 @@ interface BranchProcessResult {
  * Uses two ctx.run() calls to minimize journal size:
  *   1. Generate + upload + create reminder
  *   2. Send email
- * Returns null on non-terminal failures (branch error isolation).
+ * Always returns a result — errors are caught and logged (branch error isolation).
  */
 async function processSingleBranch(
   params: ProcessSoaParams,
   branch: Branch
-): Promise<BranchProcessResult | null> {
+): Promise<BranchProcessResult> {
   const { ctx, customerData, params: soaParams } = params;
   const dateNow = new Date(soaParams.processingDate);
   const startTime = await ctx.date.now();
 
   // ctx.run() #1: Read staging, filter, generate docs, upload to S3
   let generated: {
-    excelFileName: string;
-    excelUrl: string;
-    pdfFileName: string;
-    pdfUrl: string;
+    excelFile: FileData;
+    pdfFile: FileData;
     count: number;
+    dcNoteNos: string[];
   } | null;
   try {
     generated = await ctx.run(
       `generate-upload-${branch.officeCode}`,
       async () => {
-        const rawSoaList = await getStagingSoaData(
+        const soaData = await getStagingSoaData(
           customerData.code,
-          branch.officeCode
+          branch.officeCode,
+          AGING_THRESHOLD
         );
-        const soaData = filterAgingData(rawSoaList);
 
-        if (!soaData || soaData.length === 0) {
+        if (soaData.length === 0) {
           return null;
         }
 
@@ -79,25 +78,13 @@ async function processSingleBranch(
           pdfFileName: letterSoaPdfName(customerData.code),
         });
 
-        // Create reminder inside callback — dcNoteNos never leaves this scope
         const dcNoteNos = soaData.map((s) => s.debitAndCreditNoteNo);
-        if (dcNoteNos.length > 0) {
-          await createReminder({
-            customer: customerData,
-            timePeriod: soaParams.timePeriod,
-            branchCode: branch.officeCode,
-            processingDate: soaParams.processingDate,
-            dcNoteNos,
-            ctx,
-          });
-        }
 
         return {
-          excelFileName: result.excelFileName,
-          excelUrl: result.excelUrl,
-          pdfFileName: result.pdfFileName,
-          pdfUrl: result.pdfUrl,
+          excelFile: result.excelFile,
+          pdfFile: result.pdfFile,
           count: soaData.length,
+          dcNoteNos,
         };
       }
     );
@@ -108,7 +95,7 @@ async function processSingleBranch(
     ctx.console.log(
       `[Branch] Failed generate/upload for ${branch.officeCode}: ${error instanceof Error ? error.message : "Unknown error"}`
     );
-    return null;
+    return { branch, hasDocuments: false };
   }
 
   if (!generated) {
@@ -116,21 +103,32 @@ async function processSingleBranch(
     return { branch, hasDocuments: false };
   }
 
+  // Create reminder OUTSIDE ctx.run() to avoid nested context calls
+  const dcNoteNos = generated.dcNoteNos;
+  if (dcNoteNos.length > 0) {
+    await createReminder({
+      customer: customerData,
+      timePeriod: soaParams.timePeriod,
+      branchCode: branch.officeCode,
+      processingDate: soaParams.processingDate,
+      dcNoteNos,
+      ctx,
+    });
+  }
+
   ctx.console.log(
     `SOA generated for ${customerData.code} branch ${branch.officeCode}: ${generated.count} records`
   );
 
-  // ctx.run() #2: Send email with S3 object URLs
+  // ctx.run() #2: Send email with buffers directly (skip S3 download)
   try {
     await ctx.run(`send-email-${branch.officeCode}`, async () => {
       await sendSoaEmail({
         customerData,
         date: dateNow,
         isReminder: false,
-        excelFileName: generated.excelFileName,
-        excelUrl: generated.excelUrl,
-        pdfFileName: generated.pdfFileName,
-        pdfUrl: generated.pdfUrl,
+        excelFile: generated.excelFile,
+        pdfFile: generated.pdfFile,
       });
     });
   } catch (error: unknown) {
@@ -140,7 +138,7 @@ async function processSingleBranch(
     ctx.console.log(
       `[Branch] Failed email send for ${branch.officeCode}: ${error instanceof Error ? error.message : "Unknown error"}`
     );
-    return null;
+    return { branch, hasDocuments: false };
   }
 
   const duration = (await ctx.date.now()) - startTime;
@@ -154,7 +152,8 @@ async function processSingleBranch(
 
 /**
  * Process SOA for a customer across one or more branches.
- * Uses try/catch for error isolation — one branch failure doesn't kill the customer.
+ * Uses Promise.all for parallel execution — each branch handles its own errors
+ * internally and always returns a result (branch error isolation).
  */
 export async function processBranchSoa(
   params: ProcessSoaParams
@@ -168,17 +167,23 @@ export async function processBranchSoa(
     : [{ officeCode: params.params.branch, name: params.params.branch }];
 
   if (isMultiBranch) {
-    ctx.console.log(`Processing ${branches.length} branches`);
+    ctx.console.log(`Processing ${branches.length} branches in parallel`);
   }
 
-  const results: BranchProcessResult[] = [];
-
-  for (const branch of branches) {
-    const result = await processSingleBranch(params, branch);
-    if (result) {
-      results.push(result);
+  // Parallel processing — each branch catches errors to isolate failures
+  // (one branch failure doesn't kill the customer)
+  const branchPromises = branches.map(async (branch) => {
+    try {
+      return await processSingleBranch(params, branch);
+    } catch (error) {
+      ctx.console.log(
+        `[Branch] Unhandled error for ${branch.officeCode}: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+      return { branch, hasDocuments: false };
     }
-  }
+  });
+
+  const results = await Promise.all(branchPromises);
 
   return { hasDocuments: results.some((r) => r.hasDocuments) };
 }

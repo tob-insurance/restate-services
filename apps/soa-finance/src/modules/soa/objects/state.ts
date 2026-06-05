@@ -22,7 +22,7 @@ export interface LetterRecord {
   letterNo: string;
   referenceLetterNo?: string;
   sentDate: string;
-  status: "pending" | "sent" | "failed";
+  status: "pending" | "sent" | "failed" | "skipped";
   type: string;
 }
 

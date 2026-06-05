@@ -25,7 +25,7 @@ import { soaSchema } from "../types.js";
 
 const DEV_TEST_CUSTOMER_CODES = parseEnvList("SOA_TEST_CUSTOMERS") ?? [];
 
-const MAX_WORKERS = parseEnvInt("SOA_MAX_WORKERS", 5);
+const MAX_WORKERS = parseEnvInt("SOA_MAX_WORKERS", 10);
 const INACTIVITY_TIMEOUT_HOURS = parseEnvInt("SOA_INACTIVITY_TIMEOUT_HOURS", 6);
 
 interface WorkerResult {
@@ -49,7 +49,7 @@ export interface BatchWorkflowResult {
  * BatchWorkflow - Main workflow for processing Statement of Account (SOA) in batch.
  *
  * Fetches all customer accounts, then processes them in bounded chunks
- * (default 5 concurrent) using RestatePromise.all. Individual account
+ * (default 10 concurrent) using RestatePromise.all. Individual account
  * failures are isolated via .map() so one failure does not kill the batch.
  *
  * Process flow:

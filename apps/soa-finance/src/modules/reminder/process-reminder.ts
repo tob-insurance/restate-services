@@ -6,19 +6,16 @@ import {
 import type { Account } from "../../types/customer.type.js";
 import { type SoaItem, SoaTypeLabels } from "../../types/soa.type.js";
 import { generateReminderLetter } from "./generate-reminder-letter.js";
-import type { ProcessReminder } from "./types.js";
+import type {
+  GenerateReminderResult,
+  ProcessReminder,
+  SoaReminder,
+} from "./types.js";
 
 interface ProcessReminderParams {
   ctx: ObjectContext;
   customer: Account;
   item: SoaItem;
-}
-
-interface SoaReminder {
-  customerCode: string;
-  id: string;
-  officeId: string;
-  timePeriod: string;
 }
 
 export const processReminderLetter = async (
@@ -65,20 +62,29 @@ export const processReminderLetter = async (
     return { processed: false, remindersSent: 0 };
   }
 
-  let remindersSent = 0;
-
-  for (const reminder of reminders) {
-    const result = await generateReminderLetter({
-      ctx,
-      customer,
-      item,
-      reminder,
-    });
-
-    if (result?.sent) {
-      remindersSent += 1;
+  // Parallelize reminder processing with error isolation
+  // Each reminder runs independently; failures are caught and logged
+  const reminderPromises = reminders.map(
+    async (reminder): Promise<GenerateReminderResult> => {
+      try {
+        const result = await generateReminderLetter({
+          ctx,
+          customer,
+          item,
+          reminder,
+        });
+        return result ?? { sent: false, reason: "ERROR" };
+      } catch (error) {
+        ctx.console.log(
+          `[Reminder] Failed for ${customer.code} reminder ${reminder.id}: ${error instanceof Error ? error.message : "Unknown error"}`
+        );
+        return { sent: false, reason: "ERROR" };
+      }
     }
-  }
+  );
+
+  const results = await Promise.all(reminderPromises);
+  const remindersSent = results.filter((r) => r.sent).length;
 
   return { processed: true, remindersSent };
 };

@@ -2,13 +2,18 @@ import type { ObjectContext } from "@restatedev/restate-sdk";
 import { SENTINEL_ALL } from "../../constants/constants.js";
 import { isDevelopment } from "../../constants/environment.js";
 import { getAccountEmails } from "../../infrastructure/database/queries/customer-query.js";
+import {
+  getReminderDetails,
+  markDcNotesAsPaid,
+} from "../../infrastructure/database/queries/reminder-query.js";
 import type { Account } from "../../types/customer.type.js";
 import type { SoaItem } from "../../types/soa.type.js";
+import { areAllDcNotesPaid } from "../../utils/dc-note.js";
 import { reminderPdfName } from "../../utils/formatter/naming.formatter.js";
 import { getStagingSoaData } from "../data-access/staging-reader.js";
 import { generateAndUploadDocuments } from "../document-generation/index.js";
 import { sendSoaEmail } from "../email/index.js";
-import { getUnpaidSoaData } from "../payment/unpaid-data.js";
+import { reconcilePayment } from "../payment/reconcile-payment.js";
 import {
   assignLetterRecord,
   getLatestSentLetter,
@@ -71,18 +76,18 @@ const validateReminderType = (
 const createAndSendReminder = async (
   reminderCtx: ReminderContext,
   params: {
-    branchName: string;
     latestLetter: LatestLetter;
     letters: StoredLetterRecord[];
     reminderCount: number;
     toEmail: string;
   }
-): Promise<GenerateReminderResult> => {
+): Promise<GenerateReminderResult | null> => {
   const { ctx, customer, reminder, item } = reminderCtx;
-  const { branchName, latestLetter, letters, reminderCount, toEmail } = params;
+  const { latestLetter, letters, reminderCount, toEmail } = params;
 
   const dateNow = new Date(item.processingDate);
   const type = reminderCount.toString();
+  const branchCode = reminder.officeId || SENTINEL_ALL;
 
   const pendingRecord = await assignLetterRecord({
     ctx,
@@ -94,18 +99,44 @@ const createAndSendReminder = async (
   });
 
   try {
-    // Re-fetch unpaid data inside ctx.run() — large array never crosses boundary
-    await ctx.run("generate-upload-send-reminder", async () => {
-      const unpaidData = await getStagingSoaData(
-        customer.code,
-        reminder.officeId || SENTINEL_ALL
-      );
-      if (unpaidData.length === 0) {
-        return;
+    const result = await ctx.run("generate-upload-send-reminder", async () => {
+      // Fetch staging data ONCE — payment check + doc generation share the same query
+      const stagingData = await getStagingSoaData(customer.code, branchCode);
+      if (stagingData.length === 0) {
+        return { status: "no_data" as const };
       }
 
+      // Payment reconciliation (previously in getUnpaidSoaData)
+      const parts = reminder.id.split(":");
+      if (parts.length !== 2) {
+        throw new Error(`Invalid reminder ID format: ${reminder.id}`);
+      }
+      const [timePeriod, officeId] = parts;
+
+      const details = await getReminderDetails(
+        customer.code,
+        timePeriod,
+        officeId
+      );
+      const currentDcNotes = stagingData.map((s) => s.debitAndCreditNoteNo);
+      const { paidDcNoteIds } = reconcilePayment(details, currentDcNotes);
+      if (paidDcNoteIds.length > 0) {
+        await markDcNotesAsPaid(customer.code, paidDcNoteIds);
+      }
+
+      const paidSet = new Set(paidDcNoteIds.map((dc) => dc.toLowerCase()));
+      const unpaidItems = stagingData.filter(
+        (soaItem) => !areAllDcNotesPaid(soaItem.debitAndCreditNoteNo, paidSet)
+      );
+
+      if (unpaidItems.length === 0) {
+        return { status: "all_paid" as const };
+      }
+
+      const branchName = unpaidItems[0].branch;
+
       const files = await generateAndUploadDocuments({
-        soaData: unpaidData,
+        soaData: unpaidItems,
         customerData: customer,
         params: item,
         branchName,
@@ -124,28 +155,37 @@ const createAndSendReminder = async (
         previousLetterDate: latestLetter?.sentDate,
         branch: branchName,
         toEmail,
-        totalPremium: unpaidData.reduce(
+        totalPremium: unpaidItems.reduce(
           (sum, s) => sum + (s.netPremiumIdr || 0),
           0
         ),
-        excelFileName: files.excelFileName,
-        excelUrl: files.excelUrl,
-        pdfFileName: files.pdfFileName,
-        pdfUrl: files.pdfUrl,
+        excelFile: files.excelFile,
+        pdfFile: files.pdfFile,
       });
+
+      return { status: "sent" as const };
     });
+
+    if (result.status === "no_data") {
+      await updateLetterStatus(ctx, reminder, pendingRecord, "failed");
+      return null;
+    }
+
+    if (result.status === "all_paid") {
+      await updateLetterStatus(ctx, reminder, pendingRecord, "skipped");
+      return { sent: false, letterNo: null, reason: "ALL_PAID" };
+    }
+
+    await updateLetterStatus(ctx, reminder, pendingRecord, "sent");
+    return {
+      sent: true,
+      letterNo: pendingRecord.letterNo,
+      reason: "SENT",
+    };
   } catch (error: unknown) {
     await updateLetterStatus(ctx, reminder, pendingRecord, "failed");
     throw error;
   }
-
-  await updateLetterStatus(ctx, reminder, pendingRecord, "sent");
-
-  return {
-    sent: true,
-    letterNo: pendingRecord.letterNo,
-    reason: "SENT",
-  };
 };
 
 export const generateReminderLetter = async (
@@ -180,21 +220,7 @@ export const generateReminderLetter = async (
     return null;
   }
 
-  const unpaidData = await getUnpaidSoaData(ctx, customer, reminder);
-  if (!unpaidData) {
-    return null;
-  }
-
-  if (unpaidData.unpaidCount === 0) {
-    return {
-      sent: false,
-      letterNo: null,
-      reason: "ALL_PAID",
-    };
-  }
-
   const result = await createAndSendReminder(reminderCtx, {
-    branchName: unpaidData.branchName,
     latestLetter,
     reminderCount,
     letters,
@@ -203,9 +229,13 @@ export const generateReminderLetter = async (
 
   const duration = (await ctx.date.now()) - startTime;
   ctx.console.log(
-    { component: "Reminder", customer: customer.code, durationMs: duration },
+    {
+      component: "Reminder",
+      customer: customer.code,
+      durationMs: duration,
+    },
     `Reminder completed in ${duration}ms`
   );
 
-  return { ...result };
+  return result;
 };

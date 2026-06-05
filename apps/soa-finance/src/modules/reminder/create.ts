@@ -24,12 +24,6 @@ export const createReminder = async (
   );
 
   const reminderId = `${timePeriod}:${branchCode}`;
-
-  // Store header in PostgreSQL
-  await ctx.run("upsert-reminder-header", () =>
-    upsertReminderHeader(customer.code, timePeriod, branchCode)
-  );
-
   // Parse all DC note IDs
   const allDcNoteIds: string[] = [];
   for (const dcNoteNo of dcNoteNos) {
@@ -37,16 +31,17 @@ export const createReminder = async (
     allDcNoteIds.push(...dcNoteIds);
   }
 
-  // Store details in PostgreSQL
-  await ctx.run("create-reminder-details", () =>
-    createReminderDetails(
+  // Batch both DB operations in single ctx.run() to avoid journal bloat
+  await ctx.run("create-reminder", async () => {
+    await upsertReminderHeader(customer.code, timePeriod, branchCode);
+    await createReminderDetails(
       customer.code,
       timePeriod,
       branchCode,
       reminderId,
       allDcNoteIds
-    )
-  );
+    );
+  });
 
   ctx.console.log(
     `[Reminder] Created reminder ${reminderId} with ${dcNoteNos.length} details for ${customer.code}`

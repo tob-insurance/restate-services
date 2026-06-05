@@ -4,8 +4,8 @@ import {
 } from "../../constants/environment.js";
 import { sendEmail } from "../../infrastructure/email/index.js";
 import type { SendEmailResult } from "../../infrastructure/email/types.js";
-import { downloadFile } from "../../infrastructure/s3";
 import type { Account } from "../../types/customer.type.js";
+import type { FileData } from "../../types/soa.type.js";
 import { formatDateDDMMYYYY } from "../../utils/formatter/date.formatter.js";
 import {
   buildEmailAttachments,
@@ -22,12 +22,10 @@ export interface SendSoaEmailParams {
   branch?: string;
   customerData: Account;
   date: Date;
-  excelFileName: string;
-  excelUrl: string;
+  excelFile: FileData;
   isReminder?: boolean;
   letterNo?: string;
-  pdfFileName: string;
-  pdfUrl: string;
+  pdfFile: FileData;
   previousLetterDate?: Date;
   previousLetterNo?: string;
   reminderType?: "1" | "2" | "3";
@@ -38,7 +36,7 @@ export interface SendSoaEmailParams {
 
 /**
  * Unified email sender for both SOA and reminder emails.
- * Replaces send-soa.ts, send-reminder.ts, and send-with-attachments.ts.
+ * Accepts FileData with S3 keys — downloads from S3 internally.
  */
 export async function sendSoaEmail(
   params: SendSoaEmailParams
@@ -54,8 +52,8 @@ export async function sendSoaEmail(
     branch,
     toEmail,
     totalPremium,
-    excelUrl,
-    pdfUrl,
+    excelFile,
+    pdfFile,
   } = params;
 
   const customerEmail = toEmail || customerData.email || "";
@@ -107,16 +105,13 @@ export async function sendSoaEmail(
     throw new Error(`No recipients for ${customerData.code}`);
   }
 
-  // Download files from S3 object URLs
-  const [excelFile, pdfFile] = await Promise.all([
-    downloadFile(excelUrl),
-    downloadFile(pdfUrl),
-  ]);
-
   const sent = await sendEmail({
     to: recipients,
     cc: isDevelopment()
-      ? [getTestEmailRecipient()]
+      ? getTestEmailRecipient()
+          .split(",")
+          .map((r) => r.trim())
+          .filter((r) => r.length > 0)
       : getCcRecipients(customerData.actingCode),
     subject,
     body: htmlContent,

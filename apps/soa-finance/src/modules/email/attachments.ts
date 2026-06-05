@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { EmailAttachment } from "../../infrastructure/email/types.js";
 import type { FileData } from "../../types/soa.type.js";
+import { isS3FileData } from "../../types/soa.type.js";
 import { EMAIL_CONFIG } from "../../utils/config/emails.js";
 import logger from "../../utils/logger.js";
 import { ASSETS_DIR } from "../../utils/paths.js";
@@ -48,18 +49,41 @@ export const buildEmailAttachments = (
   excelFile: FileData,
   pdfFile: FileData
 ): EmailAttachment[] => {
-  const attachments: EmailAttachment[] = [
-    {
+  const attachments: EmailAttachment[] = [];
+
+  // Excel attachment
+  if (isS3FileData(excelFile)) {
+    // S3-based: pass key, sender will download and stream
+    attachments.push({
       name: excelFile.fileName,
       contentType: excelFile.contentType,
-      contentBytes: excelFile.bytes.toString("base64"),
-    },
-    {
+      contentBytes: "", // placeholder — sender uses s3Key
+      s3Key: excelFile.s3Key,
+    });
+  } else {
+    // Buffer-based
+    attachments.push({
+      name: excelFile.fileName,
+      contentType: excelFile.contentType,
+      contentBytes: Buffer.from(excelFile.bytes).toString("base64"),
+    });
+  }
+
+  // PDF attachment
+  if (isS3FileData(pdfFile)) {
+    attachments.push({
       name: pdfFile.fileName,
       contentType: pdfFile.contentType,
-      contentBytes: pdfFile.bytes.toString("base64"),
-    },
-  ];
+      contentBytes: "",
+      s3Key: pdfFile.s3Key,
+    });
+  } else {
+    attachments.push({
+      name: pdfFile.fileName,
+      contentType: pdfFile.contentType,
+      contentBytes: Buffer.from(pdfFile.bytes).toString("base64"),
+    });
+  }
 
   const signature = getSignatureAttachment();
   if (signature) {

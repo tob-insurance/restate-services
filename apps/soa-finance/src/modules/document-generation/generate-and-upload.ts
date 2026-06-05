@@ -1,7 +1,11 @@
 import { CONTENT_TYPES } from "../../constants/constants.js";
-import { getObjectUrl, uploadFile } from "../../infrastructure/s3";
+import { uploadFile } from "../../infrastructure/s3";
 import type { Account } from "../../types/customer.type.js";
-import type { SoaItem, StatementOfAccountModel } from "../../types/soa.type.js";
+import type {
+  FileData,
+  SoaItem,
+  StatementOfAccountModel,
+} from "../../types/soa.type.js";
 import { excelSoaName } from "../../utils/formatter/naming.formatter.js";
 import { generateExcel } from "./excel-generator.js";
 import { generateSoaPdfHandler } from "./generate-soa-pdf.js";
@@ -18,10 +22,8 @@ interface GenerateAndUploadParams {
 }
 
 interface GenerateAndUploadResult {
-  excelFileName: string;
-  excelUrl: string;
-  pdfFileName: string;
-  pdfUrl: string;
+  excelFile: FileData;
+  pdfFile: FileData;
 }
 
 export async function generateAndUploadDocuments(
@@ -75,14 +77,17 @@ export async function generateAndUploadDocuments(
     uploadFile(pdfFile, toDate),
   ]);
 
-  // Generate object URLs (permanent public URLs)
-  const excelUrl = getObjectUrl(excelUpload.key);
-  const pdfUrl = getObjectUrl(pdfUpload.key);
-
+  // Return FileData with S3 keys — no raw buffers in ctx.run() journal
   return {
-    excelFileName: excelFile.fileName,
-    excelUrl,
-    pdfFileName: pdfFile.fileName,
-    pdfUrl,
+    excelFile: {
+      fileName: excelFile.fileName,
+      contentType: CONTENT_TYPES.XLSX,
+      s3Key: excelUpload.key,
+    },
+    pdfFile: {
+      fileName: pdfFile.fileName,
+      contentType: pdfFile.contentType,
+      s3Key: pdfUpload.key,
+    },
   };
 }

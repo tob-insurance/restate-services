@@ -12,5 +12,5 @@ export const reminderPdfName = (customerCode: string): string =>
 export const letterSoaPdfName = (customerCode: string): string =>
   `Collection-Letter-${customerCode}-${randomSuffix()}.pdf`;
 
-export const excelSoaName = (): string =>
-  `Outstanding-SOA-${randomSuffix()}.xlsx`;
+export const excelSoaName = (customerCode: string): string =>
+  `Outstanding-SOA-${customerCode}-${randomSuffix()}.xlsx`;

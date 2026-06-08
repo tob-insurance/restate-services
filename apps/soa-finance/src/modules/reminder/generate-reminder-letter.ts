@@ -1,5 +1,5 @@
 import type { ObjectContext } from "@restatedev/restate-sdk";
-import { SENTINEL_ALL } from "../../constants/constants.js";
+import { AGING_THRESHOLD, SENTINEL_ALL } from "../../constants/constants.js";
 import { isDevelopment } from "../../constants/environment.js";
 import { getAccountEmails } from "../../infrastructure/database/queries/customer-query.js";
 import {
@@ -101,7 +101,11 @@ const createAndSendReminder = async (
   try {
     const result = await ctx.run("generate-upload-send-reminder", async () => {
       // Fetch staging data ONCE — payment check + doc generation share the same query
-      const stagingData = await getStagingSoaData(customer.code, branchCode);
+      const stagingData = await getStagingSoaData(
+        customer.code,
+        branchCode,
+        AGING_THRESHOLD
+      );
       if (stagingData.length === 0) {
         return { status: "no_data" as const };
       }

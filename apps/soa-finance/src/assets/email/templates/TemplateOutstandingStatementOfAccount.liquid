@@ -5,7 +5,7 @@
         line-height: 1.5;
         color: #1a1a1a;
         word-wrap: break-word;
-        padding-top: 10px;
+        padding-top: 20px;
     }
     .letter p {
         margin: 0 0 12px 0;
@@ -146,4 +146,106 @@
     <p>
         Finance Dept.
     </p>
+</div>
+    <div id="Bahasa_Inggris" style="padding-top: 20px; page-break-before: always;">
+        <p>
+            Jakarta, {{ asAtDate }}
+        </p>
+        <p>
+            Dear {{ customerName }},
+        </p>
+        <p>
+            We would like to thank you for your trust and cooperation with PT. ASURANSI TOTAL BERSAMA.
+            <br />
+            Based on our records as of {{ asAtDate }}, please find attached the premium billing details.
+        </p>
+        <p>
+            We kindly request you to make payment for the premiums,
+            <span class="highlight">especially for bills that have passed the due date</span>
+        </p>
+        <p>
+            Premium can be paid to BCA VIRTUAL ACCOUNT as follows:
+        </p>
+        <table class="info-table">
+            <tr>
+                <td class="label">Virtual Account No.</td>
+                <td class="sep">:</td>
+                <td>{{ virtualAccount }}</td>
+            </tr>
+            <tr>
+                <td class="label">Account Name</td>
+                <td class="sep">:</td>
+                <td>{{ customerName }}</td>
+            </tr>
+        </table>
+        <p>
+            If the Virtual Account cannot be used, payment can be made to our following bank accounts:
+        </p>
+        <table class="info-table">
+            <tr>
+                <td class="label">1. Account No.</td>
+                <td class="sep">:</td>
+                <td>879-209-1333</td>
+            </tr>
+            <tr>
+                <td class="label indent">Account Name</td>
+                <td class="sep">:</td>
+                <td>PT. ASURANSI TOTAL BERSAMA</td>
+            </tr>
+            <tr>
+                <td class="label indent">Bank</td>
+                <td class="sep">:</td>
+                <td>BCA Cab. WTC Mangga Dua</td>
+            </tr>
+            <tr class="group-gap">
+                <td class="label">2. Account No.</td>
+                <td class="sep">:</td>
+                <td>120-00-3588888-7 (MANDIRI USD)</td>
+            </tr>
+            <tr>
+                <td class="label indent">Account Name</td>
+                <td class="sep">:</td>
+                <td>PT. ASURANSI TOTAL BERSAMA</td>
+            </tr>
+            <tr>
+                <td class="label indent">Bank</td>
+                <td class="sep">:</td>
+                <td>Mandiri USD cab Sunter Permai</td>
+            </tr>
+            <tr class="group-gap">
+                <td class="label">3. Account No.</td>
+                <td class="sep">:</td>
+                <td>120-00-3288888-0 (MANDIRI IDR)</td>
+            </tr>
+            <tr>
+                <td class="label indent">Account Name</td>
+                <td class="sep">:</td>
+                <td>PT. ASURANSI TOTAL BERSAMA</td>
+            </tr>
+            <tr>
+                <td class="label indent">Bank</td>
+                <td class="sep">:</td>
+                <td>Mandiri Cab Sunter Permai</td>
+            </tr>
+        </table>
+        <p>
+            We hope the payment can be made soon.
+        </p>
+        <p>
+            If payment has already been made, please inform us at
+            <a href="mailto:finance@tob-ins.com" target="_blank" rel="noopener noreferrer" class="email-link">finance@tob-ins.com</a>
+        </p>
+        <p>
+            If the outstanding amount has already been paid prior to receiving this letter, please notify us and kindly disregard this.
+            <br />
+            Thank you for your attention.
+        </p>
+        <p>
+            Warmest regards,
+        </p>
+        <img src="{{ImgSign}}" class="signature" alt="Signature" />
+        <p>
+            Finance Dept.
+        </p>
+    </div>
 </div>

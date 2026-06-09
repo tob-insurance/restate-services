@@ -211,18 +211,25 @@ async function createDraft(
   message: EmailMessage
 ): Promise<string> {
   const initiatorEmail = getEnv("AZURE_INITIATOR_EMAIL");
+  const sharedMailbox = process.env.AZURE_SHARED_MAILBOX;
   const url = `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(initiatorEmail)}/messages`;
 
   return await withRetry(async () => {
-    const body = Buffer.from(
-      JSON.stringify({
-        subject: message.subject,
-        body: { contentType: "HTML", content: message.body },
-        toRecipients: formatRecipients(message.to),
-        ccRecipients: message.cc ? formatRecipients(message.cc) : [],
-      }),
-      "utf8"
-    );
+    const mailBody: Record<string, unknown> = {
+      subject: message.subject,
+      body: { contentType: "HTML", content: message.body },
+      toRecipients: formatRecipients(message.to),
+      ccRecipients: message.cc ? formatRecipients(message.cc) : [],
+    };
+
+    // Send from shared mailbox if configured
+    if (sharedMailbox) {
+      mailBody.from = {
+        emailAddress: { address: sharedMailbox },
+      };
+    }
+
+    const body = Buffer.from(JSON.stringify(mailBody), "utf8");
 
     const response = await makeRequest(
       url,
@@ -255,7 +262,8 @@ async function createDraft(
 async function addSmallAttachment(
   token: string,
   messageId: string,
-  att: EmailAttachment
+  att: EmailAttachment,
+  contentBase64: string
 ): Promise<void> {
   const initiatorEmail = getEnv("AZURE_INITIATOR_EMAIL");
   const url = `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(initiatorEmail)}/messages/${messageId}/attachments`;
@@ -266,7 +274,7 @@ async function addSmallAttachment(
         "@odata.type": "#microsoft.graph.fileAttachment",
         name: att.name,
         contentType: att.contentType,
-        contentBytes: att.contentBytes,
+        contentBytes: contentBase64,
         isInline: att.isInline ?? false,
         contentId: att.contentId,
       }),
@@ -514,7 +522,12 @@ export async function sendEmail(message: EmailMessage): Promise<boolean> {
       if (bytes.length >= MAX_ATTACHMENT_BYTES) {
         await uploadLargeAttachment(token, messageId, att, bytes);
       } else {
-        await addSmallAttachment(token, messageId, att);
+        await addSmallAttachment(
+          token,
+          messageId,
+          att,
+          bytes.toString("base64")
+        );
       }
     });
 

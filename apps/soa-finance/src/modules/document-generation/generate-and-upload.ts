@@ -50,7 +50,7 @@ export async function generateAndUploadDocuments(
 
   const [excelFile, pdfFile] = await Promise.all([
     generateExcel({ soaData }).then((excel) => {
-      excel.fileName = excelSoaName();
+      excel.fileName = excelSoaName(customerData.code);
       return excel;
     }),
     buildPdfTemplateData({

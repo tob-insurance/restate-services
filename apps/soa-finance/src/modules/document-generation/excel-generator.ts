@@ -115,6 +115,8 @@ export function groupAndAggregateSoa(
     // Take first record as base
     const base = { ...group[0] };
 
+    // Clear DC note number - meaningless in aggregated view
+    base.debitAndCreditNoteNo = "";
     // Aggregate financial fields from remaining records
     for (let i = 1; i < group.length; i++) {
       const record = group[i];

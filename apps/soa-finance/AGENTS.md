@@ -94,12 +94,27 @@ GOTENBERG_URL=https://xxxx.lambda-url.ap-southeast-3.on.aws
 # S3 Storage (via Gateway Endpoint)
 S3_BUCKET=soa-finance-xxxxxxxx
 S3_PIPELINE_PREFIX=parquet
+AWS_REGION=ap-southeast-3
 
-# Squid Proxy for external HTTPS
-HTTPS_PROXY=http://172.31.0.x:3128
 
 # Test email recipient (dev only)
 TEST_EMAIL_RECIPIENT=you@tob-ins.com
+SOA_DEV_TEST_EMAIL=dev-test@tob-ins.com
+SOA_DEV_REFRESH_STAGING=false
+
+# Workflow config
+SOA_MAX_WORKERS=5
+SOA_INACTIVITY_TIMEOUT_HOURS=6
+SOA_TEST_CUSTOMERS=00004162,00004829
+SOA_SCHEDULE_DAYS=4,11,19,25
+SOA_CC_RECIPIENTS=finance@tob-ins.com
+SOA_FALLBACK_EMAIL=collection@tob-ins.com
+
+# Email tuning (optional)
+MAX_ATTACHMENT_BYTES=3145728                   # 3MB default
+CHUNK_SIZE=4194304                             # 4MB default
+EMAIL_MAX_RETRIES=3                            # default
+EMAIL_BASE_BACKOFF_MS=1000                     # default
 ```
 
 > Full deployment guide: [`docs/deployment.md`](docs/deployment.md)

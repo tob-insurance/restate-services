@@ -3,11 +3,12 @@ import {
   object,
   TerminalError,
 } from "@restatedev/restate-sdk";
+import { parseEnvInt } from "../constants/environment.js";
 import { getPostgresClient } from "../infrastructure/database/postgres.js";
 
 // Refresh state tracked in Virtual Object
 export interface RefreshState {
-  lastRefresh: string; // ISO timestamp
+  lastRefresh: string; // ISO timestamp of the last completed refresh
   status: "idle" | "running" | "completed" | "failed";
   steps: Record<
     string,
@@ -25,109 +26,273 @@ interface RefreshResult {
   rowsAffected: number;
 }
 
-// Shared refresh logic (not a handler - just a function)
+// Refresh queries can run far longer than the connection pool's default
+// statement_timeout (5 min) — a full rebuild aggregates tens of millions of
+// rows. Each step runs on a dedicated connection with a raised timeout plus
+// the same planner tuning the staging build uses, which steers the large
+// aggregations onto parallel seq scans + parallel hash aggregates instead of
+// single-threaded index scans with random heap I/O.
+const REFRESH_STATEMENT_TIMEOUT_MS = 7_200_000; // 2 hours
+
+// A full rebuild keeps a single ctx.run busy for many minutes. Without a raised
+// inactivity timeout Restate aborts the attempt and replays it, leaving the
+// original query running orphaned in Postgres while a duplicate starts — they
+// pile up and starve each other. Must comfortably exceed the statement timeout.
+const REFRESH_INACTIVITY_TIMEOUT_HOURS = parseEnvInt(
+  "SOA_REFRESH_INACTIVITY_TIMEOUT_HOURS",
+  3
+);
+
+// Errors where a retry can only repeat the failure: broken SQL, bad data,
+// constraint violations, auth, or a statement that already burned through its
+// 2-hour timeout. Everything else (connection loss, deadlock, resource
+// pressure) is left to Restate's retry — completed steps replay from the
+// journal and execution resumes at the failed step.
+function isTerminalRefreshError(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  if (typeof code !== "string") {
+    return false;
+  }
+  return (
+    code === "57014" || // statement_timeout / query canceled
+    code.startsWith("22") || // data exception
+    code.startsWith("23") || // integrity constraint violation
+    code.startsWith("28") || // invalid authorization
+    code.startsWith("42") // syntax error / undefined object
+  );
+}
+
+const REFRESH_SESSION_SETTINGS = [
+  `SET statement_timeout = ${REFRESH_STATEMENT_TIMEOUT_MS}`,
+  "SET work_mem = '512MB'",
+  "SET hash_mem_multiplier = '4.0'",
+  "SET jit = off",
+  "SET max_parallel_workers_per_gather = '4'",
+  "SET parallel_tuple_cost = 0.01",
+  "SET parallel_setup_cost = 100",
+  // The fin-settle aggregate groups ~28M near-unique rows. A HashAggregate
+  // builds a ~28M-entry hash table that spills to disk, and the planner
+  // underestimates the group count (multi-column independence assumption), so
+  // it keeps picking it. Force the streaming GroupAggregate over the
+  // already-sorted index instead — constant memory, no spill. The other steps
+  // only aggregate inside per-row lateral probes (a handful of rows each), so
+  // this is a no-op for them (it does not affect hash joins).
+  "SET enable_hashagg = off",
+  // Speed up the bulk index/PK builds on the freshly rebuilt table.
+  "SET maintenance_work_mem = '1GB'",
+  "SET max_parallel_maintenance_workers = '4'",
+];
+
+// Acquire a dedicated connection with the refresh session settings applied.
+async function getRefreshConnection() {
+  const conn = await getPostgresClient().pool.connect();
+  for (const stmt of REFRESH_SESSION_SETTINGS) {
+    await conn.query(stmt);
+  }
+  return conn;
+}
+
+// Index/constraint to (re)build on a full rebuild's fresh table.
+interface RebuildIndex {
+  // Comma-separated column list.
+  columns: string;
+  // Final name the index/constraint carries on the live table.
+  name: string;
+  // When true, build a PRIMARY KEY (sets the columns NOT NULL + unique index);
+  // otherwise a plain secondary index.
+  primaryKey?: boolean;
+}
+
+interface MaterializeOptions {
+  // Indexes/constraints to rebuild on the fresh table before the swap.
+  indexes?: RebuildIndex[];
+  // Physical row order for the CTAS. Lay rows out in the order the read path
+  // filters on so each consumer's rows are contiguous.
+  orderBy?: string;
+}
+
+// Materialize an aggregate/staging table from a SELECT: build into a side
+// table (CREATE TABLE AS — parallelizes the scan/aggregate, unlike
+// INSERT ... SELECT), bulk-build its indexes, then swap it in atomically.
+// This writes the rows once and builds indexes in bulk instead of maintaining
+// them row by row. The live table keeps an ACCESS EXCLUSIVE lock only for the
+// instant of the rename, not for the whole multi-minute rebuild.
+async function materialize(
+  table: string,
+  selectSql: string,
+  options: MaterializeOptions
+): Promise<{ rowCount: number | null }> {
+  const conn = await getRefreshConnection();
+  try {
+    return await rebuildAndSwap(conn, table, selectSql, options);
+  } finally {
+    conn.release();
+  }
+}
+
+// Build a fresh table, bulk-build its indexes, swap it in atomically.
+async function rebuildAndSwap(
+  conn: RefreshConnection,
+  table: string,
+  selectSql: string,
+  options: MaterializeOptions
+): Promise<{ rowCount: number | null }> {
+  const buildTable = `${table}_build`;
+  const indexes = options.indexes ?? [];
+
+  // Replay-safe: a previously aborted attempt may have left the build table
+  // behind. Dropping it first makes the rebuild idempotent under Restate
+  // retries — the swap below rebuilds from the (unchanged) source either way.
+  await conn.query(`DROP TABLE IF EXISTS ${buildTable}`);
+
+  // A fresh table only carries privileges from the owner's default ACL —
+  // explicit per-table GRANTs on the live table (reporting/read-only
+  // roles) would silently disappear in the swap. Snapshot them now and
+  // re-apply to the build table below.
+  const grants = await conn.query(
+    `SELECT a.privilege_type,
+                CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE a.grantee::regrole::text END AS grantee
+         FROM pg_class c, aclexplode(c.relacl) a
+         WHERE c.oid = to_regclass($1)`,
+    [table]
+  );
+
+  // Single parallel write into an index-less table.
+  const buildResult = await conn.query(
+    `CREATE TABLE ${buildTable} AS ${selectSql}${options.orderBy ? ` ORDER BY ${options.orderBy}` : ""}`
+  );
+  const rowsBuilt = buildResult.rowCount ?? 0;
+
+  for (const grant of grants.rows) {
+    await conn.query(
+      `GRANT ${grant.privilege_type} ON ${buildTable} TO ${grant.grantee}`
+    );
+  }
+
+  // Build indexes/constraints on the private build table — bulk-built here,
+  // before the swap, so neither the build cost nor the table scan holds a
+  // lock any reader cares about. Temporary "_build" suffix avoids colliding
+  // with the live table's index names (still present until the swap).
+  for (const idx of indexes) {
+    if (idx.primaryKey) {
+      await conn.query(
+        `ALTER TABLE ${buildTable} ADD CONSTRAINT ${idx.name}_build PRIMARY KEY (${idx.columns})`
+      );
+    } else {
+      await conn.query(
+        `CREATE INDEX ${idx.name}_build ON ${buildTable} (${idx.columns})`
+      );
+    }
+  }
+
+  // Stats survive the rename (they key on the relation OID). Without this,
+  // readers hitting the table right after the swap plan against an
+  // unanalyzed table until autovacuum gets to it.
+  await conn.query(`ANALYZE ${buildTable}`);
+
+  // Atomic swap: only a DROP + RENAMEs, so the live table is locked just for
+  // the instant the transaction commits.
+  await conn.query("BEGIN");
+  try {
+    await conn.query(`DROP TABLE ${table}`);
+    await conn.query(`ALTER TABLE ${buildTable} RENAME TO ${table}`);
+    for (const idx of indexes) {
+      if (idx.primaryKey) {
+        // Renaming a PK/unique constraint also renames its backing index,
+        // so this single statement handles both — no separate ALTER INDEX.
+        await conn.query(
+          `ALTER TABLE ${table} RENAME CONSTRAINT ${idx.name}_build TO ${idx.name}`
+        );
+      } else {
+        await conn.query(`ALTER INDEX ${idx.name}_build RENAME TO ${idx.name}`);
+      }
+    }
+    await conn.query("COMMIT");
+  } catch (err) {
+    await conn.query("ROLLBACK");
+    throw err;
+  }
+
+  return { rowCount: rowsBuilt };
+}
+
+type RefreshConnection = Awaited<ReturnType<typeof getRefreshConnection>>;
+
+// Every refresh rebuilds all three tables from source. Refresh only runs
+// right before a scheduled batch (a handful of times per month), and a full
+// rebuild takes minutes — an incremental path would save ~2 minutes per run
+// while carrying a whole watermark-correctness surface (clock skew, partial
+// group recomputes, changed-key propagation) and leaving hard deletes and
+// master-data edits stale between its escalation intervals. Rebuilding from
+// source heals both on every run by construction.
 async function executeRefresh(
   ctx: ObjectContext,
-  state: RefreshState,
-  forceFull: boolean
+  state: RefreshState
 ): Promise<{
   status: string;
   durationMs?: number;
   steps?: Record<string, unknown>;
 }> {
-  // Prevent concurrent refreshes
-  if (state.status === "running") {
-    ctx.console.log("Refresh already in progress, skipping");
-    return { status: "already_running" };
-  }
-
-  // Update state to running
+  // No concurrent-refresh guard: virtual objects serialize handler executions
+  // per key, so a second refresh queues behind the first. A state-based guard
+  // would only ever fire after a killed invocation left status "running" — and
+  // then it would block every future refresh.
   state.status = "running";
   state.steps = {};
   ctx.set("state", state);
 
   try {
-    const lastRefresh = forceFull ? new Date(0) : new Date(state.lastRefresh);
-    const now = new Date();
+    // ctx.date.now() is journaled: a replay reuses the original timestamp.
+    const now = new Date(await ctx.date.now());
 
-    // Step 1: Refresh soa_fin_settle_agg
+    // Sequential dependency chain: staging_unpaid joins soa_fin_settle_agg,
+    // and pipeline_staging reads staging_unpaid (computing the note-detail
+    // sums inline via lateral index probes), so each step needs its
+    // predecessor — nothing is independent enough to run in parallel.
     state.steps.fin_settle_agg = {
       status: "running",
       rowsAffected: 0,
       durationMs: 0,
     };
+    ctx.set("state", state);
 
     const step1Result = await ctx.run("refresh-fin-settle-agg", () =>
-      refreshFinSettleAgg(lastRefresh)
+      refreshFinSettleAgg()
     );
     state.steps.fin_settle_agg = {
       status: "completed",
       rowsAffected: step1Result.rowsAffected,
       durationMs: step1Result.durationMs,
     };
+    state.steps.staging_unpaid = {
+      status: "running",
+      rowsAffected: 0,
+      durationMs: 0,
+    };
     ctx.set("state", state);
 
-    // Step 2: Refresh soa_pnd_agg
-    state.steps.pnd_agg = { status: "running", rowsAffected: 0, durationMs: 0 };
-
-    const step2Result = await ctx.run("refresh-pnd-agg", () =>
-      refreshPndAgg(lastRefresh)
+    const step2Result = await ctx.run("refresh-staging-unpaid", () =>
+      refreshStagingUnpaid()
     );
-    state.steps.pnd_agg = {
+    state.steps.staging_unpaid = {
       status: "completed",
       rowsAffected: step2Result.rowsAffected,
       durationMs: step2Result.durationMs,
     };
-    ctx.set("state", state);
-
-    // Step 3: Refresh soa_staging_unpaid
-    state.steps.staging_unpaid = {
+    state.steps.pipeline_staging = {
       status: "running",
       rowsAffected: 0,
       durationMs: 0,
     };
+    ctx.set("state", state);
 
-    const step3Result = await ctx.run("refresh-staging-unpaid", () =>
-      refreshStagingUnpaid(lastRefresh)
+    const step3Result = await ctx.run("refresh-pipeline-staging", () =>
+      refreshPipelineStaging()
     );
-    state.steps.staging_unpaid = {
+    state.steps.pipeline_staging = {
       status: "completed",
       rowsAffected: step3Result.rowsAffected,
       durationMs: step3Result.durationMs,
-    };
-    ctx.set("state", state);
-
-    // Step 4: Refresh soa_staging_unpaid_pnd
-    state.steps.staging_unpaid_pnd = {
-      status: "running",
-      rowsAffected: 0,
-      durationMs: 0,
-    };
-
-    const step4Result = await ctx.run("refresh-staging-unpaid-pnd", () =>
-      refreshStagingUnpaidPnd(lastRefresh)
-    );
-    state.steps.staging_unpaid_pnd = {
-      status: "completed",
-      rowsAffected: step4Result.rowsAffected,
-      durationMs: step4Result.durationMs,
-    };
-    ctx.set("state", state);
-
-    // Step 5: Refresh soa_pipeline_staging
-    state.steps.pipeline_staging = {
-      status: "running",
-      rowsAffected: 0,
-      durationMs: 0,
-    };
-
-    const step5Result = await ctx.run("refresh-pipeline-staging", () =>
-      refreshPipelineStaging(lastRefresh)
-    );
-    state.steps.pipeline_staging = {
-      status: "completed",
-      rowsAffected: step5Result.rowsAffected,
-      durationMs: step5Result.durationMs,
     };
 
     // Update final state
@@ -148,21 +313,31 @@ async function executeRefresh(
       steps: state.steps,
     };
   } catch (error) {
-    state.status = "failed";
-    ctx.set("state", state);
-
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
-    ctx.console.error(`Refresh failed: ${errorMessage}`);
 
-    throw new TerminalError(`Refresh failed: ${errorMessage}`);
+    if (isTerminalRefreshError(error)) {
+      state.status = "failed";
+      ctx.set("state", state);
+      ctx.console.error(`Refresh failed (terminal): ${errorMessage}`);
+      throw new TerminalError(`Refresh failed: ${errorMessage}`);
+    }
+
+    // Transient failure: rethrow as-is so Restate retries the invocation.
+    // Completed steps replay from the journal; execution resumes at the
+    // failed step. Status stays "running" — the refresh is still in flight.
+    ctx.console.error(`Refresh step failed, retrying: ${errorMessage}`);
+    throw error;
   }
 }
 
 export const SoaRefreshManager = object({
   name: "SoaRefreshManager",
+  options: {
+    inactivityTimeout: { hours: REFRESH_INACTIVITY_TIMEOUT_HOURS },
+  },
   handlers: {
-    // Start incremental refresh
+    // Rebuild all pipeline tables from source.
     refresh: async (ctx: ObjectContext) => {
       const state = (await ctx.get<RefreshState>("state")) ?? {
         lastRefresh: new Date(0).toISOString(),
@@ -170,7 +345,7 @@ export const SoaRefreshManager = object({
         steps: {},
       };
 
-      return executeRefresh(ctx, state, false);
+      return executeRefresh(ctx, state);
     },
 
     // Get current refresh status
@@ -184,41 +359,36 @@ export const SoaRefreshManager = object({
         }
       );
     },
-
-    // Force full refresh (ignores lastRefresh timestamp)
-    forceFullRefresh: async (ctx: ObjectContext) => {
-      const state = (await ctx.get<RefreshState>("state")) ?? {
-        lastRefresh: new Date(0).toISOString(),
-        status: "idle",
-        steps: {},
-      };
-
-      // Force full refresh by setting lastRefresh to epoch
-      state.lastRefresh = new Date(0).toISOString();
-      ctx.set("state", state);
-
-      return executeRefresh(ctx, state, true);
-    },
   },
 });
 
 // Helper functions for each refresh step
-async function refreshFinSettleAgg(lastRefresh: Date): Promise<RefreshResult> {
-  const startTime = Date.now();
-  const client = getPostgresClient();
 
-  const result = await client.executeQuery(
+// Settled amount per dc-note key, for all keys. Not prefilterable: every
+// dcnote candidate needs its settled amount to decide unpaidness, and
+// materializing keeps the planner from rebuilding the ~28M-group aggregate
+// per hash-join worker. No predicates beyond dc_office IS NOT NULL, so the
+// aggregate runs as a streaming index-only scan over idx_fin_settle_covering.
+async function refreshFinSettleAgg(): Promise<RefreshResult> {
+  const startTime = Date.now();
+
+  const result = await materialize(
+    "soa_fin_settle_agg",
     `
-    INSERT INTO soa_fin_settle_agg
     SELECT dc_office, dc_year, dc_month, dc_mode, dc_seq, SUM(fn_orig_amt) AS amt
     FROM financial_settle
-    WHERE mod_date > $1
-      AND dc_office IS NOT NULL
+    WHERE dc_office IS NOT NULL
     GROUP BY dc_office, dc_year, dc_month, dc_mode, dc_seq
-    ON CONFLICT (dc_office, dc_year, dc_month, dc_mode, dc_seq)
-    DO UPDATE SET amt = EXCLUDED.amt
   `,
-    [lastRefresh]
+    {
+      indexes: [
+        {
+          name: "soa_fin_settle_agg_pkey",
+          columns: "dc_office, dc_year, dc_month, dc_mode, dc_seq",
+          primaryKey: true,
+        },
+      ],
+    }
   );
 
   return {
@@ -227,87 +397,36 @@ async function refreshFinSettleAgg(lastRefresh: Date): Promise<RefreshResult> {
   };
 }
 
-async function refreshPndAgg(lastRefresh: Date): Promise<RefreshResult> {
+// The prefilter: reduces ~28M dcnote candidates to the ~800K unpaid notes
+// every later step works from. The PK doubles as a tripwire — a fan-out bug
+// upstream would surface here as a constraint violation instead of silently
+// duplicating staging rows.
+async function refreshStagingUnpaid(): Promise<RefreshResult> {
   const startTime = Date.now();
-  const client = getPostgresClient();
 
-  const result = await client.executeQuery(
+  const result = await materialize(
+    "soa_staging_unpaid",
     `
-    INSERT INTO soa_pnd_agg
     SELECT
-      pol_office, pol_subclass, pol_resv, pol_year, pol_month,
-      pol_sequence, pol_end_no, pol_note_no,
-      COALESCE(SUM(pol_note_trn_amount) FILTER (WHERE pol_note_trn_code IN ('DPRM','CPRM','RPRM')), 0) AS premium,
-      COALESCE(SUM(pol_note_trn_amount) FILTER (WHERE pol_note_trn_code IN ('DDSC','CDIS','CDSC','DDS1')), 0) AS discount,
-      COALESCE(SUM(pol_note_trn_amount) FILTER (WHERE pol_note_trn_code IN ('DCOM','CCOM','MCOM','RCOM','DBKG')), 0) AS commission,
-      COALESCE(SUM(pol_note_trn_amount) FILTER (WHERE pol_note_trn_code = 'DVAT'), 0) AS vat,
-      COALESCE(SUM(pol_note_trn_amount) FILTER (WHERE pol_note_trn_code = 'DW21'), 0) AS w21,
-      COALESCE(SUM(pol_note_trn_amount) FILTER (WHERE pol_note_trn_code = 'DWTX'), 0) AS wtx,
-      COALESCE(SUM(pol_note_trn_amount) FILTER (WHERE pol_note_trn_code = 'COST'), 0) AS cost,
-      COALESCE(SUM(pol_note_trn_amount) FILTER (WHERE pol_note_trn_code = 'STMP'), 0) AS stamp,
-      SUM(pol_note_trn_amount) AS total,
-      NOW() AS last_updated
-    FROM policy_note_detail
-    WHERE mod_date > $1
-      AND pol_note_trn_code IN ('DPRM','CPRM','RPRM','DDSC','CDIS','CDSC','DDS1','DCOM','CCOM','MCOM','RCOM','DBKG','DVAT','DW21','DWTX','COST','STMP')
-      AND pol_resv = '00'
-    GROUP BY pol_office, pol_subclass, pol_resv, pol_year, pol_month, pol_sequence, pol_end_no, pol_note_no
-    ON CONFLICT (pol_office, pol_subclass, pol_resv, pol_year, pol_month, pol_sequence, pol_end_no, pol_note_no)
-    DO UPDATE SET
-      premium = EXCLUDED.premium,
-      discount = EXCLUDED.discount,
-      commission = EXCLUDED.commission,
-      vat = EXCLUDED.vat,
-      w21 = EXCLUDED.w21,
-      wtx = EXCLUDED.wtx,
-      cost = EXCLUDED.cost,
-      stamp = EXCLUDED.stamp,
-      total = EXCLUDED.total,
-      last_updated = NOW()
-  `,
-    [lastRefresh]
-  );
-
-  return {
-    rowsAffected: result.rowCount ?? 0,
-    durationMs: Date.now() - startTime,
-  };
-}
-
-async function refreshStagingUnpaid(lastRefresh: Date): Promise<RefreshResult> {
-  const startTime = Date.now();
-  const client = getPostgresClient();
-
-  const result = await client.executeQuery(
-    `
-    INSERT INTO soa_staging_unpaid
-    SELECT 
       dn.dc_office, dn.dc_year, dn.dc_month, dn.dc_mode, dn.dc_seq,
       dn.pol_office, dn.pol_subclass, dn.pol_year, dn.pol_month, dn.pol_seq as pol_sequence, dn.pol_end_no, dn.pol_notes_no as pol_note_no,
       dn.orig_amount, dn.currency, dn.dc_account_full_name, dn.dc_post_date,
       fst.amt as settled_amount
     FROM dcnote dn
     LEFT JOIN soa_fin_settle_agg fst ON dn.dc_office = fst.dc_office AND dn.dc_year = fst.dc_year AND dn.dc_month = fst.dc_month AND dn.dc_mode = fst.dc_mode AND dn.dc_seq = fst.dc_seq
-    WHERE dn.dc_mode IN ('01','02','03','04','05') 
+    WHERE dn.dc_mode IN ('01','02','03','04','05')
       AND dn.pol_office IS NOT NULL
       AND (ABS(dn.orig_amount) - ABS(COALESCE(fst.amt, 0))) > 1
-      AND dn.upd_date > $1
-    ON CONFLICT (dc_office, dc_year, dc_month, dc_mode, dc_seq)
-    DO UPDATE SET
-      pol_office = EXCLUDED.pol_office,
-      pol_subclass = EXCLUDED.pol_subclass,
-      pol_year = EXCLUDED.pol_year,
-      pol_month = EXCLUDED.pol_month,
-      pol_sequence = EXCLUDED.pol_sequence,
-      pol_end_no = EXCLUDED.pol_end_no,
-      pol_note_no = EXCLUDED.pol_note_no,
-      orig_amount = EXCLUDED.orig_amount,
-      currency = EXCLUDED.currency,
-      dc_account_full_name = EXCLUDED.dc_account_full_name,
-      dc_post_date = EXCLUDED.dc_post_date,
-      settled_amount = EXCLUDED.settled_amount
   `,
-    [lastRefresh]
+    {
+      indexes: [
+        {
+          name: "soa_staging_unpaid_pkey",
+          columns: "dc_office, dc_year, dc_month, dc_mode, dc_seq",
+          primaryKey: true,
+        },
+      ],
+    }
   );
 
   return {
@@ -316,86 +435,20 @@ async function refreshStagingUnpaid(lastRefresh: Date): Promise<RefreshResult> {
   };
 }
 
-async function refreshStagingUnpaidPnd(
-  lastRefresh: Date
-): Promise<RefreshResult> {
+async function refreshPipelineStaging(): Promise<RefreshResult> {
   const startTime = Date.now();
-  const client = getPostgresClient();
 
-  const result = await client.executeQuery(
+  // The nine note-detail sums are computed inline (the pnd lateral below) as
+  // index-only probes of idx_pnd_detail_covering, ~2 rows per group, instead
+  // of pre-aggregating all ~28M policy_note_detail groups into a 5.9GB table
+  // of which only ~3% was ever joined (measured: all 788K probes = 16s vs
+  // 346s for the full aggregate). HAVING COUNT(*) > 0 keeps the former
+  // inner-join semantics: staging rows with no qualifying note detail are
+  // dropped, not emitted with zeroed sums.
+  const result = await materialize(
+    "soa_pipeline_staging",
     `
-    INSERT INTO soa_staging_unpaid_pnd
-    SELECT 
-      dn.dc_office, dn.dc_year, dn.dc_month, dn.dc_mode, dn.dc_seq,
-      dn.pol_office, dn.pol_subclass, dn.pol_year, dn.pol_month, dn.pol_sequence, dn.pol_end_no, dn.pol_note_no,
-      dn.orig_amount, dn.currency, dn.dc_account_full_name, dn.dc_post_date, dn.settled_amount,
-      pnd.premium, pnd.discount, pnd.commission, pnd.vat, pnd.w21, pnd.wtx, pnd.cost, pnd.stamp, pnd.total
-    FROM soa_staging_unpaid dn
-    JOIN soa_pnd_agg pnd ON dn.pol_office = pnd.pol_office 
-      AND dn.pol_subclass = pnd.pol_subclass 
-      AND dn.pol_year = pnd.pol_year 
-      AND dn.pol_month = pnd.pol_month 
-      AND dn.pol_sequence = pnd.pol_sequence 
-      AND dn.pol_end_no = pnd.pol_end_no 
-      AND dn.pol_note_no = pnd.pol_note_no
-    WHERE dn.dc_post_date > $1
-    ON CONFLICT (dc_office, dc_year, dc_month, dc_mode, dc_seq)
-    DO UPDATE SET
-      pol_office = EXCLUDED.pol_office,
-      pol_subclass = EXCLUDED.pol_subclass,
-      pol_year = EXCLUDED.pol_year,
-      pol_month = EXCLUDED.pol_month,
-      pol_sequence = EXCLUDED.pol_sequence,
-      pol_end_no = EXCLUDED.pol_end_no,
-      pol_note_no = EXCLUDED.pol_note_no,
-      orig_amount = EXCLUDED.orig_amount,
-      currency = EXCLUDED.currency,
-      dc_account_full_name = EXCLUDED.dc_account_full_name,
-      dc_post_date = EXCLUDED.dc_post_date,
-      settled_amount = EXCLUDED.settled_amount,
-      premium = EXCLUDED.premium,
-      discount = EXCLUDED.discount,
-      commission = EXCLUDED.commission,
-      vat = EXCLUDED.vat,
-      w21 = EXCLUDED.w21,
-      wtx = EXCLUDED.wtx,
-      cost = EXCLUDED.cost,
-      stamp = EXCLUDED.stamp,
-      total = EXCLUDED.total
-  `,
-    [lastRefresh]
-  );
-
-  return {
-    rowsAffected: result.rowCount ?? 0,
-    durationMs: Date.now() - startTime,
-  };
-}
-
-async function refreshPipelineStaging(
-  lastRefresh: Date
-): Promise<RefreshResult> {
-  const startTime = Date.now();
-  const client = getPostgresClient();
-
-  // Delete rows for changed dc_notes
-  await client.executeQuery(
-    `
-    DELETE FROM soa_pipeline_staging
-    WHERE dc_note IN (
-      SELECT DISTINCT dn.dc_office || '-' || dn.dc_month || '-' || dn.dc_mode || '-' || dn.dc_year || '-' || dn.dc_seq
-      FROM soa_staging_unpaid_pnd dn
-      WHERE dn.dc_post_date > $1
-    )
-  `,
-    [lastRefresh]
-  );
-
-  // Insert new/updated rows
-  const result = await client.executeQuery(
-    `
-    INSERT INTO soa_pipeline_staging
-    SELECT 
+    SELECT
       mb.description as branch,
       dn.pol_subclass || '-' || dn.pol_office || '-' || dn.pol_month || '-' || dn.pol_year || '-' || dn.pol_sequence as policy_no,
       dn.pol_end_no,
@@ -419,22 +472,45 @@ async function refreshPipelineStaging(
       pe.end_reason,
       cm.acting_code,
       prp.tsi,
-      dn.premium as gp,
-      dn.discount as disc,
-      dn.commission as comm,
-      dn.vat as ppn,
-      dn.w21 as pph21,
-      dn.wtx as pph23,
-      dn.cost,
-      dn.stamp as stmp,
-      dn.total as nett_premium,
+      pnd.premium as gp,
+      pnd.discount as disc,
+      pnd.commission as comm,
+      pnd.vat as ppn,
+      pnd.w21 as pph21,
+      pnd.wtx as pph23,
+      pnd.cost,
+      pnd.stamp as stmp,
+      pnd.total as nett_premium,
       pn.pol_inst_no || '/' || pn.pol_total_inst as inst_no,
       pn.due_date,
       dn.dc_office || '-' || dn.dc_month || '-' || dn.dc_mode || '-' || dn.dc_year || '-' || dn.dc_seq as dc_note,
       dn.orig_amount,
       pm.distribution_code
-    FROM soa_staging_unpaid_pnd dn
-    JOIN policy_note pn ON dn.pol_office = pn.pol_office 
+    FROM soa_staging_unpaid dn
+    JOIN LATERAL (
+      SELECT
+        COALESCE(SUM(p.pol_note_trn_amount) FILTER (WHERE p.pol_note_trn_code IN ('DPRM','CPRM','RPRM')), 0) AS premium,
+        COALESCE(SUM(p.pol_note_trn_amount) FILTER (WHERE p.pol_note_trn_code IN ('DDSC','CDIS','CDSC','DDS1')), 0) AS discount,
+        COALESCE(SUM(p.pol_note_trn_amount) FILTER (WHERE p.pol_note_trn_code IN ('DCOM','CCOM','MCOM','RCOM','DBKG')), 0) AS commission,
+        COALESCE(SUM(p.pol_note_trn_amount) FILTER (WHERE p.pol_note_trn_code = 'DVAT'), 0) AS vat,
+        COALESCE(SUM(p.pol_note_trn_amount) FILTER (WHERE p.pol_note_trn_code = 'DW21'), 0) AS w21,
+        COALESCE(SUM(p.pol_note_trn_amount) FILTER (WHERE p.pol_note_trn_code = 'DWTX'), 0) AS wtx,
+        COALESCE(SUM(p.pol_note_trn_amount) FILTER (WHERE p.pol_note_trn_code = 'COST'), 0) AS cost,
+        COALESCE(SUM(p.pol_note_trn_amount) FILTER (WHERE p.pol_note_trn_code = 'STMP'), 0) AS stamp,
+        SUM(p.pol_note_trn_amount) AS total
+      FROM policy_note_detail p
+      WHERE p.pol_office = dn.pol_office
+        AND p.pol_subclass = dn.pol_subclass
+        AND p.pol_resv = '00'
+        AND p.pol_year = dn.pol_year
+        AND p.pol_month = dn.pol_month
+        AND p.pol_sequence = dn.pol_sequence
+        AND p.pol_end_no = dn.pol_end_no
+        AND p.pol_note_no = dn.pol_note_no
+        AND p.pol_note_trn_code IN ('DPRM','CPRM','RPRM','DDSC','CDIS','CDSC','DDS1','DCOM','CCOM','MCOM','RCOM','DBKG','DVAT','DW21','DWTX','COST','STMP')
+      HAVING COUNT(*) > 0
+    ) pnd ON TRUE
+    JOIN policy_note pn ON dn.pol_office = pn.pol_office
       AND dn.pol_subclass = pn.pol_subclass 
       AND dn.pol_year = pn.pol_year 
       AND dn.pol_month = pn.pol_month 
@@ -463,15 +539,23 @@ async function refreshPipelineStaging(
       AND pid.pol_month = dn.pol_month 
       AND pid.pol_sequence = dn.pol_sequence 
       AND pid.pol_end_no = dn.pol_end_no
-    LEFT JOIN policy_risk_profile prp ON prp.pol_office = dn.pol_office 
-      AND prp.pol_subclass = dn.pol_subclass 
-      AND prp.pol_resv = '00' 
-      AND prp.pol_year = dn.pol_year 
-      AND prp.pol_month = dn.pol_month 
-      AND prp.pol_sequence = dn.pol_sequence 
-      AND prp.pol_end_no = dn.pol_end_no 
-      AND prp.item_no = '001' 
-      AND prp.no_of_years = '1'
+    -- policy_risk_profile has no unique key and carries fully duplicated rows
+    -- even at a fixed (policy, item_no, no_of_years), so a plain join fans
+    -- out. LIMIT 1 is safe: the duplicates are identical, and only tsi is read.
+    LEFT JOIN LATERAL (
+      SELECT p.tsi
+      FROM policy_risk_profile p
+      WHERE p.pol_office = dn.pol_office
+        AND p.pol_subclass = dn.pol_subclass
+        AND p.pol_resv = '00'
+        AND p.pol_year = dn.pol_year
+        AND p.pol_month = dn.pol_month
+        AND p.pol_sequence = dn.pol_sequence
+        AND p.pol_end_no = dn.pol_end_no
+        AND p.item_no = '001'
+        AND p.no_of_years = '1'
+      LIMIT 1
+    ) prp ON TRUE
     LEFT JOIN policy_motor_info pmi ON pmi.pol_office = dn.pol_office 
       AND pmi.pol_subclass = dn.pol_subclass 
       AND pmi.pol_resv = '00' 
@@ -483,12 +567,27 @@ async function refreshPipelineStaging(
     JOIN master_rbc_lob rl ON rl.subclass_code = dn.pol_subclass
     JOIN master_branch mb ON mb.office_code = dn.pol_office
     JOIN master_cm cm ON cm.cm_code = pm.distribution_code
-    LEFT JOIN exch_rate exc ON exc.cur_code = dn.currency 
-      AND exc.as_at >= TO_DATE(pe.acct_year || pe.acct_month || '01', 'YYYYMMDD')
-      AND exc.as_at < TO_DATE(pe.acct_year || pe.acct_month || '01', 'YYYYMMDD') + INTERVAL '1 month'
-    WHERE dn.dc_post_date > $1
+    LEFT JOIN LATERAL (
+      SELECT e.the_rate
+      FROM exch_rate e
+      WHERE e.cur_code = dn.currency
+        AND e.as_at >= TO_DATE(pe.acct_year || pe.acct_month || '01', 'YYYYMMDD')
+        AND e.as_at < TO_DATE(pe.acct_year || pe.acct_month || '01', 'YYYYMMDD') + INTERVAL '1 month'
+      ORDER BY e.as_at DESC
+      LIMIT 1
+    ) exc ON TRUE
   `,
-    [lastRefresh]
+    {
+      indexes: [
+        {
+          name: "idx_soa_pipeline_staging_dist",
+          columns: "distribution_code, branch",
+        },
+      ],
+      // Every read of this table filters by customer, so lay rows out in that
+      // order — each customer's rows land contiguous instead of scattered.
+      orderBy: "distribution_code, branch",
+    }
   );
 
   return {

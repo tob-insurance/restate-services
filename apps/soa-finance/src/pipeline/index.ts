@@ -5,7 +5,7 @@ import { SoaRefreshManager } from "./refresh-manager.js";
 import type { SoaPipelineResult } from "./types.js";
 
 // Pipeline: materialize SOA query result into staging table.
-// Uses incremental refresh via SoaRefreshManager Virtual Object.
+// Rebuilds the staging tables from source via SoaRefreshManager Virtual Object.
 
 export async function generateSoaPipeline(
   ctx: Context,
@@ -25,14 +25,7 @@ export async function generateSoaPipeline(
 
   // Call refresh manager via Restate client
   const refreshClient = ctx.objectClient(SoaRefreshManager, "main");
-
-  if (forceRefresh) {
-    // Force full refresh
-    await refreshClient.forceFullRefresh();
-  } else {
-    // Incremental refresh
-    await refreshClient.refresh();
-  }
+  await refreshClient.refresh();
 
   logger.info({ component: "Pipeline" }, "Completed");
 

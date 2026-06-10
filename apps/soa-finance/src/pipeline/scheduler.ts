@@ -7,7 +7,6 @@ import {
 import { DateTime } from "luxon";
 import { TIMEZONE } from "../constants/constants.js";
 import { SCHEDULE_CONFIG, type ScheduleConfig } from "../constants/schedule.js";
-import { PIPELINE_TIMEOUT_MS } from "../constants/timeouts.js";
 import { batchWorkflow } from "../modules/soa/workflows/batch-workflow.js";
 import { formatDuration } from "../utils/formatter/date.formatter.js";
 import { generateSoaPipeline } from "./index.js";
@@ -157,16 +156,10 @@ async function runPipelineAndBatch(
 
   const pipelineStartTime = await ctx.date.now();
 
-  // Use Promise.race for timeout
-  const pipelineResult = await Promise.race([
-    generateSoaPipeline(ctx, now.toJSDate()),
-    new Promise<never>((_, reject) =>
-      setTimeout(
-        () => reject(new Error("Pipeline timeout")),
-        PIPELINE_TIMEOUT_MS
-      )
-    ),
-  ]);
+  // No local timeout: a native setTimeout isn't durable (every replay arms a
+  // fresh timer) and can't cancel the refresh anyway — the statement timeout
+  // and the refresh manager's inactivity timeout already bound the work.
+  const pipelineResult = await generateSoaPipeline(ctx, now.toJSDate());
 
   if (!pipelineResult.success) {
     throw new Error(

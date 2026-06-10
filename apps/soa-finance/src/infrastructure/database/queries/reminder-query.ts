@@ -45,26 +45,46 @@ export async function createReminderDetails(
     return;
   }
 
-  // Build bulk insert query
-  const values: string[] = [];
-  const params: unknown[] = [];
-  let paramIndex = 1;
+  // PostgreSQL wire protocol limit: 65,535 max parameters (uint16).
+  // Chunk the bulk insert to stay well under the limit.
+  // Each row uses 5 parameters, so 1000 rows = 5000 params.
+  const CHUNK_SIZE = 1000;
 
-  for (const dcNoteId of dcNoteIds) {
-    values.push(
-      `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4})`
-    );
-    params.push(customerCode, timePeriod, officeId, dcNoteId, reminderId);
-    paramIndex += 5;
-  }
+  const client = getPostgresClient();
+  await withConnection(client, async (conn) => {
+    await conn.query("BEGIN");
+    try {
+      for (let i = 0; i < dcNoteIds.length; i += CHUNK_SIZE) {
+        const chunk = dcNoteIds.slice(i, i + CHUNK_SIZE);
 
-  await executeQuery(
-    `INSERT INTO soa_reminder_details (customer_code, time_period, office_id, dc_note_id, reminder_id)
-     VALUES ${values.join(", ")}
-     ON CONFLICT (customer_code, time_period, office_id, dc_note_id)
-     DO UPDATE SET reminder_id = EXCLUDED.reminder_id`,
-    params
-  );
+        const values: string[] = [];
+        const params: unknown[] = [];
+        let paramIndex = 1;
+
+        for (const dcNoteId of chunk) {
+          values.push(
+            `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4})`
+          );
+          params.push(customerCode, timePeriod, officeId, dcNoteId, reminderId);
+          paramIndex += 5;
+        }
+
+        await conn.query(
+          `INSERT INTO soa_reminder_details (customer_code, time_period, office_id, dc_note_id, reminder_id)
+           VALUES ${values.join(", ")}
+           ON CONFLICT (customer_code, time_period, office_id, dc_note_id)
+           DO UPDATE SET reminder_id = EXCLUDED.reminder_id`,
+          params
+        );
+      }
+      await conn.query("COMMIT");
+    } catch (error: unknown) {
+      await conn.query("ROLLBACK").catch(() => {
+        /* intentional: ignore rollback errors */
+      });
+      throw error;
+    }
+  });
 }
 
 /**

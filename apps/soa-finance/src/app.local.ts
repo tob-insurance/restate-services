@@ -23,6 +23,20 @@ function registerShutdownHandlers(): void {
   };
   process.on("SIGTERM", shutdown);
   process.on("SIGINT", shutdown);
+
+  // Prevent crashes from PostgreSQL TLS timeout on idle connections
+  process.on("uncaughtException", (err) => {
+    if (err.message?.includes("ETIMEDOUT") && err.stack?.includes("pg/")) {
+      logger.warn(
+        { component: "App", err: err.message },
+        "PostgreSQL TLS timeout on idle connection (non-fatal)"
+      );
+      return;
+    }
+    // Re-throw other uncaught exceptions
+    logger.error({ component: "App", err }, "Uncaught exception");
+    process.exit(1);
+  });
 }
 
 registerShutdownHandlers();

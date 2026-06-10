@@ -9,6 +9,14 @@ process.on("unhandledRejection", (reason) => {
 });
 
 process.on("uncaughtException", (error) => {
+  // Suppress PostgreSQL TLS timeout on idle connections
+  if (error.message?.includes("ETIMEDOUT") && error.stack?.includes("pg/")) {
+    logger.warn(
+      { component: "App", err: error.message },
+      "PostgreSQL TLS timeout on idle connection (non-fatal)"
+    );
+    return;
+  }
   logger.error({ component: "FATAL", err: error }, "Uncaught Exception");
 });
 

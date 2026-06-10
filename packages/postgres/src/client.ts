@@ -78,6 +78,9 @@ export function createPostgresClient(config: PostgresConfig): PostgresClient {
     allowExitOnIdle: false,
     connectionTimeoutMillis: 10_000,
     statement_timeout: 300_000,
+    // Keep TCP connections alive to prevent TLS timeout on idle connections
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
     ...poolConfig,
     ...(isLambda ? { min: 0, max: 1 } : {}),
   });

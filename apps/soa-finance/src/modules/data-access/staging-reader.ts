@@ -42,18 +42,6 @@ interface StagingRow {
   tsi: number;
 }
 
-interface StagingRowMinimal {
-  branch: string;
-  dc_note: string;
-  nett_premium: number;
-}
-
-export interface StagingMinimalItem {
-  branch: string;
-  debitAndCreditNoteNo: string;
-  netPremium: number;
-}
-
 function mapRow(row: StagingRow): StatementOfAccountModel {
   const netPremium = Number(row.nett_premium) || 0;
   const exchangeRate = Number(row.exch_rate) || 1;
@@ -102,14 +90,6 @@ function mapRow(row: StagingRow): StatementOfAccountModel {
   };
 }
 
-function mapRowMinimal(row: StagingRowMinimal): StagingMinimalItem {
-  return {
-    branch: row.branch ?? "",
-    debitAndCreditNoteNo: row.dc_note ?? "",
-    netPremium: Number(row.nett_premium) || 0,
-  };
-}
-
 export async function getStagingSoaData(
   customerCode: string,
   branchCode: string,
@@ -127,18 +107,4 @@ export async function getStagingSoaData(
 
   const result = await executeQuery<StagingRow>(query, params);
   return result.rows.map(mapRow);
-}
-
-export async function getStagingSoaDataMinimal(
-  customerCode: string,
-  branchCode: string
-): Promise<StagingMinimalItem[]> {
-  const result = await executeQuery<StagingRowMinimal>(
-    `SELECT dc_note, branch, nett_premium FROM soa_pipeline_staging
-     WHERE distribution_code = $1
-       AND ($2 = $3 OR branch = $2)`,
-    [customerCode, branchCode, SENTINEL_ALL]
-  );
-
-  return result.rows.map(mapRowMinimal);
 }

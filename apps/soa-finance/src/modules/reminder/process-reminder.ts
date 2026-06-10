@@ -62,28 +62,25 @@ export const processReminderLetter = async (
     return { processed: false, remindersSent: 0 };
   }
 
-  // Parallelize reminder processing with error isolation
+  // Sequential processing for deterministic journal ordering
   // Each reminder runs independently; failures are caught and logged
-  const reminderPromises = reminders.map(
-    async (reminder): Promise<GenerateReminderResult> => {
-      try {
-        const result = await generateReminderLetter({
-          ctx,
-          customer,
-          item,
-          reminder,
-        });
-        return result ?? { sent: false, reason: "ERROR" };
-      } catch (error) {
-        ctx.console.log(
-          `[Reminder] Failed for ${customer.code} reminder ${reminder.id}: ${error instanceof Error ? error.message : "Unknown error"}`
-        );
-        return { sent: false, reason: "ERROR" };
-      }
+  const results: GenerateReminderResult[] = [];
+  for (const reminder of reminders) {
+    try {
+      const result = await generateReminderLetter({
+        ctx,
+        customer,
+        item,
+        reminder,
+      });
+      results.push(result ?? { sent: false, reason: "ERROR" });
+    } catch (error) {
+      ctx.console.log(
+        `[Reminder] Failed for ${customer.code} reminder ${reminder.id}: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+      results.push({ sent: false, reason: "ERROR" });
     }
-  );
-
-  const results = await Promise.all(reminderPromises);
+  }
   const remindersSent = results.filter((r) => r.sent).length;
 
   return { processed: true, remindersSent };

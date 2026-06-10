@@ -50,6 +50,10 @@ async function processSingleBranch(
     count: number;
     dcNoteNos: string[];
   } | null;
+  ctx.console.log(
+    `Processing branch ${branch.officeCode} for customer ${customerData.code}`
+  );
+
   try {
     generated = await ctx.run(
       `generate-upload-${branch.officeCode}`,
@@ -63,10 +67,6 @@ async function processSingleBranch(
         if (soaData.length === 0) {
           return null;
         }
-
-        ctx.console.log(
-          `Processing branch ${branch.officeCode} for customer ${customerData.code}`
-        );
 
         const result = await generateAndUploadDocuments({
           soaData,
@@ -152,7 +152,7 @@ async function processSingleBranch(
 
 /**
  * Process SOA for a customer across one or more branches.
- * Uses Promise.all for parallel execution — each branch handles its own errors
+ * Uses sequential processing for deterministic journal ordering — each branch handles its own errors
  * internally and always returns a result (branch error isolation).
  */
 export async function processBranchSoa(
@@ -170,20 +170,19 @@ export async function processBranchSoa(
     ctx.console.log(`Processing ${branches.length} branches in parallel`);
   }
 
-  // Parallel processing — each branch catches errors to isolate failures
+  // Sequential processing — each branch catches errors to isolate failures
   // (one branch failure doesn't kill the customer)
-  const branchPromises = branches.map(async (branch) => {
+  const results: BranchProcessResult[] = [];
+  for (const branch of branches) {
     try {
-      return await processSingleBranch(params, branch);
+      results.push(await processSingleBranch(params, branch));
     } catch (error) {
       ctx.console.log(
         `[Branch] Unhandled error for ${branch.officeCode}: ${error instanceof Error ? error.message : "Unknown error"}`
       );
-      return { branch, hasDocuments: false };
+      results.push({ branch, hasDocuments: false });
     }
-  });
-
-  const results = await Promise.all(branchPromises);
+  }
 
   return { hasDocuments: results.some((r) => r.hasDocuments) };
 }

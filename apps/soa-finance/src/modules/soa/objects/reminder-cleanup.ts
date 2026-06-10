@@ -1,5 +1,5 @@
 import { withConnection } from "@restate-tob/postgres";
-import { type ObjectContext, object } from "@restatedev/restate-sdk";
+import { type ObjectContext, object, rpc } from "@restatedev/restate-sdk";
 import { DateTime } from "luxon";
 import { TIMEZONE } from "../../../constants/constants.js";
 import { getPostgresClient } from "../../../infrastructure/database/postgres.js";
@@ -30,7 +30,7 @@ export const reminderCleanup = object({
     cleanup: async (ctx: ObjectContext) => {
       ctx.console.log("Starting reminder cleanup");
 
-      const now = DateTime.now().setZone(TIMEZONE);
+      const now = DateTime.fromMillis(await ctx.date.now()).setZone(TIMEZONE);
       const cutoffDate = now.minus({ months: 3 }).toISODate();
 
       if (!cutoffDate) {
@@ -40,16 +40,18 @@ export const reminderCleanup = object({
 
       ctx.console.log(`Cleaning up reminders older than ${cutoffDate}`);
 
-      const result = await ctx.run("delete-old-reminders", () =>
-        deleteOldRemindersByDate(cutoffDate)
-      );
+      try {
+        const result = await ctx.run("delete-old-reminders", () =>
+          deleteOldRemindersByDate(cutoffDate)
+        );
 
-      ctx.console.log(
-        `Cleanup completed: ${result.deletedCount} records deleted`
-      );
-
-      // Schedule next cleanup
-      await scheduleNextCleanup(ctx);
+        ctx.console.log(
+          `Cleanup completed: ${result.deletedCount} records deleted`
+        );
+      } finally {
+        // Schedule next cleanup
+        await scheduleNextCleanup(ctx);
+      }
     },
   },
 });
@@ -95,7 +97,7 @@ async function deleteOldRemindersByDate(
 }
 
 async function scheduleNextCleanup(ctx: ObjectContext): Promise<void> {
-  const now = DateTime.now().setZone(TIMEZONE);
+  const now = DateTime.fromMillis(await ctx.date.now()).setZone(TIMEZONE);
   const nextRun = now
     .plus({ days: 1 })
     .set({ hour: 2, minute: 0, second: 0, millisecond: 0 });
@@ -103,9 +105,10 @@ async function scheduleNextCleanup(ctx: ObjectContext): Promise<void> {
 
   ctx.console.log(`Next cleanup scheduled for ${nextRun.toISO()}`);
 
-  // Sleep until next cleanup time, then trigger cleanup
-  await ctx.sleep(delayMs);
-  ctx.objectSendClient(reminderCleanup, "self").cleanup();
+  // Delayed send: schedule cleanup without holding the lock
+  ctx
+    .objectSendClient(reminderCleanup, "self")
+    .cleanup(rpc.sendOpts({ delay: { milliseconds: delayMs } }));
 }
 
 export type ReminderCleanup = typeof reminderCleanup;

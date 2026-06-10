@@ -48,14 +48,15 @@ export interface BatchWorkflowResult {
 /**
  * BatchWorkflow - Main workflow for processing Statement of Account (SOA) in batch.
  *
- * Fetches all customer accounts, then processes them in bounded chunks
- * (default 10 concurrent) using RestatePromise.all. Individual account
- * failures are isolated via .map() so one failure does not kill the batch.
+ * Fetches all customer accounts, then processes them with a sliding window
+ * of MAX_WORKERS (default 10) concurrent invocations: RestatePromise.race
+ * fills each freed slot immediately. Individual account failures are
+ * isolated via .map() so one failure does not kill the batch.
  *
  * Process flow:
  * 1. Initialize date parameters
- * 2. Fetch all customer accounts from Oracle
- * 3. Process accounts in chunks of MAX_WORKERS
+ * 2. Fetch all customer accounts
+ * 3. Process accounts with a sliding window of MAX_WORKERS
  * 4. Return batch result with success/failure counts
  */
 
@@ -121,7 +122,7 @@ export const batchWorkflow = workflow({
 
       const totalAccounts = accountCodes.length;
 
-      ctx.set("status", "fetching");
+      ctx.set("status", "processing");
       ctx.set("progress", {
         processed: 0,
         total: totalAccounts,
@@ -131,81 +132,99 @@ export const batchWorkflow = workflow({
       ctx.console.log(`Starting batch with ${totalAccounts} accounts`);
 
       // STEP 3: Process with bounded concurrency
-      // Process accounts in chunks of MAX_WORKERS. Errors from individual
-      // accounts are isolated via .map() so one failure does not kill the batch.
+      // Sliding window of MAX_WORKERS accounts: each completion immediately
+      // frees its slot for the next account, so the window never idles on a
+      // slow account the way per-chunk barriers do (account sizes are heavily
+      // skewed). Losing a race leaves the other invocations running untouched
+      // — they re-enter the next race with their work intact — and the race
+      // itself can never reject because .map() converts each failure into a
+      // WorkerResult, isolating it from the batch.
       let failedAccountCount = 0;
       const failedAccounts: BatchWorkflowResult["failedAccounts"] = [];
       let processedAccountCount = 0;
 
-      for (let i = 0; i < accountCodes.length; i += MAX_WORKERS) {
-        const chunk = accountCodes.slice(i, i + MAX_WORKERS);
+      const startAccount = (accountId: string) => {
+        const idempotencyKey = `${accountId}:${processingDates.timePeriod}:${soaProcessingType}`;
 
-        const chunkPromises = chunk.map((accountId) => {
-          const idempotencyKey = `${accountId}:${processingDates.timePeriod}:${soaProcessingType}`;
+        return ctx
+          .objectClient(soaCustomer, accountId)
+          .process(
+            {
+              customerId: asCustomerId(accountId),
+              timePeriod: processingDates.timePeriod,
+              processingDate: processingDates.processingDate,
+              classOfBusiness: soaOptions.classOfBusiness,
+              branch: soaOptions.branch,
+              toDate: processingDates.toDate,
+              processingType: soaProcessingType,
+              correlationId,
+            },
+            rpc.opts({ idempotencyKey })
+          )
+          .map((_value, failure): WorkerResult => {
+            if (failure) {
+              return { accountId, failed: true, error: failure.message };
+            }
+            return { accountId, failed: false };
+          });
+      };
 
-          return ctx
-            .objectClient(soaCustomer, accountId)
-            .process(
-              {
-                customerId: asCustomerId(accountId),
-                timePeriod: processingDates.timePeriod,
-                processingDate: processingDates.processingDate,
-                classOfBusiness: soaOptions.classOfBusiness,
-                branch: soaOptions.branch,
-                toDate: processingDates.toDate,
-                processingType: soaProcessingType,
-                correlationId,
-              },
-              rpc.opts({ idempotencyKey })
-            )
-            .map((_value, failure): WorkerResult => {
-              if (failure) {
-                return { accountId, failed: true, error: failure.message };
-              }
-              return { accountId, failed: false };
-            });
-        });
+      const queue = [...accountCodes];
+      const pending = new Map<string, RestatePromise<WorkerResult>>();
 
-        const results = await RestatePromise.all(chunkPromises);
-
-        for (const result of results) {
-          processedAccountCount += 1;
-          if (result.failed) {
-            failedAccountCount += 1;
-            failedAccounts.push({
-              accountId: result.accountId,
-              error: result.error ?? "Unknown error",
-            });
-            ctx.console.log(
-              `[Batch] Worker failed for ${result.accountId}: ${result.error}`
-            );
-          }
+      while (queue.length > 0 || pending.size > 0) {
+        while (pending.size < MAX_WORKERS && queue.length > 0) {
+          const accountId = queue.shift() as string;
+          pending.set(accountId, startAccount(accountId));
         }
 
-        ctx.set("progress", {
-          processed: processedAccountCount,
-          total: totalAccounts,
-          failed: failedAccountCount,
-        });
+        const result = await RestatePromise.race([...pending.values()]);
+        pending.delete(result.accountId);
 
-        ctx.console.log(
-          `[Batch] Progress: ${processedAccountCount}/${totalAccounts}`
-        );
+        processedAccountCount += 1;
+        if (result.failed) {
+          failedAccountCount += 1;
+          failedAccounts.push({
+            accountId: result.accountId,
+            error: result.error ?? "Unknown error",
+          });
+          ctx.console.log(
+            `[Batch] Worker failed for ${result.accountId}: ${result.error}`
+          );
+        }
+
+        // Throttle state writes to reduce journal bloat
+        if (
+          processedAccountCount % 10 === 0 ||
+          processedAccountCount === totalAccounts
+        ) {
+          ctx.set("progress", {
+            processed: processedAccountCount,
+            total: totalAccounts,
+            failed: failedAccountCount,
+          });
+        }
+        if (
+          processedAccountCount % MAX_WORKERS === 0 ||
+          processedAccountCount === totalAccounts
+        ) {
+          ctx.console.log(
+            `[Batch] Progress: ${processedAccountCount}/${totalAccounts}`
+          );
+        }
       }
-
-      ctx.console.log(
-        "[Batch] Failed accounts:",
-        JSON.stringify(failedAccounts)
-      );
-
-      ctx.console.log(
-        `Batch completed: ${processedAccountCount - failedAccountCount} succeeded, ${failedAccountCount} failed, out of ${totalAccounts} accounts`
-      );
 
       const MAX_REPORTED_FAILURES = 10;
       const compactFailedAccounts = failedAccounts.slice(
         0,
         MAX_REPORTED_FAILURES
+      );
+      ctx.console.log(
+        `[Batch] Failed accounts (${failedAccounts.length} total): ${JSON.stringify(compactFailedAccounts)}`
+      );
+
+      ctx.console.log(
+        `Batch completed: ${processedAccountCount - failedAccountCount} succeeded, ${failedAccountCount} failed, out of ${totalAccounts} accounts`
       );
 
       ctx.set("status", "completed");

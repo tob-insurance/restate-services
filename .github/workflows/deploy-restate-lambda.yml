@@ -37,6 +37,7 @@ jobs:
           domain: "https://infisical.tob-insurance.com"
           project-slug: ${{ vars.INFISICAL_PROJECT_SLUG }}
           env-slug: ${{ inputs.environment }}
+          secret-path: "/${{ inputs.app-name }}"
           export-type: "file"
           # Note: path must start with / (Infisical action uses string concatenation, not path.join)
           file-output-path: "/apps/${{ inputs.app-name }}/.env"

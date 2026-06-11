@@ -36,3 +36,6 @@ restate-data
 # Next.js
 next-env.d.ts
 .next
+
+# OpenCode
+.omo

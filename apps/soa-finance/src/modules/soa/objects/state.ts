@@ -1,36 +1,12 @@
-import type {
-  ObjectContext,
-  ObjectSharedContext,
-} from "@restatedev/restate-sdk";
-
 // ── State value types ──────────────────────────────────────────
 
-export type ReminderHeader = {
-  customerCode: string;
-  timePeriod: string;
-  officeId: string;
-  createdAt: string;
-};
-
-export type ReminderDetail = {
-  dcNoteId: string;
-  reminderId: string; // composite: "{timePeriod}:{officeId}"
-  isPaid: boolean;
-};
-
-export type LetterRecord = {
-  type: string;
+export interface LetterRecord {
   letterNo: string;
   referenceLetterNo?: string;
   sentDate: string;
-  status: "pending" | "sent" | "failed";
-};
-
-/**
- * dcNoteIndex maps DC_NOTE_ID to reminderId ("{timePeriod}:{officeId}").
- * This enables cross-period lookup without scanning all state keys.
- */
-export type DcNoteIndex = Record<string, string>; // dcNoteId → reminderId
+  status: "pending" | "sent" | "failed" | "skipped";
+  type: string;
+}
 
 // ── State key helpers ──────────────────────────────────────────
 
@@ -41,43 +17,4 @@ export const stateKeys = {
     `details:${timePeriod}:${officeId}` as const,
   letters: (timePeriod: string, officeId: string) =>
     `letters:${timePeriod}:${officeId}` as const,
-  dcNoteIndex: (timePeriod: string) => `dcNoteIndex:${timePeriod}` as const,
 } as const;
-
-export async function readDcNoteIndex(
-  ctx: ObjectContext | ObjectSharedContext,
-  currentTimePeriod?: string
-): Promise<DcNoteIndex> {
-  if (!currentTimePeriod) {
-    return {};
-  }
-  return (
-    (await ctx.get<DcNoteIndex>(stateKeys.dcNoteIndex(currentTimePeriod))) ?? {}
-  );
-}
-
-// ── Context type alias for SoaCustomer handlers ─────────────────
-
-export type CustomerContext = ObjectContext;
-export type CustomerSharedContext = ObjectSharedContext;
-
-// ── Handler parameter types ─────────────────────────────────────
-
-export type CreateReminderInput = {
-  timePeriod: string;
-  officeId: string;
-  dcNotes: Array<{ dcNoteId: string }>;
-};
-
-export type AddLetterInput = {
-  timePeriod: string;
-  officeId: string;
-  type: string;
-  letterNo: string;
-  referenceLetterNo?: string;
-  sentDate: string;
-};
-
-export type MarkDcNotesPaidInput = {
-  dcNoteIds: string[];
-};

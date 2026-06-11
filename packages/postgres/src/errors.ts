@@ -15,5 +15,8 @@ export const DATA_INTEGRITY_ERROR_CODES: readonly PgErrorCode[] = [
 ];
 
 export function isDataIntegrityError(code: string | undefined): boolean {
-  return DATA_INTEGRITY_ERROR_CODES.includes(code as PgErrorCode);
+  if (!code) {
+    return false;
+  }
+  return (DATA_INTEGRITY_ERROR_CODES as readonly string[]).includes(code);
 }

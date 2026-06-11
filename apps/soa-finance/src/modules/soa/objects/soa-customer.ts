@@ -3,18 +3,16 @@ import {
   object,
   TerminalError,
 } from "@restatedev/restate-sdk";
-
-import { getAccountById } from "../../../infrastructure/database/index.js";
-import type { ISoaItem } from "../../../types";
-import { sendWithAttachments } from "../../email";
+import { getAccountById } from "../../../infrastructure/database/queries/customer-query.js";
+import { hasRemindersForPeriod as hasRemindersForPeriodDb } from "../../../infrastructure/database/queries/reminder-query.js";
+import type { SoaItem } from "../../../types/soa.type.js";
+import { workflowLog } from "../../../utils/logger.js";
 import { processReminderLetter } from "../../reminder";
-import { processBranchSoa } from "../services/process-branches";
-import { readDcNoteIndex } from "./state";
-
-type SoaCustomerResult = {
+import { processBranchSoa } from "../services/process-branches.js";
+export interface SoaCustomerResult {
   customerId: string;
   status: "completed" | "failed";
-};
+}
 
 export const soaCustomer = object({
   name: "SoaCustomer",
@@ -28,7 +26,7 @@ export const soaCustomer = object({
   handlers: {
     process: async (
       ctx: ObjectContext,
-      soaParams: ISoaItem
+      soaParams: SoaItem
     ): Promise<SoaCustomerResult> => {
       const { customerId, timePeriod, processingType } = soaParams;
 
@@ -38,65 +36,76 @@ export const soaCustomer = object({
         );
       }
 
-      ctx.console.log(`[SoaCustomer] Starting for customer: ${customerId}`);
+      ctx.console.log(
+        workflowLog({
+          component: "SoaCustomer",
+          correlationId: soaParams.correlationId,
+          workflowId: ctx.key,
+        }),
+        `Starting for customer: ${customerId}`
+      );
+      ctx.set("status", "processing");
 
-      const customerData = await ctx.run("get-customer-data", () =>
-        getAccountById(customerId)
+      // Combined read: customer data + reminder check in single ctx.run()
+      const { customerData, hasExistingReminder } = await ctx.run(
+        "get-customer-and-reminders",
+        async () => {
+          const [customer, hasReminder] = await Promise.all([
+            getAccountById(customerId),
+            hasRemindersForPeriodDb(ctx.key, timePeriod),
+          ]);
+          return { customerData: customer, hasExistingReminder: hasReminder };
+        }
       );
 
       if (!customerData) {
         throw new TerminalError(`Customer ${customerId} not found`);
       }
 
-      const hasExistingReminder = await hasRemindersForPeriod(ctx, timePeriod);
+      ctx.set("status", "branch-processing");
 
-      if (processingType !== 1 || hasExistingReminder) {
-        await processReminderLetter({
-          ctx,
-          customer: customerData,
-          item: soaParams,
-        });
-      } else {
-        const dateNow = new Date(soaParams.processingDate);
-        const hasDocuments = await processBranchSoa({
-          ctx,
-          customerData,
-          params: soaParams,
-        });
-
-        if (hasDocuments) {
-          await ctx.run(
-            "send-email",
-            async () =>
-              await sendWithAttachments({
-                customerId: soaParams.customerId,
-                customerData,
-                date: dateNow,
-              })
-          );
+      try {
+        if (processingType !== 1 || hasExistingReminder) {
+          await processReminderLetter({
+            ctx,
+            customer: customerData,
+            item: soaParams,
+          });
         } else {
-          ctx.console.log(
-            `Skipping email for ${soaParams.customerId}: no documents generated`
-          );
+          // Email is sent inside processBranchSoa (generate+upload+send in one ctx.run)
+          const branchResult = await processBranchSoa({
+            ctx,
+            customerData,
+            params: soaParams,
+          });
+
+          if (!branchResult.hasDocuments) {
+            ctx.console.log(
+              `Skipping email for ${soaParams.customerId}: no documents generated`
+            );
+          }
         }
+
+        ctx.set("status", "completed");
+
+        ctx.console.log(
+          workflowLog({
+            component: "SoaCustomer",
+            correlationId: soaParams.correlationId,
+            workflowId: ctx.key,
+          }),
+          `Completed for customer: ${customerId}`
+        );
+
+        // Cleanup is now handled by PostgreSQL (no Restate state to clean)
+
+        return { customerId, status: "completed" };
+      } catch (error) {
+        ctx.set("status", "failed");
+        throw error;
       }
-
-      ctx.console.log(`[SoaCustomer] Completed for customer: ${customerId}`);
-
-      return { customerId, status: "completed" };
     },
   },
 });
 
 export type SoaCustomer = typeof soaCustomer;
-
-async function hasRemindersForPeriod(
-  ctx: ObjectContext,
-  timePeriod: string
-): Promise<boolean> {
-  const dcNoteIndex = await readDcNoteIndex(ctx, timePeriod);
-
-  return Object.values(dcNoteIndex).some((reminderId) =>
-    reminderId.startsWith(`${timePeriod}:`)
-  );
-}

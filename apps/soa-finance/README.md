@@ -1,6 +1,6 @@
 # SOA Finance Service
 
-This service is a **Restate** application designed to handle the Statement of Account (SOA) and Reminder Letter generation pipeline. It uses **Durable Execution** to ensure reliability across complex distributed processes involving Oracle databases, data streaming, Parquet file processing, and external services like Azure Blob Storage and Microsoft Graph.
+This service is a **Restate** application designed to handle the Statement of Account (SOA) and Reminder Letter generation pipeline. It uses **Durable Execution** to ensure reliability across complex distributed processes involving PostgreSQL databases, data streaming, Parquet file processing, and external services like Azure Blob Storage and Microsoft Graph.
 
 ## Project Structure
 
@@ -12,7 +12,7 @@ The project follows a domain-driven structure to separate concerns:
 
 - **`src/infrastructure/`**: External adapters and technical implementations.
   - `azure/`: Azure Blob Storage integration for uploading generated reports.
-  - `database/`: Database queries and connection management (Oracle).
+  - `database/`: Database queries and connection management (PostgreSQL).
   - `email/`: Email sending service (Microsoft Graph) and template management.
   - `gotenberg/`: Client for generating PDFs from HTML using Gotenberg.
 
@@ -29,13 +29,12 @@ The project follows a domain-driven structure to separate concerns:
 - **[Bun](https://bun.sh/)**: Runtime and package manager.
 - **[Docker](https://www.docker.com/)**: Required to run the Restate runtime and Gotenberg.
 - **Environment Variables**: Create a `.env` file based on `.env.example`:
-  - `ORACLE_URL`: Oracle database URL (format: `oracle://user:password@host:port/service`)
+  - `DATABASE_URL`: PostgreSQL database URL (format: `postgresql://user:password@host:5432/dbname`)
   - `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`: Microsoft Graph credentials
   - `AZURE_STORAGE_CONNECTION_STRING`: Azure Blob Storage connection
   - `AZURE_STORAGE_CONTAINER_NAME`: Container name for SOA documents
   - `AZURE_STORAGE_SOA_PREFIX`: Prefix for SOA files in storage
   - `GOTENBERG_URL`: URL of the Gotenberg service (default: `http://localhost:3000`)
-  - `ORACLE_LIB_DIR` (optional): Oracle Instant Client path for macOS/Windows
 
 ## Getting Started
 

@@ -1,3 +1,2 @@
-export { type CreateReminderParams, createReminder } from "./create";
-export { generateReminderLetter } from "./generate-reminder-letter";
-export { processReminderLetter } from "./process-reminder";
+export { type CreateReminderParams, createReminder } from "./create.js";
+export { processReminderLetter } from "./process-reminder.js";

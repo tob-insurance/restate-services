@@ -1,83 +1,75 @@
-import type { WorkflowContext } from "@restatedev/restate-sdk";
+import type {
+  WorkflowContext,
+  WorkflowSharedContext,
+} from "@restatedev/restate-sdk";
 import {
   RestatePromise,
   rpc,
   TerminalError,
   workflow,
 } from "@restatedev/restate-sdk";
-import { isDevelopment } from "../../../constants";
-import { getAllAccounts } from "../../../infrastructure/database/index.js";
-import type { IAccount, SoaType } from "../../../types";
-import { formatDateToUnixTimestamp, formatTimePeriod } from "../../../utils";
-import { soaCustomer } from "../objects/soa-customer";
-import { soaSchema } from "../types";
+import { SENTINEL_ALL } from "../../../constants/constants.js";
+import {
+  isDevelopment,
+  parseEnvInt,
+  parseEnvList,
+} from "../../../constants/environment.js";
+import { getAgentAccounts } from "../../../infrastructure/database/queries/customer-query.js";
+import { asCorrelationId, asCustomerId } from "../../../types/branded.js";
+import {
+  formatDateToUnixTimestamp,
+  formatTimePeriod,
+} from "../../../utils/formatter/date.formatter.js";
+import { soaCustomer } from "../objects/soa-customer.js";
+import { soaSchema } from "../types.js";
 
-function parseEnvInt(key: string, defaultVal: number): number {
-  const raw = process.env[key];
-  if (!raw) {
-    return defaultVal;
-  }
-  const val = Number(raw);
-  return Number.isFinite(val) && val > 0 ? val : defaultVal;
-}
+const DEV_TEST_CUSTOMER_CODES = parseEnvList("SOA_TEST_CUSTOMERS") ?? [];
 
-function parseEnvList(key: string): string[] | null {
-  const raw = process.env[key];
-  if (!raw) {
-    return null;
-  }
-  const items = raw
-    .split(",")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-  return items.length > 0 ? items : null;
-}
+const MAX_WORKERS = parseEnvInt("SOA_MAX_WORKERS", 10);
+const INACTIVITY_TIMEOUT_HOURS = parseEnvInt("SOA_INACTIVITY_TIMEOUT_HOURS", 6);
 
-const DEV_TEST_CUSTOMER_CODES = parseEnvList("SOA_TEST_CUSTOMERS") ?? [
-  "00004162",
-  "00004829",
-  "00005017",
-  "00003758",
-  "00003390",
-  "00002844",
-];
-
-const MAX_WORKERS = parseEnvInt("SOA_MAX_WORKERS", 5);
-
-type WorkerResult = {
+interface WorkerResult {
   accountId: string;
-  failed: boolean;
   error?: string;
-};
+  failed: boolean;
+}
 
-type IBatchWorkflowResult = {
-  message: string;
-  totalAccounts: number;
+export interface BatchWorkflowResult {
   failedAccountCount: number;
+  failedAccounts: Array<{
+    accountId: string;
+    error: string;
+  }>;
+  message: string;
   status: "Completed";
-};
+  totalAccounts: number;
+}
 
 /**
  * BatchWorkflow - Main workflow for processing Statement of Account (SOA) in batch.
  *
- * Fetches all customer accounts, then processes them in bounded chunks
- * (default 5 concurrent) using RestatePromise.all. Individual account
- * failures are isolated via .map() so one failure does not kill the batch.
+ * Fetches all customer accounts, then processes them with a sliding window
+ * of MAX_WORKERS (default 10) concurrent invocations: RestatePromise.race
+ * fills each freed slot immediately. Individual account failures are
+ * isolated via .map() so one failure does not kill the batch.
  *
  * Process flow:
  * 1. Initialize date parameters
- * 2. Fetch all customer accounts from Oracle
- * 3. Process accounts in chunks of MAX_WORKERS
+ * 2. Fetch all customer accounts
+ * 3. Process accounts with a sliding window of MAX_WORKERS
  * 4. Return batch result with success/failure counts
  */
 
 export const batchWorkflow = workflow({
   name: "BatchWorkflow",
+  options: {
+    inactivityTimeout: { hours: INACTIVITY_TIMEOUT_HOURS },
+  },
   handlers: {
     run: async (
       ctx: WorkflowContext,
       soaRequest: soaSchema
-    ): Promise<IBatchWorkflowResult> => {
+    ): Promise<BatchWorkflowResult> => {
       // Validate input
       const parseResult = soaSchema.safeParse(soaRequest);
       if (!parseResult.success) {
@@ -86,112 +78,177 @@ export const batchWorkflow = workflow({
         );
       }
 
-      // STEP 1: Initialize Date Parameters
-      const processingDates = await ctx.run("initialize-dates", () => {
-        const currentDate = new Date();
-        return {
-          timePeriod: formatTimePeriod(currentDate),
-          toDate: formatDateToUnixTimestamp(currentDate),
-          processingDate: currentDate.toISOString(),
-        };
-      });
+      // STEP 1: Initialize Date Parameters (deterministic timestamp from Restate context)
+      const now = await ctx.date.now();
+      const currentDate = new Date(now);
+      const processingDates = {
+        timePeriod: formatTimePeriod(currentDate),
+        toDate: formatDateToUnixTimestamp(currentDate),
+        processingDate: currentDate.toISOString(),
+      };
+      const correlationId = asCorrelationId(
+        `batch:${processingDates.timePeriod}:${now}`
+      );
 
-      const soaProcessingType = parseResult.data.type as SoaType;
+      const soaProcessingType = parseResult.data.type;
       const soaOptions = {
-        classOfBusiness: "ALL",
-        branch: "ALL",
+        classOfBusiness: SENTINEL_ALL,
+        branch: SENTINEL_ALL,
       };
 
       // STEP 2: Fetch Customer Accounts
-      const allAccounts = await ctx.run(
-        "get-all-accounts",
-        async (): Promise<IAccount[]> => {
-          const accounts = await getAllAccounts();
+      ctx.set("status", "started");
+
+      const accountCodes = await ctx.run(
+        "get-all-account-codes",
+        async (): Promise<string[]> => {
+          const accounts = await getAgentAccounts();
           if (!accounts || accounts.length === 0) {
-            throw new TerminalError("No customer accounts found");
+            throw new Error("No customer accounts found");
           }
 
-          return accounts;
+          // Return only codes — not full Account objects
+          let codes = accounts.map((a) => a.code);
+
+          // Filter to test customers in development
+          if (isDevelopment() && DEV_TEST_CUSTOMER_CODES.length > 0) {
+            const testCodes = new Set(DEV_TEST_CUSTOMER_CODES);
+            codes = codes.filter((code) => testCodes.has(code));
+          }
+
+          return codes;
         }
       );
 
-      let accountsToProcess: IAccount[];
-      if (isDevelopment()) {
-        const testCodes = new Set(DEV_TEST_CUSTOMER_CODES);
-        accountsToProcess = allAccounts.filter((a) => testCodes.has(a.code));
-        ctx.console.log(
-          `[Dev] Filtered ${allAccounts.length} accounts to ${accountsToProcess.length} test customers`
-        );
-      } else {
-        accountsToProcess = allAccounts;
-      }
+      const totalAccounts = accountCodes.length;
 
-      const totalAccounts = accountsToProcess.length;
+      ctx.set("status", "processing");
+      ctx.set("progress", {
+        processed: 0,
+        total: totalAccounts,
+        failed: 0,
+      });
 
       ctx.console.log(`Starting batch with ${totalAccounts} accounts`);
 
       // STEP 3: Process with bounded concurrency
-      // Process accounts in chunks of MAX_WORKERS. Errors from individual
-      // accounts are isolated via .map() so one failure does not kill the batch.
+      // Sliding window of MAX_WORKERS accounts: each completion immediately
+      // frees its slot for the next account, so the window never idles on a
+      // slow account the way per-chunk barriers do (account sizes are heavily
+      // skewed). Losing a race leaves the other invocations running untouched
+      // — they re-enter the next race with their work intact — and the race
+      // itself can never reject because .map() converts each failure into a
+      // WorkerResult, isolating it from the batch.
       let failedAccountCount = 0;
+      const failedAccounts: BatchWorkflowResult["failedAccounts"] = [];
       let processedAccountCount = 0;
 
-      for (let i = 0; i < accountsToProcess.length; i += MAX_WORKERS) {
-        const chunk = accountsToProcess.slice(i, i + MAX_WORKERS);
+      const startAccount = (accountId: string) => {
+        const idempotencyKey = `${accountId}:${processingDates.timePeriod}:${soaProcessingType}`;
 
-        const chunkPromises = chunk.map((account) => {
-          const accountId = account.code;
-          const idempotencyKey = `${accountId}:${processingDates.timePeriod}:${soaProcessingType}`;
+        return ctx
+          .objectClient(soaCustomer, accountId)
+          .process(
+            {
+              customerId: asCustomerId(accountId),
+              timePeriod: processingDates.timePeriod,
+              processingDate: processingDates.processingDate,
+              classOfBusiness: soaOptions.classOfBusiness,
+              branch: soaOptions.branch,
+              toDate: processingDates.toDate,
+              processingType: soaProcessingType,
+              correlationId,
+            },
+            rpc.opts({ idempotencyKey })
+          )
+          .map((_value, failure): WorkerResult => {
+            if (failure) {
+              return { accountId, failed: true, error: failure.message };
+            }
+            return { accountId, failed: false };
+          });
+      };
 
-          return ctx
-            .objectClient(soaCustomer, accountId)
-            .process(
-              {
-                customerId: accountId,
-                timePeriod: processingDates.timePeriod,
-                processingDate: processingDates.processingDate,
-                classOfBusiness: soaOptions.classOfBusiness,
-                branch: soaOptions.branch,
-                toDate: processingDates.toDate,
-                processingType: soaProcessingType,
-              },
-              rpc.opts({ idempotencyKey })
-            )
-            .map((_value, failure): WorkerResult => {
-              if (failure) {
-                return { accountId, failed: true, error: failure.message };
-              }
-              return { accountId, failed: false };
-            });
-        });
+      const queue = [...accountCodes];
+      const pending = new Map<string, RestatePromise<WorkerResult>>();
 
-        const results = await RestatePromise.all(chunkPromises);
-
-        for (const result of results) {
-          processedAccountCount += 1;
-          if (result.failed) {
-            failedAccountCount += 1;
-            ctx.console.log(
-              `[Batch] Worker failed for ${result.accountId}: ${result.error}`
-            );
-          }
+      while (queue.length > 0 || pending.size > 0) {
+        while (pending.size < MAX_WORKERS && queue.length > 0) {
+          const accountId = queue.shift() as string;
+          pending.set(accountId, startAccount(accountId));
         }
 
-        ctx.console.log(
-          `[Batch] Progress: ${processedAccountCount}/${totalAccounts}`
-        );
+        const result = await RestatePromise.race([...pending.values()]);
+        pending.delete(result.accountId);
+
+        processedAccountCount += 1;
+        if (result.failed) {
+          failedAccountCount += 1;
+          failedAccounts.push({
+            accountId: result.accountId,
+            error: result.error ?? "Unknown error",
+          });
+          ctx.console.log(
+            `[Batch] Worker failed for ${result.accountId}: ${result.error}`
+          );
+        }
+
+        // Throttle state writes to reduce journal bloat
+        if (
+          processedAccountCount % 10 === 0 ||
+          processedAccountCount === totalAccounts
+        ) {
+          ctx.set("progress", {
+            processed: processedAccountCount,
+            total: totalAccounts,
+            failed: failedAccountCount,
+          });
+        }
+        if (
+          processedAccountCount % MAX_WORKERS === 0 ||
+          processedAccountCount === totalAccounts
+        ) {
+          ctx.console.log(
+            `[Batch] Progress: ${processedAccountCount}/${totalAccounts}`
+          );
+        }
       }
+
+      const MAX_REPORTED_FAILURES = 10;
+      const compactFailedAccounts = failedAccounts.slice(
+        0,
+        MAX_REPORTED_FAILURES
+      );
+      ctx.console.log(
+        `[Batch] Failed accounts (${failedAccounts.length} total): ${JSON.stringify(compactFailedAccounts)}`
+      );
 
       ctx.console.log(
         `Batch completed: ${processedAccountCount - failedAccountCount} succeeded, ${failedAccountCount} failed, out of ${totalAccounts} accounts`
       );
 
-      return {
+      ctx.set("status", "completed");
+
+      const batchResult = {
         message: "SOA batch processing completed successfully",
         totalAccounts,
         failedAccountCount,
-        status: "Completed",
+        failedAccounts: compactFailedAccounts,
+        status: "Completed" as const,
       };
+
+      return batchResult;
+    },
+
+    getStatus: async (ctx: WorkflowSharedContext) => {
+      const status = (await ctx.get<string>("status")) ?? "unknown";
+      const progress = await ctx.get<{
+        processed: number;
+        total: number;
+        failed: number;
+      }>("progress");
+
+      return { status, progress: progress ?? null };
     },
   },
 });

@@ -1,3 +1,4 @@
+import { logger } from "@restate-tob/shared";
 import { Pool, type PoolClient } from "pg";
 import type { PostgresClient, PostgresConfig } from "./types.js";
 
@@ -12,7 +13,10 @@ export async function withConnection<T>(
 
   const onError = (err: Error) => {
     connectionError = err;
-    console.error("PostgreSQL connection error during operation:", err.message);
+    logger.error(
+      { component: "PostgresPool", err: err.message },
+      "PostgreSQL connection error during operation"
+    );
   };
   poolClient.on("error", onError);
 
@@ -43,6 +47,22 @@ function validateSchemaName(schema: string): void {
   }
 }
 
+async function connectWithSchema(
+  pool: Pool,
+  schema: string | undefined
+): Promise<PoolClient> {
+  const client = await pool.connect();
+  if (schema) {
+    try {
+      await client.query(`SET search_path TO "${schema}"`);
+    } catch (err) {
+      client.release();
+      throw err;
+    }
+  }
+  return client;
+}
+
 export function createPostgresClient(config: PostgresConfig): PostgresClient {
   const { schema, ...poolConfig } = config;
 
@@ -50,6 +70,7 @@ export function createPostgresClient(config: PostgresConfig): PostgresClient {
     validateSchemaName(schema);
   }
 
+  const isLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
   const pool = new Pool({
     max: 20,
     min: 2,
@@ -57,42 +78,60 @@ export function createPostgresClient(config: PostgresConfig): PostgresClient {
     allowExitOnIdle: false,
     connectionTimeoutMillis: 10_000,
     statement_timeout: 300_000,
-    query_timeout: 300_000,
+    // Keep TCP connections alive to prevent TLS timeout on idle connections
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
     ...poolConfig,
-  });
-
-  pool.on("connect", (client) => {
-    if (schema) {
-      client.query(`SET search_path TO "${schema}"`);
-    }
+    ...(isLambda ? { min: 0, max: 1 } : {}),
   });
 
   pool.on("error", (err) => {
-    console.error("Unexpected error on idle PostgreSQL client", err);
+    logger.error(
+      { component: "PostgresPool", err },
+      "Unexpected error on idle PostgreSQL client"
+    );
   });
 
   return {
     pool,
 
     async testConnection(): Promise<boolean> {
+      let client: PoolClient | undefined;
       try {
-        const client = await pool.connect();
+        client = await pool.connect();
         const result = await client.query("SELECT NOW()");
-        console.log(
-          "✅ PostgreSQL connected successfully at:",
-          result.rows[0].now
+        logger.info(
+          { component: "PostgresPool", connectedAt: result.rows[0].now },
+          "PostgreSQL connected successfully"
         );
-        client.release();
         return true;
       } catch (error: unknown) {
-        console.error("❌ PostgreSQL connection failed:", error);
+        logger.error(
+          { component: "PostgresPool", err: error },
+          "PostgreSQL connection failed"
+        );
         return false;
+      } finally {
+        client?.release();
       }
     },
 
     async close(): Promise<void> {
       await pool.end();
-      console.log("PostgreSQL pool closed");
+      logger.info({ component: "PostgresPool" }, "PostgreSQL pool closed");
+    },
+
+    async executeQuery<T>(
+      sql: string,
+      params?: unknown[]
+    ): Promise<{ rows: T[]; rowCount: number | null }> {
+      const conn = await connectWithSchema(pool, schema);
+      try {
+        const result = await conn.query(sql, params);
+        return { rows: result.rows as T[], rowCount: result.rowCount ?? null };
+      } finally {
+        conn.release();
+      }
     },
   };
 }

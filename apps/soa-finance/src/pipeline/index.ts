@@ -1,52 +1,33 @@
-import { isDevelopment } from "../constants";
-import type { IStatementOfAccountModel } from "../types";
-import { generateDevData } from "./dev-data";
-import { streamSoaData } from "./read";
-import { transformSoaStream } from "./transform";
-import type { ISoaPipelineResult } from "./types";
-import { writeToParquet } from "./write";
+import type { Context } from "@restatedev/restate-sdk";
+import { isDevelopment, parseEnvBool } from "../constants/environment.js";
+import logger from "../utils/logger.js";
+import { SoaRefreshManager } from "./refresh-manager.js";
+import type { SoaPipelineResult } from "./types.js";
 
-// Run complete SOA pipeline: Oracle → Transform → Parquet by account code → upload to Azure Blob
+// Pipeline: materialize SOA query result into staging table.
+// Rebuilds the staging tables from source via SoaRefreshManager Virtual Object.
 
 export async function generateSoaPipeline(
-  asAtDate: Date
-): Promise<ISoaPipelineResult> {
-  console.log("[Pipeline] Starting SOA pipeline");
+  ctx: Context,
+  _asAtDate: Date
+): Promise<SoaPipelineResult> {
+  logger.info({ component: "Pipeline" }, "Starting SOA pipeline");
 
-  if (isDevelopment()) {
-    console.log("[Pipeline] DEV MODE: generating synthetic data");
-    const testData = generateDevData();
-    const testStream: AsyncIterable<IStatementOfAccountModel> = {
-      [Symbol.asyncIterator]() {
-        let i = -1;
-        return {
-          next: () =>
-            Promise.resolve().then(
-              (): IteratorResult<IStatementOfAccountModel> => {
-                i += 1;
-                return i < testData.length
-                  ? { value: testData[i], done: false as const }
-                  : { value: undefined, done: true as const };
-              }
-            ),
-        };
-      },
-    };
-    await writeToParquet(testStream, asAtDate);
-    console.log("[Pipeline] Dev pipeline completed");
+  const forceRefresh = parseEnvBool("SOA_DEV_REFRESH_STAGING");
+
+  if (isDevelopment() && !forceRefresh) {
+    logger.info(
+      { component: "Pipeline" },
+      "DEV MODE: skipping staging refresh (set SOA_DEV_REFRESH_STAGING=true to force)"
+    );
     return { success: true };
   }
 
-  // Create pipeline: Reader → Transformer
-  const oracleStream = streamSoaData(asAtDate);
-  const transformedStream = transformSoaStream(oracleStream);
+  // Call refresh manager via Restate client
+  const refreshClient = ctx.objectClient(SoaRefreshManager, "main");
+  await refreshClient.refresh();
 
-  // Write to Parquet
-  await writeToParquet(transformedStream, asAtDate);
+  logger.info({ component: "Pipeline" }, "Completed");
 
-  console.log("[Pipeline] Completed");
-
-  return {
-    success: true,
-  };
+  return { success: true };
 }

@@ -1,47 +1,23 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { IEmailAttachment } from "../../infrastructure/email/types";
-import type { IFileData } from "../../types";
-import { ASSETS_DIR } from "../../utils/paths";
+import type { EmailAttachment } from "../../infrastructure/email/types.js";
+import type { FileData } from "../../types/soa.type.js";
+import { isS3FileData } from "../../types/soa.type.js";
+import { EMAIL_CONFIG } from "../../utils/config/emails.js";
+import logger from "../../utils/logger.js";
+import { ASSETS_DIR } from "../../utils/paths.js";
 
-export const FALLBACK_EMAIL =
-  process.env.SOA_FALLBACK_EMAIL || "collection@tob-ins.com";
-
-function parseEnvCcList(): string[] | null {
-  const raw = process.env.SOA_CC_RECIPIENTS;
-  if (!raw) {
-    return null;
-  }
-  const items = raw
-    .split(",")
-    .map((e) => e.trim())
-    .filter((e) => e.includes("@"));
-  return items.length > 0 ? items : null;
-}
-
-const GLOBAL_CC = parseEnvCcList();
-const DEFAULT_CC: Record<string, string[]> = {
-  DIP: ["finance@tob-ins.com", "mkt.nonleasing@tob-ins.com"],
-  DIG: [
-    "finance@tob-ins.com",
-    "mkt.nonleasing@tob-ins.com",
-    "mkt.directgroup@tob-ins.com",
-  ],
-  DEFAULT: ["finance@tob-ins.com"],
-};
+export const FALLBACK_EMAIL = EMAIL_CONFIG.FALLBACK_EMAIL;
 
 export function getCcRecipients(actingCode: string): string[] {
-  if (GLOBAL_CC) {
-    return GLOBAL_CC;
-  }
-  return DEFAULT_CC[actingCode] || DEFAULT_CC.DEFAULT;
+  return EMAIL_CONFIG.getCcRecipients(actingCode);
 }
 
 export function resolveRecipientEmail(email?: string): string {
-  return email || FALLBACK_EMAIL;
+  return email || EMAIL_CONFIG.FALLBACK_EMAIL;
 }
 
-function getSignatureAttachment(): IEmailAttachment | null {
+function getSignatureAttachment(): EmailAttachment | null {
   try {
     const signaturePath = join(ASSETS_DIR, "sign.jpeg");
     const bytes = readFileSync(signaturePath);
@@ -50,30 +26,64 @@ function getSignatureAttachment(): IEmailAttachment | null {
       contentType: "image/jpeg",
       contentBytes: bytes.toString("base64"),
       isInline: true,
-      contentId: "mgr-signature",
+      contentId: "<mgr-signature>",
     };
-  } catch {
-    console.warn("[Email] Signature file not found, skipping inline image");
-    return null;
+  } catch (error: unknown) {
+    if (
+      error instanceof Error &&
+      "code" in error &&
+      (error as NodeJS.ErrnoException).code === "ENOENT"
+    ) {
+      logger.warn(
+        { component: "Email" },
+        "Signature file not found, skipping inline image"
+      );
+      return null;
+    }
+
+    throw error;
   }
 }
 
 export const buildEmailAttachments = (
-  excelFile: IFileData,
-  pdfFile: IFileData
-): IEmailAttachment[] => {
-  const attachments: IEmailAttachment[] = [
-    {
+  excelFile: FileData,
+  pdfFile: FileData
+): EmailAttachment[] => {
+  const attachments: EmailAttachment[] = [];
+
+  // Excel attachment
+  if (isS3FileData(excelFile)) {
+    // S3-based: pass key, sender will download and stream
+    attachments.push({
       name: excelFile.fileName,
       contentType: excelFile.contentType,
-      contentBytes: excelFile.bytes.toString("base64"),
-    },
-    {
+      contentBytes: "", // placeholder — sender uses s3Key
+      s3Key: excelFile.s3Key,
+    });
+  } else {
+    // Buffer-based
+    attachments.push({
+      name: excelFile.fileName,
+      contentType: excelFile.contentType,
+      contentBytes: Buffer.from(excelFile.bytes).toString("base64"),
+    });
+  }
+
+  // PDF attachment
+  if (isS3FileData(pdfFile)) {
+    attachments.push({
       name: pdfFile.fileName,
       contentType: pdfFile.contentType,
-      contentBytes: pdfFile.bytes.toString("base64"),
-    },
-  ];
+      contentBytes: "",
+      s3Key: pdfFile.s3Key,
+    });
+  } else {
+    attachments.push({
+      name: pdfFile.fileName,
+      contentType: pdfFile.contentType,
+      contentBytes: Buffer.from(pdfFile.bytes).toString("base64"),
+    });
+  }
 
   const signature = getSignatureAttachment();
   if (signature) {

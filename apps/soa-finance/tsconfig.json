@@ -1,22 +1,11 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "esnext",
-    "lib": ["esnext"],
-    "module": "nodenext",
-    "types": ["node"],
-    "allowJs": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
     "outDir": "./dist",
     "rootDir": "./src",
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "allowSyntheticDefaultImports": true,
-    "strict": true,
-    "skipLibCheck": true,
-    "skipDefaultLibCheck": true,
-    "strictNullChecks": true
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "types": ["bun"]
   },
   "include": ["src/"]
 }

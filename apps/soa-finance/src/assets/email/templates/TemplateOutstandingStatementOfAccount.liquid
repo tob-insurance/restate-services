@@ -1,4 +1,52 @@
-﻿<div lang="en-ID" link="#0563C1" vlink="#954F72" style="padding-top: 25px; word-wrap:break-word;">
+<style>
+    .letter {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 11pt;
+        line-height: 1.5;
+        color: #1a1a1a;
+        word-wrap: break-word;
+        padding-top: 20px;
+    }
+    .letter p {
+        margin: 0 0 12px 0;
+    }
+    .info-table {
+        width: auto;
+        border-collapse: collapse;
+        margin: 4px 0 12px 0;
+    }
+    .info-table td {
+        vertical-align: top;
+        padding: 1px 0;
+    }
+    .info-table .label {
+        white-space: nowrap;
+        padding-right: 16px;
+    }
+    .info-table .sep {
+        padding-right: 8px;
+    }
+    .info-table .indent {
+        padding-left: 18px;
+    }
+    .info-table .group-gap td {
+        padding-top: 10px;
+    }
+    .highlight {
+        background-color: #fff200;
+        font-weight: bold;
+    }
+    .email-link {
+        color: #0563c1;
+        text-decoration: underline;
+    }
+    .signature {
+        width: 100px;
+        height: auto;
+        margin: 4px 0;
+    }
+</style>
+<div lang="en-ID" class="letter">
     <p>
         Jakarta, {{ asAtDate }}
     </p>
@@ -12,74 +60,71 @@
     </p>
     <p>
         Besar harapan kami kepada Bpk/Ibu dapat melakukan pembayaran atas premi,
-        <span style="background-color: yellow; font-weight: bold;">terutama tagihan yang melewati tanggal jatuh tempo</span>
+        <span class="highlight">terutama tagihan yang melewati tanggal jatuh tempo</span>
     </p>
     <p>
         Premi dapat dibayarkan ke BCA VIRTUAL ACCOUNT sebagai berikut:
     </p>
-    <table style="width:auto; border-collapse: collapse;">
+    <table class="info-table">
         <tr>
-            <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">No. Virtual Account</td>
-            <td style="vertical-align: top;">:</td>
-            <td style="vertical-align: top;">{{ virtualAccount }}</td>
+            <td class="label">No. Virtual Account</td>
+            <td class="sep">:</td>
+            <td>{{ virtualAccount }}</td>
         </tr>
         <tr>
-            <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">Atas Nama</td>
-            <td style="vertical-align: top;">:</td>
-            <td style="vertical-align: top;">{{ customerName }}</td>
+            <td class="label">Atas Nama</td>
+            <td class="sep">:</td>
+            <td>{{ customerName }}</td>
         </tr>
     </table>
-    <br />
     <p>
         Jika Virtual Account tidak bisa digunakan, maka dapat dibayarkan pada pilihan rekening kami sebagai berikut:
     </p>
-    <table style="width:auto; border-collapse: collapse;">
+    <table class="info-table">
         <tr>
-            <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">1. No Rekening</td>
-            <td style="vertical-align: top;">:</td>
-            <td style="vertical-align: top;">879-209-1333</td>
+            <td class="label">1. No Rekening</td>
+            <td class="sep">:</td>
+            <td>879-209-1333</td>
         </tr>
         <tr>
-            <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">&nbsp;&nbsp;&nbsp; Nama Rekening</td>
-            <td style="vertical-align: top;">:</td>
-            <td style="vertical-align: top;">PT. ASURANSI TOTAL BERSAMA</td>
+            <td class="label indent">Nama Rekening</td>
+            <td class="sep">:</td>
+            <td>PT. ASURANSI TOTAL BERSAMA</td>
         </tr>
         <tr>
-            <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">&nbsp;&nbsp;&nbsp; Bank</td>
-            <td style="vertical-align: top;">:</td>
-            <td style="vertical-align: top;">BCA Cab. WTC Mangga Dua</td>
+            <td class="label indent">Bank</td>
+            <td class="sep">:</td>
+            <td>BCA Cab. WTC Mangga Dua</td>
         </tr>
-        <tr><td><br /></td></tr>
-        <tr>
-            <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">2. No Rekening</td>
-            <td style="vertical-align: top;">:</td>
-            <td style="vertical-align: top;">120-00-3588888-7 (MANDIRI USD)</td>
-        </tr>
-        <tr>
-            <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">&nbsp;&nbsp;&nbsp; Nama Rekening</td>
-            <td style="vertical-align: top;">:</td>
-            <td style="vertical-align: top;">PT. ASURANSI TOTAL BERSAMA</td>
+        <tr class="group-gap">
+            <td class="label">2. No Rekening</td>
+            <td class="sep">:</td>
+            <td>120-00-3588888-7 (MANDIRI USD)</td>
         </tr>
         <tr>
-            <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">&nbsp;&nbsp;&nbsp; Bank</td>
-            <td style="vertical-align: top;">:</td>
-            <td style="vertical-align: top;">Mandiri USD cab Sunter Permai</td>
-        </tr>
-        <tr><td><br /></td></tr>
-        <tr>
-            <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">3. No Rekening</td>
-            <td style="vertical-align: top;">:</td>
-            <td style="vertical-align: top;">120-00-3288888-0 (MANDIRI IDR)</td>
+            <td class="label indent">Nama Rekening</td>
+            <td class="sep">:</td>
+            <td>PT. ASURANSI TOTAL BERSAMA</td>
         </tr>
         <tr>
-            <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">&nbsp;&nbsp;&nbsp; Nama Rekening</td>
-            <td style="vertical-align: top;">:</td>
-            <td style="vertical-align: top;">PT. ASURANSI TOTAL BERSAMA</td>
+            <td class="label indent">Bank</td>
+            <td class="sep">:</td>
+            <td>Mandiri USD cab Sunter Permai</td>
+        </tr>
+        <tr class="group-gap">
+            <td class="label">3. No Rekening</td>
+            <td class="sep">:</td>
+            <td>120-00-3288888-0 (MANDIRI IDR)</td>
         </tr>
         <tr>
-            <td style="padding-right: 20px; vertical-align: top; white-space: nowrap;">&nbsp;&nbsp;&nbsp; Bank</td>
-            <td style="vertical-align: top;">:</td>
-            <td style="vertical-align: top;">Mandiri Cab Sunter Permai</td>
+            <td class="label indent">Nama Rekening</td>
+            <td class="sep">:</td>
+            <td>PT. ASURANSI TOTAL BERSAMA</td>
+        </tr>
+        <tr>
+            <td class="label indent">Bank</td>
+            <td class="sep">:</td>
+            <td>Mandiri Cab Sunter Permai</td>
         </tr>
     </table>
     <p>
@@ -87,21 +132,120 @@
     </p>
     <p>
         Apabila pembayaran telah dilakukan mohon dapat diinfokan ke
-        <a href="mailto:finance@tob-ins.com" target="_blank" rel="noopener noreferrer" style="color: blue !important;">
-            finance@tob-ins.com
-        </a>
+        <a href="mailto:finance@tob-ins.com" target="_blank" rel="noopener noreferrer" class="email-link">finance@tob-ins.com</a>
     </p>
     <p>
         Jika tagihan tersebut telah dibayarkan sebelum surat ini diterima, mohon untuk menginformasikannya kepada kami dan abaikan surat tagihan ini.
-        <br/>
+        <br />
         Demikian kami sampaikan, atas perhatian dan kerjasamanya kami ucapkan terima kasih.
     </p>
     <p>
         Hormat kami,
     </p>
-	<img src="{{ImgSign}}" style="width:100px;height:auto" />
+    <img src="{{ImgSign}}" class="signature" alt="Signature" />
     <p>
         Finance Dept.
     </p>
 </div>
-                        
+    <div id="Bahasa_Inggris" style="padding-top: 20px; page-break-before: always;">
+        <p>
+            Jakarta, {{ asAtDate }}
+        </p>
+        <p>
+            Dear {{ customerName }},
+        </p>
+        <p>
+            We would like to thank you for your trust and cooperation with PT. ASURANSI TOTAL BERSAMA.
+            <br />
+            Based on our records as of {{ asAtDate }}, please find attached the premium billing details.
+        </p>
+        <p>
+            We kindly request you to make payment for the premiums,
+            <span class="highlight">especially for bills that have passed the due date</span>
+        </p>
+        <p>
+            Premium can be paid to BCA VIRTUAL ACCOUNT as follows:
+        </p>
+        <table class="info-table">
+            <tr>
+                <td class="label">Virtual Account No.</td>
+                <td class="sep">:</td>
+                <td>{{ virtualAccount }}</td>
+            </tr>
+            <tr>
+                <td class="label">Account Name</td>
+                <td class="sep">:</td>
+                <td>{{ customerName }}</td>
+            </tr>
+        </table>
+        <p>
+            If the Virtual Account cannot be used, payment can be made to our following bank accounts:
+        </p>
+        <table class="info-table">
+            <tr>
+                <td class="label">1. Account No.</td>
+                <td class="sep">:</td>
+                <td>879-209-1333</td>
+            </tr>
+            <tr>
+                <td class="label indent">Account Name</td>
+                <td class="sep">:</td>
+                <td>PT. ASURANSI TOTAL BERSAMA</td>
+            </tr>
+            <tr>
+                <td class="label indent">Bank</td>
+                <td class="sep">:</td>
+                <td>BCA Cab. WTC Mangga Dua</td>
+            </tr>
+            <tr class="group-gap">
+                <td class="label">2. Account No.</td>
+                <td class="sep">:</td>
+                <td>120-00-3588888-7 (MANDIRI USD)</td>
+            </tr>
+            <tr>
+                <td class="label indent">Account Name</td>
+                <td class="sep">:</td>
+                <td>PT. ASURANSI TOTAL BERSAMA</td>
+            </tr>
+            <tr>
+                <td class="label indent">Bank</td>
+                <td class="sep">:</td>
+                <td>Mandiri USD cab Sunter Permai</td>
+            </tr>
+            <tr class="group-gap">
+                <td class="label">3. Account No.</td>
+                <td class="sep">:</td>
+                <td>120-00-3288888-0 (MANDIRI IDR)</td>
+            </tr>
+            <tr>
+                <td class="label indent">Account Name</td>
+                <td class="sep">:</td>
+                <td>PT. ASURANSI TOTAL BERSAMA</td>
+            </tr>
+            <tr>
+                <td class="label indent">Bank</td>
+                <td class="sep">:</td>
+                <td>Mandiri Cab Sunter Permai</td>
+            </tr>
+        </table>
+        <p>
+            We hope the payment can be made soon.
+        </p>
+        <p>
+            If payment has already been made, please inform us at
+            <a href="mailto:finance@tob-ins.com" target="_blank" rel="noopener noreferrer" class="email-link">finance@tob-ins.com</a>
+        </p>
+        <p>
+            If the outstanding amount has already been paid prior to receiving this letter, please notify us and kindly disregard this.
+            <br />
+            Thank you for your attention.
+        </p>
+        <p>
+            Warmest regards,
+        </p>
+        <img src="{{ImgSign}}" class="signature" alt="Signature" />
+        <p>
+            Finance Dept.
+        </p>
+    </div>
+</div>

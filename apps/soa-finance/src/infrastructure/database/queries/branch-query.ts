@@ -1,10 +1,8 @@
-import { executeQuery } from "../database";
-import type { IBranch } from "../types";
+import { executeQuery } from "../postgres.js";
+import type { Branch } from "../types.js";
 
-export const getAllBranches = async (): Promise<IBranch[]> => {
-  const sQuery = `SELECT OFFICE_CODE AS "officeCode", CONTACT_PERSON AS "name" FROM MASTER_BRANCH`;
-
-  const result = await executeQuery(sQuery);
-  const rows = result.rows as IBranch[];
-  return rows;
+export const getAllBranches = async (): Promise<Branch[]> => {
+  const sQuery = `SELECT OFFICE_CODE AS "officeCode", DESCRIPTION AS "name" FROM MASTER_BRANCH ORDER BY OFFICE_CODE`;
+  const result = await executeQuery<Branch>(sQuery);
+  return result.rows;
 };

@@ -15,10 +15,10 @@ bun run dev
 bun run build
 
 # Run single app in dev mode
-bun run --filter @finance/closing dev
+bun run --filter @restate-tob/finance dev
 
 # Build single app
-bun run --filter @finance/closing build
+bun run --filter @restate-tob/finance build
 ```
 
 ### Linting & Typechecking
@@ -38,12 +38,32 @@ cd apps/finance && bun run typecheck
 cd apps/soa-finance && bun run typecheck
 
 # Typecheck single package
-cd packages/oracle && bun run typecheck
 cd packages/postgres && bun run typecheck
 cd packages/shared && bun run typecheck
 ```
 
 Linting uses [ultracite](https://github.com/harbordev/ultracite) (wraps Biome). Lefthook runs `ultracite fix` on pre-commit automatically.
+
+**Key linting notes:**
+- Unused imports are **errors** and **not auto-fixable** — must be removed manually
+- Barrel files (`index.ts` re-exports) are **allowed** — `noBarrelFile` is explicitly disabled in `biome.jsonc`
+- Run `bun run check` to lint, `bun run fix` to auto-fix formatting
+
+### CI/CD Pipeline
+
+- **CI**: GitHub Actions (`ci.yml`), runs on PRs to `main` — typecheck → lint → build → test
+- **Deploy**: Two reusable workflows (`deploy-finance-lambda.yml`, `deploy-soa-finance-lambda.yml`) bundle with `tsdown`, upload to AWS Lambda, register with Restate admin API
+- **Secrets**: Self-hosted Infisical (OIDC auth), converted to Lambda env vars inline
+- **No Docker** for deployment — Lambda-only. `docker-compose.yml` in `apps/soa-finance` is local dev only (Restate + Gotenberg)
+
+### Testing
+
+- **Framework**: Bun's built-in test runner (`bun:test`) — import `{ describe, expect, it } from "bun:test"`
+- **Two patterns**:
+  - Packages: `__tests__/*.test.ts` inside `src/`
+  - Apps: co-located `*.test.ts` next to source files
+- Run tests: `bun run test` (root, apps only) or `bun test src/` (per workspace)
+- Pre-commit does **not** run tests — lint only
 
 ## Architecture
 
@@ -52,9 +72,10 @@ Linting uses [ultracite](https://github.com/harbordev/ultracite) (wraps Biome). 
 - **Turborepo + Bun workspaces** manage the monorepo
 - Apps live in `apps/` directory, each with independent `package.json`
 - Shared packages in `packages/`:
-  - `@restate-tob/oracle`: Oracle database client with connection pooling
   - `@restate-tob/postgres`: PostgreSQL database client
   - `@restate-tob/shared`: Shared utilities and types
+  - `@restate-tob/oracle`: (empty — no source yet)
+- **Module resolution split**: Apps (`finance`, `soa-finance`) use `module: "preserve"` + `moduleResolution: "bundler"` (Bun-native). Packages use `module: "nodenext"` (Node ESM). Keep this in mind when adding imports.
 
 ### Restate Framework
 
@@ -90,7 +111,6 @@ Key concepts:
 
 **Connection Timeouts:**
 - PostgreSQL: 10s connection, 300s statement timeout
-- Oracle: 60s connection, 60s queue timeout
 - All database operations wrapped in connection helpers for proper cleanup
 
 **Workflow State Management:**
@@ -156,4 +176,4 @@ Write code that is **accessible, performant, type-safe, and maintainable**. Focu
 - Avoid spread syntax in accumulators within loops
 - Use top-level regex literals instead of creating them in loops
 - Prefer specific imports over namespace imports
-- Avoid barrel files (index files that re-export everything)
+- Barrel files (re-export `index.ts`) are allowed — `noBarrelFile` is disabled in this project

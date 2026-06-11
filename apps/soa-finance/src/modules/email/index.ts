@@ -1,6 +1,6 @@
-export { sendReminderEmail } from "./send-reminder";
-export { sendSoaEmail } from "./send-soa";
 export {
-  type SendWithAttachmentsParams,
-  sendWithAttachments,
-} from "./send-with-attachments";
+  buildEmailAttachments,
+  getCcRecipients,
+  resolveRecipientEmail,
+} from "./attachments.js";
+export { type SendSoaEmailParams, sendSoaEmail } from "./send-soa-email.js";

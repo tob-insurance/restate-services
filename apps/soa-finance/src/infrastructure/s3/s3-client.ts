@@ -7,13 +7,27 @@ export function getS3Client(): S3Client {
     return s3Client;
   }
 
+  const awsRegion = process.env.AWS_REGION;
+  if (!awsRegion) {
+    throw new Error(
+      "AWS_REGION environment variable is required for S3 client"
+    );
+  }
+
   s3Client = new S3Client({
-    region: process.env.AWS_REGION || "ap-southeast-3",
+    region: awsRegion,
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    maxAttempts: 3,
   });
 
   return s3Client;
 }
 
 export function getBucketName(): string {
-  return process.env.S3_BUCKET || "soa-finance-1778060263";
+  const s3Bucket = process.env.S3_BUCKET;
+  if (!s3Bucket) {
+    throw new Error("S3_BUCKET environment variable is required");
+  }
+
+  return s3Bucket;
 }

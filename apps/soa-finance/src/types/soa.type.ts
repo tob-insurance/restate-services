@@ -1,71 +1,96 @@
-export const SoaType = {
+import type { CorrelationId, CustomerId } from "./branded.js";
+
+export const SoaTypeLabels = {
   1: "SOA",
   2: "RL1",
   3: "RL2",
   4: "WL",
-};
+} as const;
 
-export type SoaType = keyof typeof SoaType;
+export const SoaType = {
+  SOA: 1,
+  RL1: 2,
+  RL2: 3,
+  WL: 4,
+} as const;
+export type SoaType = (typeof SoaType)[keyof typeof SoaType];
 
-export type ISoaItem = {
-  customerId: string;
-  timePeriod: string;
-  processingDate: string;
+export interface SoaItem {
+  branch: string;
   classOfBusiness: string;
-  branch: string;
-  toDate: number;
+  correlationId?: CorrelationId;
+  customerId: CustomerId;
+  processingDate: string;
   processingType: SoaType;
-};
+  timePeriod: string;
+  toDate: number;
+}
 
-export type IStatementOfAccountModel = {
-  debitAndCreditNoteNo: string;
-  branch: string;
-  policyNo: string;
-  policyEndNo: string;
-  contractNo: string;
-  plateNo: string;
-  coInFacRefNo: string;
-  fireConjunctionPolicy: string;
-  lob: string;
-  sourceOfBusiness: string;
+export interface StatementOfAccountModel {
   accountName: string;
-  insuredName: string;
+  actingCode: string;
+  aging: number;
+  branch: string;
+  coInFacRefNo: string;
+  commission: number;
+  contractNo: string;
+  cost: number;
+  currency: string;
+  debitAndCreditNoteNo: string;
+  discount: number;
+  distributionCode: string;
   distributionName: string;
   distributionNameSecond: string;
-  qualitateQuaName: string;
+  dueDate: string;
   endEffDate: string;
   endExpDate: string;
-  postDate: string;
-  dueDate: string;
-  aging: number;
-  currency: string;
-  exchangeRate: number;
   endReason: string;
-  actingCode: string;
-  totalSumInsured: number;
+  exchangeRate: number;
+  fireConjunctionPolicy: string;
   grossPremium: number;
-  discount: number;
-  commission: number;
-  ppn: number;
-  pph21: number;
-  pph23: number;
-  cost: number;
-  stmp: number;
+  installment: string;
+  insuredName: string;
+  lob: string;
   netPremium: number;
   netPremiumIdr: number;
-  installment: string;
   origAmount: number;
-  dcNoteNo?: string;
-  classOfBusiness?: string;
-  customerCode: string;
-  officeCode?: string;
-  distributionCode: string;
-};
+  plateNo: string;
+  policyEndNo: string;
+  policyNo: string;
+  postDate: string;
+  pph21: number;
+  pph23: number;
+  ppn: number;
+  qualitateQuaName: string;
+  sourceOfBusiness: string;
+  stmp: number;
+  totalSumInsured: number;
+}
 
-export type IFileData = {
-  fileName: string;
-  bytes: Buffer;
-  contentType: string;
-  isInline?: boolean;
+export type FileData = S3FileData | BufferFileData;
+
+export interface S3FileData {
   contentId?: string;
-};
+  contentType: string;
+  fileName: string;
+  isInline?: boolean;
+  s3Key: string;
+}
+
+export interface BufferFileData {
+  bytes: Buffer;
+  contentId?: string;
+  contentType: string;
+  fileName: string;
+  isInline?: boolean;
+}
+
+/** Type guard to check if FileData has S3 key */
+export function isS3FileData(file: FileData): file is S3FileData {
+  return "s3Key" in file && typeof file.s3Key === "string";
+}
+
+/** Type guard to check if FileData has bytes */
+export function isBufferFileData(file: FileData): file is BufferFileData {
+  return "bytes" in file && Buffer.isBuffer(file.bytes);
+}

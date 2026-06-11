@@ -1,20 +1,28 @@
-export type IEmailAttachment = {
-  name: string;
-  contentType: string;
-  contentBytes: string;
-  isInline?: boolean;
+export interface EmailAttachment {
+  contentBytes: string; // base64 for small files
   contentId?: string;
-};
+  contentType: string;
+  isInline?: boolean;
+  name: string;
+  rawBytes?: Buffer; // raw buffer for large files (upload sessions)
+  s3Key?: string; // S3 key — sender downloads and streams to Graph API
+}
 
-export type IEmailMessage = {
-  to: string[];
+export interface UploadSession {
+  expirationDateTime: string;
+  nextExpectedRanges: string[];
+  uploadUrl: string;
+}
+
+export interface EmailMessage {
+  attachments?: EmailAttachment[];
+  body: string;
   cc?: string[];
   subject: string;
-  body: string;
-  attachments?: IEmailAttachment[];
-};
+  to: string[];
+}
 
-export type ISendEmailResult = {
-  sent: boolean;
+export interface SendEmailResult {
   reason?: string;
-};
+  sent: boolean;
+}

@@ -1,39 +1,20 @@
-import { SCHEDULE_CONFIG } from "../../../constants/schedule";
 import {
-  formatDateEnglishMonthFirst,
+  computeDeadline,
   formatDateIndonesian,
-} from "../../../utils/formatter";
-import { formatEnDate } from "../../../utils/template/email-formatters";
-import type { EmailTemplateName } from "../../../utils/template/engine";
-import { renderEmail } from "../../../utils/template/engine";
-import type { IReminderEmailData } from "../../reminder/types";
+} from "../../../utils/formatter/date.formatter.js";
+import { formatEnDate } from "../../../utils/template/email-formatters.js";
+import type { EmailTemplateName } from "../../../utils/template/engine.js";
+import { renderEmail } from "../../../utils/template/engine.js";
+import type { ReminderEmailData } from "../../reminder/types.js";
 
 const currencyFormatter = new Intl.NumberFormat("id-ID", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 
-function computeDeadline(
-  type: string,
-  processingDate: Date
-): { deadlineId: string; deadlineEn: string } | null {
-  const soaType = Number(type) + 1;
-  const schedule = SCHEDULE_CONFIG.find((s) => s.soaType === soaType);
-  const graceDays = schedule?.graceDays ?? 0;
-  if (graceDays === 0) {
-    return null;
-  }
-  const deadline = new Date(processingDate);
-  deadline.setDate(deadline.getDate() + graceDays);
-  return {
-    deadlineId: formatDateIndonesian(deadline),
-    deadlineEn: formatDateEnglishMonthFirst(deadline),
-  };
-}
-
 export async function generateReminderEmailHtml(
   type: string,
-  data: IReminderEmailData,
+  data: ReminderEmailData,
   templateName: EmailTemplateName = "TemplateReminderLetterSOA"
 ): Promise<string> {
   const deadline = computeDeadline(type, data.asAtDate);

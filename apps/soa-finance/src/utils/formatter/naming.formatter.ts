@@ -1,13 +1,16 @@
-export const reminderPdfName = (reminderCount: number | string): string =>
-  `Reminder_${reminderCount}.pdf`;
+import { randomUUID } from "node:crypto";
+
+/**
+ * Generate a random suffix for file names to prevent URL guessing.
+ * Uses UUID v4 for cryptographically random strings.
+ */
+const randomSuffix = (): string => randomUUID().slice(0, 4);
+
+export const reminderPdfName = (customerCode: string): string =>
+  `Reminder-Letter-${customerCode}-${randomSuffix()}.pdf`;
 
 export const letterSoaPdfName = (customerCode: string): string =>
-  `Collection_Letter_${customerCode}.pdf`;
+  `Collection-Letter-${customerCode}-${randomSuffix()}.pdf`;
 
-export const excelSoaName = (
-  customerCode: string,
-  date: Date = new Date()
-): string => {
-  const ticks = date.getTime() * 10_000 + 621_355_968_000_000_000;
-  return `Outstanding-SOA--${customerCode}-${ticks}.xlsx`;
-};
+export const excelSoaName = (customerCode: string): string =>
+  `Outstanding-SOA-${customerCode}-${randomSuffix()}.xlsx`;

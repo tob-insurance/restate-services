@@ -1,47 +1,29 @@
-import { SCHEDULE_CONFIG } from "../../constants/schedule";
-import type { IAccount, IStatementOfAccountModel } from "../../types";
+import type { Account } from "../../types/customer.type.js";
+import type { StatementOfAccountModel } from "../../types/soa.type.js";
 import {
+  computeDeadline,
   formatDateEnglish,
-  formatDateEnglishMonthFirst,
   formatDateIndonesian,
   formatMonthEnglish,
   formatMonthIndonesian,
-  formatThousands,
-} from "../../utils/formatter";
-import { getSignature } from "./pdf-assets";
+} from "../../utils/formatter/date.formatter.js";
+import { formatThousands } from "../../utils/formatter/number.formatter.js";
+import { getSignature } from "./pdf-assets.js";
 
 type LatestLetterInfo = {
   letterNo: string;
   sentDate: Date;
 } | null;
 
-type BuildPdfTemplateDataParams = {
-  isReminder: boolean;
-  toDate: Date;
-  customerData: IAccount;
+interface BuildPdfTemplateDataParams {
   branchName: string;
-  soaData: IStatementOfAccountModel[];
+  customerData: Account;
+  isReminder: boolean;
+  latestLetter?: LatestLetterInfo;
   letterNo: string;
   reminderCount: string;
-  latestLetter?: LatestLetterInfo;
-};
-
-function computeDeadline(
-  reminderCount: string,
-  asAtDate: Date
-): { deadlineId: string; deadlineEn: string } | null {
-  const soaType = Number(reminderCount) + 1;
-  const schedule = SCHEDULE_CONFIG.find((s) => s.soaType === soaType);
-  const graceDays = schedule?.graceDays ?? 0;
-  if (graceDays === 0) {
-    return null;
-  }
-  const deadline = new Date(asAtDate);
-  deadline.setDate(deadline.getDate() + graceDays);
-  return {
-    deadlineId: formatDateIndonesian(deadline),
-    deadlineEn: formatDateEnglishMonthFirst(deadline),
-  };
+  soaData: StatementOfAccountModel[];
+  toDate: Date;
 }
 
 export async function buildPdfTemplateData(
@@ -60,7 +42,7 @@ export async function buildPdfTemplateData(
 
   if (isReminder) {
     const totalPremiumVal = soaData.reduce(
-      (acc: number, item: IStatementOfAccountModel) =>
+      (acc: number, item: StatementOfAccountModel) =>
         acc + (item.netPremiumIdr || 0),
       0
     );

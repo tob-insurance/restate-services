@@ -1,99 +1,87 @@
 import type { ObjectContext } from "@restatedev/restate-sdk";
-import { type IAccount, type ISoaItem, SoaType } from "../../types";
-import type { ReminderHeader } from "../soa/objects/state";
-import { readDcNoteIndex, stateKeys } from "../soa/objects/state";
-import { generateReminderLetter } from "./generate-reminder-letter";
-import type { IProcessReminder } from "./types";
+import {
+  getReminderHeadersForPeriod,
+  getReminderIdsForPeriod,
+} from "../../infrastructure/database/queries/reminder-query.js";
+import type { Account } from "../../types/customer.type.js";
+import { type SoaItem, SoaTypeLabels } from "../../types/soa.type.js";
+import { generateReminderLetter } from "./generate-reminder-letter.js";
+import type {
+  GenerateReminderResult,
+  ProcessReminder,
+  SoaReminder,
+} from "./types.js";
 
-type ProcessReminderParams = {
+interface ProcessReminderParams {
   ctx: ObjectContext;
-  customer: IAccount;
-  item: ISoaItem;
-};
-
-type SoaReminder = {
-  id: string;
-  customerCode: string;
-  timePeriod: string;
-  officeId: string;
-};
+  customer: Account;
+  item: SoaItem;
+}
 
 export const processReminderLetter = async (
   params: ProcessReminderParams
-): Promise<IProcessReminder> => {
+): Promise<ProcessReminder> => {
   const { ctx, customer, item } = params;
 
   ctx.console.log(
     `[Reminder] Processing for ${customer.code}, type: ${
-      SoaType[item.processingType]
+      SoaTypeLabels[item.processingType]
     }`
   );
 
-  const dcNoteIndex = await readDcNoteIndex(ctx, item.timePeriod);
-
-  if (Object.keys(dcNoteIndex).length === 0) {
-    ctx.console.log(
-      `[Reminder] Skipping ${customer.code}: no previous reminder records`
-    );
-    return { processed: false, remindersSent: 0, dcNotesPaid: [] };
-  }
-
-  const reminderIdsForPeriod = new Set(
-    Object.values(dcNoteIndex).filter((id) =>
-      id.startsWith(`${item.timePeriod}:`)
-    )
+  // Combined read: reminder IDs + headers in single ctx.run()
+  const { reminderIds, reminderHeaders } = await ctx.run(
+    "get-reminder-ids-and-headers",
+    async () => {
+      const [ids, headers] = await Promise.all([
+        getReminderIdsForPeriod(customer.code, item.timePeriod),
+        getReminderHeadersForPeriod(customer.code, item.timePeriod),
+      ]);
+      return { reminderIds: ids, reminderHeaders: headers };
+    }
   );
 
-  if (reminderIdsForPeriod.size === 0) {
+  if (reminderIds.length === 0) {
     ctx.console.log(
       `[Reminder] Skipping ${customer.code}: no reminders for period ${item.timePeriod}`
     );
-    return { processed: false, remindersSent: 0, dcNotesPaid: [] };
+    return { processed: false, remindersSent: 0 };
   }
 
-  const reminders: SoaReminder[] = [];
-  for (const reminderId of reminderIdsForPeriod) {
-    const [officeId] = reminderId.split(":").slice(1);
-    const header = await ctx.get<ReminderHeader>(
-      stateKeys.header(item.timePeriod, officeId)
-    );
-    if (header) {
-      reminders.push({
-        id: reminderId,
-        customerCode: header.customerCode,
-        timePeriod: header.timePeriod,
-        officeId: header.officeId,
-      });
-    }
-  }
+  const reminders: SoaReminder[] = reminderHeaders.map((header) => ({
+    id: `${header.time_period}:${header.office_id}`,
+    customerCode: header.customer_code,
+    timePeriod: header.time_period,
+    officeId: header.office_id,
+  }));
 
   if (reminders.length === 0) {
     ctx.console.log(
       `[Reminder] Skipping ${customer.code}: no reminder headers found`
     );
-    return { processed: false, remindersSent: 0, dcNotesPaid: [] };
+    return { processed: false, remindersSent: 0 };
   }
 
-  const allDcNotesPaid: string[] = [];
-  let remindersSent = 0;
-
+  // Sequential processing for deterministic journal ordering
+  // Each reminder runs independently; failures are caught and logged
+  const results: GenerateReminderResult[] = [];
   for (const reminder of reminders) {
-    const result = await generateReminderLetter({
-      ctx,
-      customer,
-      reminder,
-      item,
-    });
-
-    if (result) {
-      if (result.sent) {
-        remindersSent += 1;
-      }
-      if (result.dcNotesPaid?.length > 0) {
-        allDcNotesPaid.push(...result.dcNotesPaid);
-      }
+    try {
+      const result = await generateReminderLetter({
+        ctx,
+        customer,
+        item,
+        reminder,
+      });
+      results.push(result ?? { sent: false, reason: "ERROR" });
+    } catch (error) {
+      ctx.console.log(
+        `[Reminder] Failed for ${customer.code} reminder ${reminder.id}: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+      results.push({ sent: false, reason: "ERROR" });
     }
   }
+  const remindersSent = results.filter((r) => r.sent).length;
 
-  return { processed: true, remindersSent, dcNotesPaid: allDcNotesPaid };
+  return { processed: true, remindersSent };
 };

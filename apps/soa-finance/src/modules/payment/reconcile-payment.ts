@@ -1,40 +1,51 @@
-import type { ObjectContext } from "@restatedev/restate-sdk";
-import type { ReminderDetail } from "../soa/objects/state";
-import { stateKeys } from "../soa/objects/state";
+import type { ReminderDetailRow } from "../../infrastructure/database/queries/reminder-query.js";
+import { parseDcNoteIds } from "../../utils/dc-note.js";
 
-export const reconcilePayment = async (
-  ctx: ObjectContext,
-  reminderId: string,
+const BULK_PAYMENT_MIN_COUNT = 5;
+const BULK_PAYMENT_RATIO_THRESHOLD = 0.8;
+
+export const reconcilePayment = (
+  details: ReminderDetailRow[] | null,
   currentDcNotes: string[]
-): Promise<string[]> => {
-  const [timePeriod, officeId] = reminderId.split(":");
-
-  const details = await ctx.get<Record<string, ReminderDetail>>(
-    stateKeys.details(timePeriod, officeId)
-  );
-
-  if (!details) {
-    return [];
+): {
+  paidDcNoteIds: string[];
+  bulkPaymentSkipped: boolean;
+} => {
+  if (!details || details.length === 0) {
+    return { paidDcNoteIds: [], bulkPaymentSkipped: false };
   }
 
   const currentDcNotesSet = new Set(
-    currentDcNotes.map((dc) => dc.toLowerCase())
+    currentDcNotes.flatMap((dc) => parseDcNoteIds(dc))
   );
 
-  const paidDcNotes = Object.values(details).filter(
+  // Notes that disappeared from staging = newly detected as paid
+  const newlyDetectedPaid = details.filter(
     (detail) =>
-      !(detail.isPaid || currentDcNotesSet.has(detail.dcNoteId.toLowerCase()))
+      !(
+        detail.is_paid || currentDcNotesSet.has(detail.dc_note_id.toLowerCase())
+      )
   );
 
-  if (paidDcNotes.length === 0) {
-    return [];
+  if (newlyDetectedPaid.length === 0) {
+    return { paidDcNoteIds: [], bulkPaymentSkipped: false };
   }
 
-  const updatedDetails = { ...details };
-  for (const paid of paidDcNotes) {
-    updatedDetails[paid.dcNoteId] = { ...paid, isPaid: true };
-  }
-  ctx.set(stateKeys.details(timePeriod, officeId), updatedDetails);
+  // Safety: don't mark most reminders as paid at once (likely data issue)
+  const totalDetails = details.length;
 
-  return paidDcNotes.map((d) => d.dcNoteId);
+  if (totalDetails > BULK_PAYMENT_MIN_COUNT) {
+    const paidRatio = newlyDetectedPaid.length / totalDetails;
+    if (paidRatio >= BULK_PAYMENT_RATIO_THRESHOLD) {
+      return {
+        paidDcNoteIds: [],
+        bulkPaymentSkipped: true,
+      };
+    }
+  }
+
+  return {
+    paidDcNoteIds: newlyDetectedPaid.map((d) => d.dc_note_id),
+    bulkPaymentSkipped: false,
+  };
 };

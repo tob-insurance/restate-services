@@ -15,11 +15,42 @@ export function isDevelopment(): boolean {
 }
 
 export function getPipelinePathPrefix(): string {
-  const raw = process.env.AZURE_STORAGE_PIPELINE_PREFIX || "parquet";
+  const raw = process.env.S3_PIPELINE_PREFIX || "parquet";
   const prefix = raw.replace(TRAILING_SLASHES, "");
   return `${prefix}/${getAppEnvironment()}`;
 }
 
 export function getTestEmailRecipient(): string {
-  return process.env.TEST_EMAIL_RECIPIENT || "";
+  return (
+    process.env.TEST_EMAIL_RECIPIENT || process.env.SOA_DEV_TEST_EMAIL || ""
+  );
+}
+
+export function parseEnvInt(key: string, defaultVal: number): number {
+  const raw = process.env[key];
+  if (!raw) {
+    return defaultVal;
+  }
+  const val = Number(raw);
+  return Number.isFinite(val) && val > 0 ? val : defaultVal;
+}
+
+export function parseEnvBool(key: string): boolean {
+  const raw = process.env[key];
+  if (!raw) {
+    return false;
+  }
+  return raw.toLowerCase() === "true" || raw === "1";
+}
+
+export function parseEnvList(key: string): string[] | null {
+  const raw = process.env[key];
+  if (!raw) {
+    return null;
+  }
+  const items = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  return items.length > 0 ? items : null;
 }

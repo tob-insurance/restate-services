@@ -3,7 +3,7 @@ import { join } from "node:path";
 import juice from "juice";
 import { Liquid } from "liquidjs";
 
-import { ASSETS_DIR } from "../paths";
+import { ASSETS_DIR } from "../paths.js";
 
 const TEMPLATES_DIR = join(ASSETS_DIR, "email/templates");
 
@@ -12,6 +12,8 @@ const TEMPLATE_KEYS = [
   "_partials/bank-accounts-id",
   "_partials/bank-accounts-en",
   "_partials/signature",
+  "_partials/signature-id",
+  "_partials/signature-en",
   "_partials/contact-info",
   "TemplateOutstandingStatementOfAccount",
   "TemplateReminderLetterSOA",
@@ -50,9 +52,13 @@ export async function renderEmail(
   });
 }
 
-export function renderPlain(
-  templateName: EmailTemplateName,
+const simpleLiquid = new Liquid({
+  cache: process.env.NODE_ENV === "production",
+});
+
+export function renderString(
+  template: string,
   data: Record<string, unknown>
 ): Promise<string> {
-  return engine.renderFile(templateName, data);
+  return simpleLiquid.parseAndRender(template, data);
 }

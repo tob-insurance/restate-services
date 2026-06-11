@@ -2,6 +2,8 @@
  * Date Formatting Functions
  */
 
+import { SCHEDULE_CONFIG } from "../../constants/schedule.js";
+
 const INDONESIAN_MONTHS = [
   "Januari",
   "Februari",
@@ -31,13 +33,6 @@ const ENGLISH_MONTHS = [
   "November",
   "December",
 ];
-
-export function formatIndonesianDate(date: Date): string {
-  const day = date.getDate().toString().padStart(2, "0");
-  const month = INDONESIAN_MONTHS[date.getMonth()];
-  const year = date.getFullYear();
-  return `Jakarta, ${day} ${month} ${year}`;
-}
 
 export function formatDateIndonesian(date: Date): string {
   return `${date.getDate()} ${INDONESIAN_MONTHS[date.getMonth()]} ${date.getFullYear()}`;
@@ -95,6 +90,24 @@ export function formatDuration(durationMs: number): string {
   return `${hh}:${mm}:${ss}`;
 }
 
+export function computeDeadline(
+  type: string,
+  processingDate: Date
+): { deadlineId: string; deadlineEn: string } | null {
+  const soaType = Number(type) + 1;
+  const schedule = SCHEDULE_CONFIG.find((s) => s.soaType === soaType);
+  const graceDays = schedule?.graceDays ?? 0;
+  if (graceDays === 0) {
+    return null;
+  }
+  const deadline = new Date(processingDate);
+  deadline.setDate(deadline.getDate() + graceDays);
+  return {
+    deadlineId: formatDateIndonesian(deadline),
+    deadlineEn: formatDateEnglishMonthFirst(deadline),
+  };
+}
+
 export function parseDate(value: unknown): string {
   if (!value) {
     return "-";
@@ -119,4 +132,60 @@ export function parseDate(value: unknown): string {
   const day = date.getDate();
 
   return `${month}/${day}/${year}`;
+}
+
+const DATE_PATTERN = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+
+function parseSlashDate(value: string): Date | null {
+  // Try ISO first
+  let d = new Date(value);
+  if (!Number.isNaN(d.getTime()) && d.getFullYear() > 1900) {
+    return d;
+  }
+
+  const match = DATE_PATTERN.exec(value);
+  if (!match) {
+    return null;
+  }
+
+  const [, first, second, year] = match;
+  const yearNum = Number(year);
+
+  // Try both (first=month, second=day) and (first=day, second=month)
+  for (const [month, day] of [
+    [Number(first), Number(second)],
+    [Number(second), Number(first)],
+  ]) {
+    d = new Date(yearNum, month - 1, day);
+    if (
+      d.getFullYear() === yearNum &&
+      d.getMonth() === month - 1 &&
+      d.getDate() === day
+    ) {
+      return d;
+    }
+  }
+
+  return null;
+}
+
+export function toExcelDate(value: unknown): Date | null {
+  if (value === null || value === undefined || value === "" || value === "-") {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  if (typeof value === "number") {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  if (typeof value === "string") {
+    return parseSlashDate(value);
+  }
+
+  return null;
 }

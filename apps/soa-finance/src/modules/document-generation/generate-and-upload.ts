@@ -1,30 +1,30 @@
-import { CONTENT_TYPES } from "../../constants";
+import { CONTENT_TYPES } from "../../constants/constants.js";
 import { uploadFile } from "../../infrastructure/s3";
+import type { Account } from "../../types/customer.type.js";
 import type {
-  IAccount,
-  IFileData,
-  ISoaItem,
-  IStatementOfAccountModel,
-} from "../../types";
-import { excelSoaName } from "../../utils/formatter";
-import { generateExcel } from "./excel.generator";
-import { generateSoaPdfHandler } from "./generate-soa-pdf";
-import { buildPdfTemplateData } from "./pdf-template";
+  FileData,
+  SoaItem,
+  StatementOfAccountModel,
+} from "../../types/soa.type.js";
+import { excelSoaName } from "../../utils/formatter/naming.formatter.js";
+import { generateExcel } from "./excel-generator.js";
+import { generateSoaPdfHandler } from "./generate-soa-pdf.js";
+import { buildPdfTemplateData } from "./pdf-template.js";
 
-type GenerateAndUploadParams = {
-  soaData: IStatementOfAccountModel[];
-  customerData: IAccount;
-  params: ISoaItem;
+interface GenerateAndUploadParams {
   branchName: string;
-  letterNo: string;
+  customerData: Account;
   latestLetter: { letterNo: string; sentDate: Date } | null;
+  letterNo: string;
+  params: SoaItem;
   pdfFileName: string;
-};
+  soaData: StatementOfAccountModel[];
+}
 
-type GenerateAndUploadResult = {
-  excelFile: IFileData;
-  pdfFile: IFileData;
-};
+interface GenerateAndUploadResult {
+  excelFile: FileData;
+  pdfFile: FileData;
+}
 
 export async function generateAndUploadDocuments(
   options: GenerateAndUploadParams
@@ -42,46 +42,52 @@ export async function generateAndUploadDocuments(
   const isReminder = params.processingType > 1;
   const toDate = new Date(params.toDate * 1000);
   const reminderCount = (params.processingType - 1).toString();
-  const dateNow = new Date(params.processingDate);
 
-  const excelFile = await generateExcel({
-    soaData,
-    customerId: customerData.code,
-  });
-  const excelFileName = excelSoaName(customerData.code, dateNow);
-  excelFile.fileName = excelFileName;
-
+  // Excel and PDF generation are independent — run in parallel
   const templateName = isReminder
     ? "TemplateReminderLetterSOA"
     : "TemplateOutstandingStatementOfAccount";
 
-  const templateData = await buildPdfTemplateData({
-    isReminder,
-    toDate,
-    customerData,
-    branchName,
-    soaData,
-    letterNo,
-    reminderCount,
-    latestLetter,
-  });
+  const [excelFile, pdfFile] = await Promise.all([
+    generateExcel({ soaData }).then((excel) => {
+      excel.fileName = excelSoaName(customerData.code);
+      return excel;
+    }),
+    buildPdfTemplateData({
+      isReminder,
+      toDate,
+      customerData,
+      branchName,
+      soaData,
+      letterNo,
+      reminderCount,
+      latestLetter,
+    }).then((templateData) =>
+      generateSoaPdfHandler({
+        templateName,
+        data: templateData,
+        filename: pdfFileName,
+      })
+    ),
+  ]);
 
-  const pdfFile: IFileData = await generateSoaPdfHandler({
-    templateName,
-    data: templateData,
-    filename: pdfFileName,
-  });
+  // Upload both files to S3 for archival (parallel)
+  const [excelUpload, pdfUpload] = await Promise.all([
+    uploadFile({ ...excelFile, contentType: CONTENT_TYPES.XLSX }, toDate),
+    uploadFile(pdfFile, toDate),
+  ]);
 
-  await uploadFile(
-    {
-      ...excelFile,
+  // Return FileData with S3 keys — no raw buffers in ctx.run() journal
+  return {
+    excelFile: {
+      fileName: excelFile.fileName,
       contentType: CONTENT_TYPES.XLSX,
+      s3Key: excelUpload.key,
     },
-    customerData.code,
-    "excel"
-  );
-
-  await uploadFile(pdfFile, customerData.code, "pdf");
-
-  return { excelFile, pdfFile };
+    pdfFile: {
+      fileName: pdfFile.fileName,
+      contentType: pdfFile.contentType,
+      s3Key: pdfUpload.key,
+    },
+  };
 }

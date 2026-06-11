@@ -16,9 +16,13 @@ on:
     branches: [main]
     paths:
       - "apps/finance/**"
-      - "packages/oracle/**"
       - "packages/postgres/**"
+      - "packages/shared/**"
       - ".github/workflows/deploy-restate-lambda.yml"
+
+concurrency:
+  group: deploy-finance-${{ inputs.environment || 'prod' }}
+  cancel-in-progress: false
 
 jobs:
   deploy:

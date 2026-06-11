@@ -4,16 +4,19 @@ export function createFooter(footerBase64: string): string {
   <head>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      html, body { width: 100%; height: 100%; }
-      .img-footer {
-        margin-bottom: -20px;
+      html, body {
+        width: 100%;
+        height: 100%;
+        background-image: url("${footerBase64}");
+        background-size: 100% auto;
+        background-position: bottom center;
+        background-repeat: no-repeat;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        padding: 0;
       }
     </style>
   </head>
-  <body>
-    <div class="footer">
-      <img class="img-footer" src="${footerBase64}" alt="Logo" style="width: 100%; height: auto;">
-    </div>
-  </body>
+  <body></body>
 </html>`;
 }

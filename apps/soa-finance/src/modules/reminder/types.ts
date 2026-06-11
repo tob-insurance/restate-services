@@ -1,30 +1,28 @@
-export type IReminderEmailData = {
-  customerName: string;
+export interface ReminderEmailData {
   asAtDate: Date;
-  virtualAccount: string;
-  letterNo: string;
-  previousLetterNo?: string;
-  previousLetterDate?: Date;
   branch?: string;
+  customerName: string;
+  letterNo: string;
+  previousLetterDate?: Date;
+  previousLetterNo?: string;
   totalPremium?: number;
-};
+  virtualAccount: string;
+}
 
-export type ISoaReminder = {
-  id: string;
+export interface SoaReminder {
   customerCode: string;
-  timePeriod: string;
+  id: string;
   officeId: string;
-};
+  timePeriod: string;
+}
 
-export type IProcessReminder = {
+export interface ProcessReminder {
   processed: boolean;
   remindersSent: number;
-  dcNotesPaid: string[];
-};
+}
 
-export type IGenerateReminderResult = {
-  sent: boolean;
-  dcNotesPaid: string[];
+export interface GenerateReminderResult {
   letterNo?: string | null;
   reason?: "ALL_PAID" | "SENT" | "ERROR";
-};
+  sent: boolean;
+}

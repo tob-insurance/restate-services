@@ -1,13 +1,15 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
-  "extends": ["ultracite/core"],
+  "extends": ["ultracite/biome/core"],
   "files": {
     "includes": [
       "!**/bun.lock",
       "!**/templates/html/**/*.html",
       "!**/templates/*.html",
-      "!**/assets/email/templates/**/*.html"
-    ]
+      "!**/assets/email/templates/**/*.html",
+      "!**/.omo"
+    ],
+    "ignoreUnknown": true
   },
   "linter": {
     "rules": {

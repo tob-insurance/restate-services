@@ -11,7 +11,7 @@
     "lint:fix": "ultracite fix",
     "start": "node ./dist/app.local.js",
     "dev": "tsx watch ./src/app.local.ts",
-    "test": "bun test src/",
+    "test": "bun test --preload ./src/test-setup.ts src/",
     "clean": "rm -rf dist dist-lambda",
     "bundle": "tsdown src/app.local.ts --minify --sourcemap --platform node --target node22 --outDir dist --clean --no-dts",
     "postbundle": "cd dist && zip -r index.zip app.local.mjs*",

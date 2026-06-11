@@ -48,6 +48,6 @@ jobs:
             turbo-${{ runner.os }}-
       - run: bun install --frozen-lockfile
       - run: bun run typecheck --filter='...[origin/main...HEAD]'
-      - run: bun run check --filter='...[origin/main...HEAD]'
+      - run: bun run check
       - run: bun run build --filter='...[origin/main...HEAD]'
       - run: bun run test --filter='...[origin/main...HEAD]'

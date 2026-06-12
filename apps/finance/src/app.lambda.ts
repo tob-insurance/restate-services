@@ -11,7 +11,14 @@ process.on("uncaughtException", (error) => {
   logger.error({ component: "FATAL", err: error }, "Uncaught Exception");
 });
 
-initPostgresClient();
+try {
+  initPostgresClient();
+} catch (error) {
+  logger.warn(
+    { component: "INIT", err: error },
+    "PostgreSQL pool init deferred — will retry on first query"
+  );
+}
 
 export const handler = createEndpointHandler({
   services: sharedServices,

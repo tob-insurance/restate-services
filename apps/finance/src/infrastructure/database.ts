@@ -5,8 +5,7 @@ import {
   type PostgresClient,
 } from "@restate-tob/postgres";
 import { TerminalError } from "@restatedev/restate-sdk";
-
-const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+import { SIX_HOURS_MS } from "../constants.js";
 
 export function getPostgresClient(): PostgresClient {
   return getGlobalPostgresClient({

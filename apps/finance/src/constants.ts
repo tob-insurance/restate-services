@@ -1,7 +1,10 @@
 export { TIMEZONE } from "@restate-tob/shared";
 export const DEFAULT_USER_ID = "adm";
 
-const scheduleTime = process.env.DAILY_CLOSING_SCHEDULE_TIME ?? "23:00";
+/** 6 hours in milliseconds — used for long-running query timeouts */
+export const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+
+const scheduleTime = process.env.DAILY_CLOSING_SCHEDULE_TIME ?? "00:00";
 const TIME_FORMAT_REGEX = /^(\d{1,2}):(\d{2})$/;
 const timeMatch = scheduleTime.match(TIME_FORMAT_REGEX);
 

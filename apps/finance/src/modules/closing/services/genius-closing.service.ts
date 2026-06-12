@@ -8,6 +8,7 @@ import { TerminalError } from "@restatedev/restate-sdk";
 import { DateTime } from "luxon";
 import type { PoolClient } from "pg";
 import { z } from "zod";
+import { SIX_HOURS_MS } from "../../../constants.js";
 import { getPostgresClient } from "../../../infrastructure/index.js";
 import type { GeniusClosingJobSubmit } from "../types.js";
 
@@ -16,8 +17,6 @@ const SubmitJobInputSchema = z.object({
   userId: UserIdSchema,
   currentTimeMillis: z.number(),
 });
-
-const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 export async function submitGeniusClosingJob(
   closingDate: string,
   currentTimeMillis: number,

@@ -10,4 +10,18 @@ export default defineConfig({
   outDir: "dist-lambda",
   clean: true,
   dts: false,
+  deps: {
+    alwaysBundle: [
+      /@restatedev\//,
+      /@restate-tob\//,
+      /luxon/,
+      /pg/,
+      /pino/,
+      /zod/,
+    ],
+    onlyBundle: false,
+  },
+  outputOptions: {
+    codeSplitting: false,
+  },
 });

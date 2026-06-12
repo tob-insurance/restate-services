@@ -97,27 +97,28 @@ jobs:
           aws lambda wait function-updated --function-name ${{ inputs.lambda-name }}
 
           # Convert .env to JSON using Node.js (handles special chars safely)
-          node -e "
-            const fs = require('fs');
-            const path = require('path');
-            const envPath = path.join('${{ github.workspace }}', 'apps', '${{ inputs.app-name }}', '.env');
-            const content = fs.readFileSync(envPath, 'utf8');
-            const vars = {};
-            content.split('\n').forEach(line => {
-              line = line.trim();
-              if (!line || line.startsWith('#')) return;
-              const eqIdx = line.indexOf('=');
-              if (eqIdx === -1) return;
-              const key = line.slice(0, eqIdx).trim();
-              let value = line.slice(eqIdx + 1).trim();
-              if ((value.startsWith('"') && value.endsWith('"')) ||
-                  (value.startsWith("'") && value.endsWith("'"))) {
-                value = value.slice(1, -1);
-              }
-              vars[key] = value;
-            });
-            fs.writeFileSync('/tmp/env.json', JSON.stringify({ Variables: vars }));
-          "
+          cat > /tmp/parse-env.js << 'SCRIPT'
+          const fs = require('fs');
+          const path = require('path');
+          const envPath = process.argv[2];
+          const content = fs.readFileSync(envPath, 'utf8');
+          const vars = {};
+          content.split('\n').forEach(line => {
+            line = line.trim();
+            if (!line || line.startsWith('#')) return;
+            const eqIdx = line.indexOf('=');
+            if (eqIdx === -1) return;
+            const key = line.slice(0, eqIdx).trim();
+            let value = line.slice(eqIdx + 1).trim();
+            if ((value.startsWith('"') && value.endsWith('"')) ||
+                (value.startsWith("'") && value.endsWith("'"))) {
+              value = value.slice(1, -1);
+            }
+            vars[key] = value;
+          });
+          fs.writeFileSync('/tmp/env.json', JSON.stringify({ Variables: vars }));
+          SCRIPT
+          node /tmp/parse-env.js "apps/${{ inputs.app-name }}/.env"
 
           aws lambda update-function-configuration \
             --function-name ${{ inputs.lambda-name }} \

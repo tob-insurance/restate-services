@@ -58,8 +58,6 @@ src/
 
 ```env
 # Database Connection String
-# Primary: DATABASE_URL (standard across all apps)
-# Fallback: POSTGRES_URL (backward compat)
 DATABASE_URL=postgresql://postgres:your_password@localhost:5432/finance?schema=financial_report
 
 # Scheduler Configuration (Jakarta Time)
